@@ -1,0 +1,30 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+.cache/
+*.pem
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.vercel
+
+# Generated
+apps/web/tsconfig.tsbuildinfo
+# Office lock files
+~$*
