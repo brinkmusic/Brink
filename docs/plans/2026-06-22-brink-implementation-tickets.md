@@ -25,6 +25,15 @@ Each ticket = one PR. Peer review required (proposal §6).
 
 ---
 
+## Local development
+
+Two processes (the live deployment stays untouched — no `vercel dev`):
+- `cd apps/web && npm run dev` → Vite frontend on `127.0.0.1:5173` (proxies `/api` → `:3001`)
+- `npm run dev:api` (repo root) → runs the `/api` serverless handlers on `:3001` from root `.env`
+
+Secrets live in git-ignored `.env` (root: DB + Supabase service + Spotify) and `apps/web/.env`
+(Vite public: Supabase URL/anon key). Tests: `npm test` (Jest) at root.
+
 ## How to run these tickets
 
 1. Each ticket lists **Depends on**. A ticket may start only when its deps are merged
@@ -99,7 +108,7 @@ flowchart LR
 
 ## EPIC B — Auth & Identity
 
-### T02 — Supabase Auth + Spotify provider token capture `feat/T02-auth-spotify`
+### T02 — Supabase Auth + Spotify provider token capture `feat/T02-auth-spotify` ✅ DONE
 **Depends on:** T01 · **Est:** 10h · **Reqs:** AUTH-1, AUTH-2, AUTH-4, AUTH-5
 - **Manual (user):** Supabase dashboard → Authentication → Providers → enable **Spotify**, paste a Spotify app's Client ID + Secret, set scopes (`user-read-recently-played user-top-read user-read-currently-playing user-read-email`), add redirect URLs.
 - **Schema:** add `supabaseUserId String @unique` to `User` (new migration) linking our row to the Supabase auth user.
