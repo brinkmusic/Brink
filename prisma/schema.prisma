@@ -10,13 +10,14 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  handle      String   @unique
-  displayName String
-  email       String?  @unique
-  avatarUrl   String?
-  spotifyId   String?  @unique
-  isSynthetic Boolean  @default(false)
+  id             String   @id @default(cuid())
+  supabaseUserId String?  @unique // links to Supabase auth.users.id; null for synthetic seed users
+  handle         String   @unique
+  displayName    String
+  email          String?  @unique
+  avatarUrl      String?
+  spotifyId      String?  @unique
+  isSynthetic    Boolean  @default(false)
   isArtist    Boolean  @default(false)
   createdAt   DateTime @default(now())
 
