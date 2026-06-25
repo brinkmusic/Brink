@@ -44,8 +44,11 @@ npm run dev:api
 3. **Never commit secrets.** `.env` (root) and `apps/web/.env` are git-ignored and stay that way.
    Secrets live only in those files locally and in Vercel/GitHub env. If you ever see a secret
    in tracked files, stop and flag it.
-4. **TDD.** Follow the `executing-plans` skill: failing test first, minimal code to pass,
-   frequent small commits. Don't execute multiple tickets at once.
+4. **TDD (expected practice).** Write a failing test first, then minimal code to pass,
+   with frequent small commits. Claude Code agents should use the `test-driven-development`
+   skill; everyone else follows the same loop by hand. This is the expected workflow, not an
+   automated guarantee — CI (`.github/workflows/ci.yml`) runs `npm test` on every PR and is
+   what actually blocks untested code. Don't execute multiple tickets at once.
 5. **Don't widen scope.** Build exactly what the ticket/requirement specifies — no extra
    features, abstractions, or error handling beyond what's asked.
 6. **Auth:** validate Supabase JWTs server-side via `getUser()` (no JWT secret). We own
