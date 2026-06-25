@@ -1,200 +1,93 @@
 # Brink — Music-Native Social
 
-A proof-of-concept social app that turns a user's real Spotify listening
-history into a feed friends can react to, plus a compatibility match-score
-between any two users.
+A social app that turns a user's real Spotify listening history into a feed friends can react
+to, plus a compatibility match-score between users and a clustering/taste analytics layer.
 
-Built as a course project for BUSA 649 at McGill University's Desautels
-Faculty of Management.
+Built as a course project for McGill University's Desautels Faculty of Management (MMA).
 
 **Team:** Andrea Vreugdenhil · Sebastian Arguedas Soley · Jonah Walker
 **Live demo:** <https://brink-self.vercel.app>
 
----
-
-## 1. What is in this repo
-
-```
-.
-├── apps/web/         ← the entire front-end (React + TypeScript + Vite)
-├── api/              ← the entire back-end (one Vercel serverless function)
-├── vercel.json       ← deploy config (static SPA + /api/* routes)
-├── .env.example      ← copy to apps/web/.env.local and fill in
-├── .gitignore
-└── README.md         ← you are here
-```
-
-There is no other hidden piece — those folders **are** the product.
-No Python, no Django, no separate server to spin up.
+> **New here?** Read [`CLAUDE.md`](./CLAUDE.md) first — it's the contributor & agent contract
+> (commands, conventions, hard rules, ownership). This README is just the high-level intro.
 
 ---
 
-## 2. Architecture in one picture
+## 1. Source of truth
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        USER'S BROWSER                                │
-│                                                                      │
-│   apps/web/index.html  ──loads──▶  src/main.tsx                      │
-│                                          │                           │
-│                                          ▼                           │
-│                                   src/App.tsx  (auth + layout)       │
-│                                          │                           │
-│                                          ▼                           │
-│                              src/pages/FeedPage.tsx                  │
-│                                          │                           │
-│                                          ▼                           │
-│                          src/components/PostCard.tsx                 │
-│                                          │                           │
-│                              click ❤  ──┘                           │
-│                                          │                           │
-│                                          ▼                           │
-│                                src/lib/backend.ts                    │
-│                                          │                           │
-│                                fetch("/api/state")                   │
-└──────────────────────────────────────────┼───────────────────────────┘
-                                           │
-                                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                  VERCEL SERVERLESS (Node 20)                         │
-│                                                                      │
-│                          api/state.js                                │
-│                              │                                       │
-│                              ▼                                       │
-│                       jsonblob.com                                   │
-│              (one shared JSON document — no signup)                  │
-└──────────────────────────────────────────────────────────────────────┘
-```
+The detailed, authoritative docs live under `docs/` — read these before planning work:
 
-### The four files that actually run the app
-
-| # | File | What it does |
-|---|---|---|
-| 1 | `apps/web/index.html` | Browser entry. One `<div id="root">` + `<script src="/src/main.tsx">`. |
-| 2 | `apps/web/src/main.tsx` | Boots React, declares every route (`/feed`, `/profile/:id`, `/artist`, `/predict`, `/analytics`, `/callback`). |
-| 3 | `apps/web/src/App.tsx` | Auth gate. If signed-out → `<LoginPage />`, otherwise renders the nav bar + the matched route. |
-| 4 | `api/state.js` | The only backend. `GET /api/state` returns all users + reactions; `POST /api/state` either upserts a user or increments a reaction count. |
+- **[`CLAUDE.md`](./CLAUDE.md)** — how we work: commands, branch/PR rules, conventions, env, ownership.
+- **`docs/plans/2026-06-22-brink-spec-design.md`** — layered spec, data model, requirement IDs.
+- **`docs/plans/2026-06-22-brink-implementation-tickets.md`** — the 27 tickets (T00–T61) and waves.
+- **`docs/decisions/adr/`** — architecture decision records (why we chose what we chose).
 
 ---
 
-## 3. Folder cheat-sheet (`apps/web/src/`)
+## 2. Architecture
 
-| Folder | Purpose |
-|---|---|
-| `pages/` | One file per route in `main.tsx` — `LoginPage`, `CallbackPage`, `FeedPage`, `ProfilePage`, `ArtistPage`, `PredictPage`, `AnalyticsPage`. |
-| `components/` | Reusable UI pieces. `PostCard.tsx` is where the heart / fire / sparkle reactions live. |
-| `lib/` | All logic, no UI: `spotify-auth.ts` (PKCE OAuth), `spotify-api.ts` (Web-API calls), `analytics.ts` (builds the `UserStats` object), `data.ts` (caching + merge with backend), `backend.ts` (the only file that talks to `/api/state`), `api.ts` (compatibility match score). |
-| `context/` | `AuthContext.tsx` — holds the Spotify access token in memory. |
-| `types/` | TypeScript shapes (`UserStats`, `RecentTrack`, etc.). |
-| `mocks/` | Fake users shown only when no real friends have signed in yet. |
+```
+Browser (React + Vite SPA, Supabase Auth)
+        │  fetch /api/*
+        ▼
+Vercel serverless functions (TypeScript, api/) ── Prisma ──▶ Supabase Postgres
+        │                                                    (Auth + Storage too)
+        ▼
+We own Spotify token refresh (encrypted at rest)
+
+Analytics: Python / scikit-learn batch job (analytics/, GitHub Actions cron) ──▶ same Postgres
+```
+
+- **`apps/web/`** — React + TypeScript + Vite SPA (frontend).
+- **`api/`** — Vercel serverless functions in TypeScript; shared helpers in `api/_lib/`.
+- **`prisma/`** — `schema.prisma` + migrations (the 14-table data model).
+- **`analytics/`** — Python pipeline, `uv`-managed (added in T30).
+- **`docs/`** — spec, tickets, and decision records.
+
+**Auth & data:** users sign in via Supabase Auth (Spotify OAuth). The backend validates the
+Supabase JWT server-side and owns long-term Spotify access by storing an encrypted refresh
+token (AES-256-GCM). The Supabase Data API is disabled — tables are reached only through Prisma.
 
 ---
 
-## 4. Running it locally
+## 3. Running it locally
 
-### Prerequisites
-- Node.js 20+
-- A Spotify developer app (Client ID — no secret needed, we use PKCE)
-- A jsonblob.com bucket ID (create one at <https://jsonblob.com> and copy the ID from the URL)
-
-### Setup
+Local dev needs **two terminals**. Do **not** run `vercel dev` (it would disturb the live
+deployment). You need a root `.env` and `apps/web/.env` — secrets are git-ignored and shared
+separately; copy `.env.example` and ask Andrea / pull from the Vercel project for the values.
 
 ```bash
-git clone https://github.com/j-jwalker/Brink.git
-cd Brink
-cp .env.example apps/web/.env.local
-# then edit apps/web/.env.local and fill in VITE_SPOTIFY_CLIENT_ID etc.
+# Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
+cd apps/web && npm install && npm run dev
 
-cd apps/web
-npm install
-npm run dev          # http://127.0.0.1:5173
+# Terminal 2 — API (serverless handlers on :3001, loads root .env)
+npm install        # first time; also wires the pre-commit hook
+npm run dev:api
 ```
 
-The front end will hit the **production** `/api/state` endpoint by default
-because that URL is same-origin in production and proxied during `vite dev`.
-If you want a local backend too:
+- **Test:** `npm test` (Jest + Supertest). Python: `cd analytics && uv run pytest`.
+- **Build frontend:** `cd apps/web && npm run build`
+- **Prisma client:** `npm run prisma:generate`
 
-```bash
-# from repo root
-npx vercel dev       # serves api/state.js at http://localhost:3000/api/state
-```
-
-### Environment variables
-
-| Variable | Where | What |
-|---|---|---|
-| `VITE_SPOTIFY_CLIENT_ID` | front end (`apps/web/.env.local`) | Spotify app Client ID |
-| `VITE_SPOTIFY_REDIRECT_URI` | front end | e.g. `http://127.0.0.1:5173/callback` for dev, `https://brink-self.vercel.app/callback` for prod |
-| `JSONBLOB_ID` | back end (Vercel project settings) | The bucket id from jsonblob.com |
-
-The Spotify app must be in **Development Mode** with each tester's email
-added under "Users and Access" until the app is submitted for review.
+See CLAUDE.md for the env-var list and the (non-interactive) migration workaround.
 
 ---
 
-## 5. Deploying
+## 4. Branching & deploying
 
-The repo is wired to Vercel. Any push to `main` triggers a deploy.
+- **`develop`** is the integration branch — every change goes through a PR into `develop`.
+- **`main`** is production — Vercel deploys it. `develop` reaches `main` only via a release PR
+  (and only once Vercel env vars are set). **Never push to `main` or `develop` directly.**
+- Branch naming: `<type>/<ticket-id>-<slug>` (e.g. `feat/T10-posts-api`). One ticket = one PR.
 
-- Build command: `cd apps/web && npm install && npm run build`
-- Output dir: `apps/web/dist`
-- `vercel.json` sends `/api/*` to the serverless function and everything else
-  to the static `index.html` (SPA routing).
-
-To deploy from a clean clone:
-
-```bash
-npm i -g vercel
-vercel link            # link to the existing brink2/brink project
-vercel --prod
-```
+CI (`.github/workflows/ci.yml`) runs tests, the web build, and a secret scan on every PR.
 
 ---
 
-## 6. How a feature flows end-to-end (example: a heart reaction)
+## 5. Contributing
 
-1. User clicks the heart on `<PostCard postId="abc" />`.
-2. `PostCard.tsx` optimistically bumps the local count and writes
-   `localStorage["brink.reacted.abc.heart"] = "1"`.
-3. It calls `reactToPost("abc", "heart", +1)` from `lib/backend.ts`.
-4. `backend.ts` does `POST /api/state` with
-   `{ action: "react", payload: { postId: "abc", kind: "heart", delta: 1 } }`.
-5. `api/state.js` (running on Vercel) fetches the current blob from
-   jsonblob.com, increments `reactions.abc.heart`, writes it back, returns
-   the new counts.
-6. Every other browser that opens the app within 30 s sees the new count
-   via `getBackendState()` (which has a 30-second in-memory cache).
-
-To add a new reaction kind, the only files you touch are `PostCard.tsx`
-(UI) and `api/state.js` (allowed kinds list). No database migration —
-the blob is schemaless.
-
----
-
-## 7. Tech choices, briefly
-
-| Layer | Pick | Why |
-|---|---|---|
-| Front-end framework | **React 18 + Vite 5** | Instant HMR, smallest learning curve for the team. |
-| Language | **TypeScript 5** | Catch shape mismatches in Spotify responses before runtime. |
-| Styling | **Tailwind CSS 3** | No CSS files to chase; design tokens live in `tailwind.config.js`. |
-| Routing | **react-router 6** | Standard. |
-| Icons | **lucide-react** | Tree-shakeable, MIT. |
-| Auth | **Spotify PKCE OAuth** | No client secret means we can ship auth purely in the browser. |
-| Back end | **Vercel Serverless Functions** | Zero ops, scales to zero, same deploy as the front end. |
-| Storage | **jsonblob.com** | Gives the POC shared state without provisioning Postgres yet. Swappable: only the four `fetch()` calls inside `api/state.js` need to change when we move to a real DB. |
-
----
-
-## 8. Contributing
-
-If you are picking this up to keep building:
-
-1. Read `apps/web/src/main.tsx` first — it is the route map.
-2. Each route is a single file in `apps/web/src/pages/`. Start there.
-3. Anything that talks to Spotify lives in `apps/web/src/lib/spotify-*.ts`.
-4. Anything cross-user (feed of friends, reactions, match score input) goes
-   through `apps/web/src/lib/backend.ts` → `api/state.js`. Don't add new
-   network code anywhere else.
-5. Run `npm run build` inside `apps/web/` before you push — Vercel will fail
-   the deploy on a TypeScript error.
+1. Read [`CLAUDE.md`](./CLAUDE.md) and the relevant ticket in `docs/plans/`.
+2. Branch off `develop`, write the test first, keep the change scoped to one ticket.
+3. Open a PR into `develop` (the template walks you through the checklist).
+4. Record architecture decisions as ADRs in `docs/decisions/adr/`; keep docs in sync in the
+   same PR.
