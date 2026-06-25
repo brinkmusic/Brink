@@ -1,21 +1,27 @@
 // Thin wrapper over the Spotify Web API. Only the endpoints Brink needs.
 // Docs: https://developer.spotify.com/documentation/web-api
 
-import { getAccessToken, logout } from "./spotify-auth";
+import { supabase } from "./supabase";
 
 const API = "https://api.spotify.com/v1";
 
+// The Spotify access token comes from the Supabase session (provider_token),
+// set when the user signs in with Spotify. Valid for ~1h within a session.
+async function spotifyToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.provider_token ?? null;
+}
+
 async function spotify<T>(path: string, params?: Record<string, string | number>): Promise<T> {
-  const token = await getAccessToken();
-  if (!token) throw new Error("Not authenticated");
+  const token = await spotifyToken();
+  if (!token) throw new Error("No Spotify access — sign in with Spotify");
   const url = new URL(`${API}${path}`);
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
   }
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 401) {
-    logout();
-    throw new Error("Spotify auth expired — please log in again");
+    throw new Error("Spotify session expired — sign in again");
   }
   if (!res.ok) {
     const body = await res.text();

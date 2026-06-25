@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd apps/web && npm install && npm run build",
+  "buildCommand": "npm run prisma:generate && cd apps/web && npm install && npm run build",
   "outputDirectory": "apps/web/dist",
-  "installCommand": "echo 'skipping root install'",
+  "installCommand": "npm install",
   "framework": null,
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },

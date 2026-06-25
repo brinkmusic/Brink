@@ -1,0 +1,199 @@
+// Brink data model. See docs/plans/2026-06-22-brink-spec-design.md §3 Layer 2.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  supabaseUserId String?  @unique // links to Supabase auth.users.id; null for synthetic seed users
+  handle         String   @unique
+  displayName    String
+  email          String?  @unique
+  avatarUrl      String?
+  spotifyId      String?  @unique
+  isSynthetic    Boolean  @default(false)
+  isArtist    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  spotifyToken SpotifyToken?
+  posts        Post[]
+  plays        Play[]
+  reactions    Reaction[]
+  comments     Comment[]
+  following    Follow[]      @relation("follower")
+  followers    Follow[]      @relation("following")
+  stats        UserStats?
+  tasteVector  TasteVector?
+  artistPosts  ArtistPost[]
+
+  clusterId String?
+  cluster   Cluster? @relation(fields: [clusterId], references: [id])
+}
+
+model SpotifyToken {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken  String // encrypted at rest (AES-GCM)
+  refreshToken String // encrypted at rest (AES-GCM)
+  expiresAt    DateTime
+  scopes       String
+}
+
+model Track {
+  spotifyId   String  @id
+  title       String
+  artistName  String
+  albumArtUrl String?
+  popularity  Int?
+
+  // audio features joined from Kaggle on spotifyId (track_id)
+  danceability  Float?
+  energy        Float?
+  valence       Float?
+  tempo         Float?
+  loudness      Float?
+  kaggleMatched Boolean @default(false)
+
+  plays Play[]
+  posts Post[]
+}
+
+model Play {
+  id       String   @id @default(cuid())
+  userId   String
+  trackId  String
+  playedAt DateTime
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [spotifyId])
+
+  @@unique([userId, playedAt]) // dedup snapshots
+  @@index([userId])
+}
+
+enum PostSource {
+  MANUAL
+  SPOTIFY
+}
+
+model Post {
+  id        String     @id @default(cuid())
+  userId    String
+  trackId   String
+  caption   String?
+  source    PostSource
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track      @relation(fields: [trackId], references: [spotifyId])
+  reactions Reaction[]
+  comments  Comment[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum ReactionType {
+  HEART
+  FIRE
+  SPARKLE
+}
+
+model Reaction {
+  id     String       @id @default(cuid())
+  postId String
+  userId String
+  type   ReactionType
+  post   Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, type]) // server-enforced dedup
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+}
+
+model ArtistPost {
+  id            String   @id @default(cuid())
+  artistUserId  String
+  imageUrl      String // Cloudinary secure URL
+  caption       String
+  linkedTrackId String?
+  createdAt     DateTime @default(now())
+  artist        User     @relation(fields: [artistUserId], references: [id], onDelete: Cascade)
+
+  @@index([artistUserId])
+}
+
+// ---- Analytics result tables (written by the Python pipeline) ----
+
+model UserStats {
+  userId        String   @id
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topTracks     Json
+  topArtists    Json
+  topGenres     Json
+  streakDays    Int
+  totalPlays30d Int
+  computedAt    DateTime
+}
+
+model TasteVector {
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vector     Json // ordered, standardized feature vector
+  coverage   Float // fraction of top tracks matched in Kaggle
+  computedAt DateTime
+}
+
+model Cluster {
+  id         String   @id
+  label      String
+  centroid   Json
+  size       Int
+  computedAt DateTime
+  users      User[]
+}
+
+model Compatibility {
+  userAId String
+  userBId String
+  score   Float // 0..1 cosine similarity
+
+  @@id([userAId, userBId])
+  @@index([userAId])
+}
+
+model ModelMetrics {
+  modelName          String   @id // "kmeans" | "popularity_regression"
+  silhouette         Float?
+  k                  Int?
+  r2                 Float?
+  rmse               Float?
+  featureImportances Json?
+  computedAt         DateTime
+}
