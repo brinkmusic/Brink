@@ -40,7 +40,10 @@ npm run dev:api
 ## Hard rules
 
 1. **Never push to `main`.** Every change goes on a branch and through a PR. One ticket = one PR.
-2. **Branch naming:** `feat/<ticket-id>-<slug>` (e.g. `feat/T10-posts-api`).
+2. **Branches:** name them `<type>/<ticket-id>-<slug>` where type is
+   `feat | fix | chore | docs | ci` (e.g. `feat/T10-posts-api`, `chore/repo-governance`).
+   Branch off the latest `main`, keep them short-lived, and **delete the branch after its PR
+   merges**. Don't let a branch drift far behind `main` — rebase or re-sync instead.
 3. **Never commit secrets.** `.env` (root) and `apps/web/.env` are git-ignored and stay that way.
    Secrets live only in those files locally and in Vercel/GitHub env. If you ever see a secret
    in tracked files, stop and flag it.
@@ -65,6 +68,16 @@ These are expectations, not automated guarantees — they set how we work.
   than a question. (Pairs with hard rule #5.)
 - **Smallest change that satisfies the ticket.** Surface follow-ups as notes; don't silently
   build them.
+- **Reuse before reinventing.** Search for an existing helper before writing a new one. Shared
+  logic lives in `api/_lib/` (backend) and `apps/web/src` shared modules (frontend) — extend
+  or import it; don't copy-paste or write a second version of something that already exists. If
+  you find duplication, factor it out as part of the change.
+- **Comments: explain *why*, never *what*.** No docstrings or boilerplate comment blocks. Code
+  should read on its own; add a comment only when the reason for something is non-obvious. Use
+  JSDoc only on exported `api/_lib/` helpers where the types don't fully convey the contract.
+- **Guard against regressions.** A bug fix starts with a failing test that reproduces the bug,
+  then the fix. Changes to shared code (`api/_lib/`, `prisma/schema.prisma`) have a wide blast
+  radius — call out in the PR what depends on them, and run the full suite (`npm test`).
 - **Commit messages:** Conventional Commits — `type(scope): summary`
   (`feat`, `fix`, `chore`, `docs`, `ci`, `test`, `refactor`). Scope is usually the ticket id,
   e.g. `feat(T10): add posts endpoint`.
@@ -103,12 +116,18 @@ To make a schema change:
 - **Getting the values (onboarding):** `.env` files are git-ignored and never shared in the
   repo. Copy `.env.example`, then get the real secret values from the Vercel/GitHub project
   env or ask Andrea. Don't paste secrets into chat, issues, or commits.
+- **Git hooks:** running `npm install` points git at `.githooks/` (a pre-commit secret guard).
+  If you skipped install, run `git config core.hooksPath .githooks` once.
 
-## Ownership (CODEOWNERS intent)
+## Ownership & review (CODEOWNERS intent)
 
 - **Andrea** — backend / API / Prisma / auth (`api/`, `prisma/`).
 - **Sebastian** — frontend (`apps/web/`).
 - **Jonah** — analytics (`analytics/`).
+
+The owner of an area is the default reviewer for PRs touching it. **Auth and crypto changes**
+(`api/_lib/auth.ts`, `api/_lib/crypto.ts`, `api/_lib/supabase.ts`, anything touching tokens or
+`TOKEN_ENC_KEY`) need a deliberate second review — don't self-merge them.
 
 ## Watch-outs
 

@@ -8,7 +8,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "dev:api": "node --env-file=.env --import tsx scripts/dev-api.ts",
-    "test": "jest"
+    "test": "jest",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

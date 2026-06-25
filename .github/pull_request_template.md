@@ -12,6 +12,8 @@
 
 - [ ] Branch is named `feat/<ticket-id>-<slug>` and targets `main` (never pushed to `main` directly).
 - [ ] Scope matches exactly one ticket — no extra features, abstractions, or error handling.
+- [ ] The ticket's acceptance criteria are met.
+- [ ] Reused existing helpers instead of duplicating logic where one already existed.
 - [ ] Tests added/updated and `npm test` passes (Python: `uv run pytest`).
 - [ ] Frontend builds (`cd apps/web && npm run build`) and lints (`npm run lint`) if `apps/web/` changed.
 - [ ] No secrets committed — `.env` files stay git-ignored.
@@ -26,3 +28,6 @@
 ## Notes for reviewer
 
 <!-- Anything else: tradeoffs, follow-ups you deliberately left out. -->
+
+<!-- After merge: delete the branch. -->
+
