@@ -10,7 +10,7 @@
 
 ## Checklist
 
-- [ ] Branch is named `feat/<ticket-id>-<slug>` and targets `main` (never pushed to `main` directly).
+- [ ] Branch is named `<type>/<ticket-id>-<slug>` and targets `develop` (never pushed to `develop`/`main` directly).
 - [ ] Scope matches exactly one ticket — no extra features, abstractions, or error handling.
 - [ ] The ticket's acceptance criteria are met.
 - [ ] Reused existing helpers instead of duplicating logic where one already existed.

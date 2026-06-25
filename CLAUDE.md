@@ -39,11 +39,14 @@ npm run dev:api
 
 ## Hard rules
 
-1. **Never push to `main`.** Every change goes on a branch and through a PR. One ticket = one PR.
+1. **`develop` is the integration branch; `main` is production. Never push to either directly.**
+   Every change goes on a branch and through a PR **into `develop`**. One ticket = one PR.
+   `main` only receives `develop` via a release PR — and only once the Vercel env vars are set,
+   because Vercel deploys production from `main`.
 2. **Branches:** name them `<type>/<ticket-id>-<slug>` where type is
    `feat | fix | chore | docs | ci` (e.g. `feat/T10-posts-api`, `chore/repo-governance`).
-   Branch off the latest `main`, keep them short-lived, and **delete the branch after its PR
-   merges**. Don't let a branch drift far behind `main` — rebase or re-sync instead.
+   Branch off the latest `develop`, keep them short-lived, and **delete the branch after its PR
+   merges**. Don't let a branch drift far behind `develop` — rebase or re-sync instead.
 3. **Never commit secrets.** `.env` (root) and `apps/web/.env` are git-ignored and stay that way.
    Secrets live only in those files locally and in Vercel/GitHub env. If you ever see a secret
    in tracked files, stop and flag it.
