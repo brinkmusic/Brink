@@ -15,8 +15,14 @@
 - [ ] Tests added/updated and `npm test` passes (Python: `uv run pytest`).
 - [ ] Frontend builds (`cd apps/web && npm run build`) and lints (`npm run lint`) if `apps/web/` changed.
 - [ ] No secrets committed — `.env` files stay git-ignored.
-- [ ] Any architecture decision or deviation from the proposal is recorded as an ADR in `docs/decisions/adr/`.
+- [ ] Docs updated in this PR: ADR for any decision/deviation (`docs/decisions/adr/`), spec/ticket
+      changes (`docs/plans/`), and `CLAUDE.md` if commands/env/conventions/status changed.
+
+## Assumptions & risks
+
+<!-- What did you assume or guess? What could break, or what should the reviewer watch?
+     If the ticket was unclear, say what you decided and why (or that you asked first). -->
 
 ## Notes for reviewer
 
-<!-- Anything the reviewer should know: tradeoffs, follow-ups, things you're unsure about. -->
+<!-- Anything else: tradeoffs, follow-ups you deliberately left out. -->

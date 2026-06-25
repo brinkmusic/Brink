@@ -54,6 +54,30 @@ npm run dev:api
 6. **Auth:** validate Supabase JWTs server-side via `getUser()` (no JWT secret). We own
    Spotify token refresh; tokens are encrypted at rest (AES-256-GCM, `TOKEN_ENC_KEY`).
 
+## Working norms (expected of humans and agents)
+
+These are expectations, not automated guarantees — they set how we work.
+
+- **State assumptions and risks explicitly** — in the PR description and when proposing a
+  plan. If you had to guess at anything, say so.
+- **Stop on ambiguity.** If a ticket or requirement is underspecified or unclear, ask —
+  don't invent scope, data shapes, or behavior to fill the gap. A wrong guess costs more
+  than a question. (Pairs with hard rule #5.)
+- **Smallest change that satisfies the ticket.** Surface follow-ups as notes; don't silently
+  build them.
+- **Commit messages:** Conventional Commits — `type(scope): summary`
+  (`feat`, `fix`, `chore`, `docs`, `ci`, `test`, `refactor`). Scope is usually the ticket id,
+  e.g. `feat(T10): add posts endpoint`.
+- **Keep docs in sync in the same PR.** Code and its docs change together — stale docs are a
+  bug. When a PR changes behavior, update the relevant doc in the same PR:
+  - Architecture/decision changes -> add or supersede an ADR in `docs/decisions/adr/`.
+  - Spec/ticket scope changes -> update `docs/plans/`.
+  - Commands, env, conventions, or status -> update this file (`CLAUDE.md`).
+- **ADRs are append-only history.** Never rewrite or delete an accepted ADR. To change a past
+  decision, write a new ADR and set the old one's status to
+  `Superseded by [ADR-NNNN](NNNN-...md)`. This is *why* the log doesn't go stale: history is
+  preserved, the current decision is always the latest non-superseded ADR.
+
 ## Database migrations (important workaround)
 
 `prisma migrate dev` is **interactive and will hang** in this environment — do not use it.
@@ -76,6 +100,9 @@ To make a schema change:
 - Root `.env`: `DATABASE_URL`/`DIRECT_URL` (Supabase pooler 6543/5432), `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`, `SPOTIFY_CLIENT_ID`/`SECRET`, `TOKEN_ENC_KEY`.
 - `apps/web/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+- **Getting the values (onboarding):** `.env` files are git-ignored and never shared in the
+  repo. Copy `.env.example`, then get the real secret values from the Vercel/GitHub project
+  env or ask Andrea. Don't paste secrets into chat, issues, or commits.
 
 ## Ownership (CODEOWNERS intent)
 
