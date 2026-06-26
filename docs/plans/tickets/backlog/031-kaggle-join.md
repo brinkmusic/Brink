@@ -7,6 +7,7 @@ tags: [analytics, python, kaggle, data]
 blocked_by: [030]
 blocks: [032, 034, 036, 038]
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: Kaggle ingest + audio-feature join (T31)
@@ -35,7 +36,7 @@ Load the Kaggle audio-features CSV, join to `Track` on `spotifyId` (= Kaggle `tr
 - **Business rule:** coverage % is computed and logged (reported, never silently dropped — ADR-0004).
 
 ## Current State (on `develop`)
-- `prisma/schema.prisma` `Track` has `danceability, energy, valence, tempo, loudness, popularity, kaggleMatched` columns ready.
+- `backend/app/models.py` `Track` has `danceability, energy, valence, tempo, loudness, popularity, kaggleMatched` columns ready.
 - `analytics/db.py` exists from T30.
 - No `ingest_kaggle.py` yet.
 

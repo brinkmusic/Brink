@@ -7,6 +7,7 @@ tags: [frontend, analytics, cleanup]
 blocked_by: [034, 036]
 blocks: [060]
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Analytics page on real tables + fold Predict (T45)
@@ -31,7 +32,7 @@ The analytics page currently shows hardcoded silhouette/feature-importance numbe
 - Fitting the models (T34/T36); profile page (T44).
 
 ## Validation & authz (ADR-0007)
-- Any new metrics-read endpoint passes `requireUser` + zod like every API route; predict input validated.
+- Any new metrics-read endpoint passes `require_user` + Pydantic like every API route; predict input validated. (The linear-predict math runs client-side in the browser from the artifact coefficients the endpoint exposes — the frontend stays TS.)
 
 ## Current State (on `develop`)
 - `apps/web/src/pages/AnalyticsPage.tsx` (hardcoded silhouette/feature-importance, `CLUSTER_POINTS`), `pages/PredictPage.tsx` (fabricated) both present.
@@ -42,7 +43,7 @@ The analytics page currently shows hardcoded silhouette/feature-importance numbe
 |------|--------|---------|
 | `apps/web/src/pages/AnalyticsPage.tsx` | MODIFY | read real metrics/clusters; remove hardcoded values; add predict widget |
 | `apps/web/src/pages/PredictPage.tsx` | DELETE | fabricated page removed |
-| `api/analytics/metrics.ts` | CREATE | thin authorized reader for `ModelMetrics`/`Cluster` (if no existing path) |
+| `backend/app/routers/analytics.py` | CREATE | thin authorized reader for `ModelMetrics`/`Cluster` (if no existing path) |
 | `apps/web/src/App routes` | MODIFY | drop the `/predict` route |
 
 ## Testing Checklist

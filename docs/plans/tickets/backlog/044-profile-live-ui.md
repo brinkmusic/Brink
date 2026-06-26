@@ -7,6 +7,7 @@ tags: [frontend, profile, analytics, spotify]
 blocked_by: [014, 020]
 blocks: [060]
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Profile page live + now-playing badge (T44)

@@ -7,6 +7,7 @@ tags: [analytics, python, data, synthetic]
 blocked_by: [030, 031]
 blocks: []
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: Synthetic user seeding — genre-coherent personas (T32)
@@ -37,7 +38,7 @@ The draft said "varied taste profiles." **ADR-0004 C3 is more specific:** build 
 - **Business rule:** synthetic data is disclosed (demo data) — recorded for the report, not hidden.
 
 ## Current State (on `develop`)
-- `prisma/schema.prisma`: `User.isSynthetic Boolean @default(false)`; `Play` with `@@unique([userId, playedAt])`.
+- `backend/app/models.py`: `User.isSynthetic` (default false); `Play` with a unique constraint on `(userId, playedAt)`.
 - `analytics/db.py` (T30) + Kaggle-joined `Track` features (T31) available.
 - No `seed_users.py` yet.
 

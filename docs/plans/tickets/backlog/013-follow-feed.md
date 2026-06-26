@@ -7,6 +7,7 @@ tags: [backend, api, feed, follow, validation]
 blocked_by: [010]
 blocks: [014, 041, 043]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Follow graph + Feed (T13)
@@ -19,11 +20,11 @@ The feed is the app's home surface, and it must be driven by a real follow graph
 
 ## Source
 - Spec reqs: **BE-4** (follow), **BE-7** (feed)
-- ADRs: [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md)
+- ADRs: [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md)
 
 ## Scope
 ### In Scope
-- `POST /api/follow/[userId]` / `DELETE /api/follow/[userId]` — follow/unfollow.
+- `POST /api/follow/{userId}` / `DELETE /api/follow/{userId}` — follow/unfollow.
 - `GET /api/feed` — posts from followees + self, newest-first, with `Track`, reaction counts (per type), comment count, and the viewer's reaction flags.
 - No-follow case: feed shows self (+ optional suggestions).
 
@@ -32,24 +33,24 @@ The feed is the app's home surface, and it must be driven by a real follow graph
 - Profile API (T14).
 
 ## Validation & authz (ADR-0007 — required on this ticket)
-- **Schema (zod):** `[userId]` path param validated; feed query params (pagination, if any) validated.
+- **Schema (Pydantic):** `{userId}` path param validated; feed query params (pagination, if any) validated.
 - **Business rule:** cannot follow yourself; following an unknown user → 404.
-- **Authorization:** `requireUser` gates all three routes; `followerId` is the authenticated user, never client-supplied.
+- **Authorization:** `require_user` gates all three routes; `followerId` is the authenticated user, never client-supplied.
 - **Integrity:** `Follow` composite PK `@@id([followerId, followingId])` makes duplicate follows structurally impossible; FKs cascade.
 - **Rate limiting:** follow writes reuse the per-user cap helper from T10.
 
 ## Current State (on `develop`)
-- `prisma/schema.prisma`: `Follow { followerId, followingId, createdAt }` with `@@id([followerId, followingId])`, `@@index([followingId])`; `Post` with `@@index([createdAt])`, relations to `reactions`/`comments`/`track`.
-- `requireUser`, `ok`/`fail` helpers exist.
-- No `api/follow/*` or `api/feed.ts` yet. Feed reads `Post` rows from T10 (`blocked_by: [010]`).
+- `backend/app/models.py`: `Follow { followerId, followingId, createdAt }` with a composite PK `(followerId, followingId)`, index on `followingId`; `Post` with an index on `createdAt`, relations to `reactions`/`comments`/`track`.
+- `require_user` (`backend/app/deps.py`), `ok`/`fail` (`backend/app/responses.py`) helpers exist.
+- No follow/feed routers (`backend/app/routers/follow.py`, `backend/app/routers/feed.py`) yet. Feed reads `Post` rows from T10 (`blocked_by: [010]`).
 
 ## Files to Create/Modify
 | File | Action | Purpose |
 |------|--------|---------|
-| `api/follow/[userId].ts` | CREATE | `POST`/`DELETE` follow |
-| `api/feed.ts` | CREATE | `GET` feed with counts + viewer reaction state |
-| `api/__tests__/follow.test.ts` | CREATE | follow endpoint tests |
-| `api/__tests__/feed.test.ts` | CREATE | feed query tests |
+| `backend/app/routers/follow.py` | CREATE | `POST`/`DELETE` follow |
+| `backend/app/routers/feed.py` | CREATE | `GET` feed with counts + viewer reaction state |
+| `backend/tests/test_follow.py` | CREATE | follow endpoint tests |
+| `backend/tests/test_feed.py` | CREATE | feed query tests |
 
 ## Testing Checklist
 - [ ] follow without a session → 401
@@ -67,4 +68,4 @@ The feed is the app's home surface, and it must be driven by a real follow graph
 - [x] Scope boundaries defined
 
 ## Notes
-Branch off `develop` as `feat/T13-follow-feed`; one PR back into `develop` (never `main`). The feed query is the heaviest read path — make sure it uses the `@@index([createdAt])` / `@@index([followingId])` indexes and batches counts (avoid N+1 per post).
+Branch off `develop` as `feat/T13-follow-feed`; one PR back into `develop` (never `main`). The feed query is the heaviest read path — make sure it uses the `createdAt` / `followingId` indexes and batches counts (avoid N+1 per post).

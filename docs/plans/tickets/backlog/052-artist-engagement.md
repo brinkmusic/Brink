@@ -7,6 +7,7 @@ tags: [backend, frontend, artist, engagement]
 blocked_by: [050, 011, 012]
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Artist engagement analytics (T52)
@@ -38,7 +39,7 @@ Per-`ArtistPost` engagement (reaction/comment counts + views) surfaced to the ow
 ## Files to Create/Modify
 | File | Action | Purpose |
 |------|--------|---------|
-| `api/artist/engagement.ts` | CREATE | per-post engagement for the owning artist |
+| `backend/app/routers/artist.py` | MODIFY | add per-post engagement route for the owning artist |
 | `apps/web/src/pages/ArtistPage.tsx` | MODIFY | render engagement |
 
 ## Testing Checklist

@@ -7,6 +7,7 @@ tags: [auth, supabase, spotify, crypto]
 blocked_by: []
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Supabase Auth + Spotify provider token capture (T02)

@@ -7,6 +7,7 @@ tags: [auth, frontend, email, supabase]
 blocked_by: []
 blocks: []
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Email (handle) accounts via Supabase OTP (T03)
@@ -19,7 +20,7 @@ Add an email OTP sign-in path (Supabase `signInWithOtp`) and surface it in `Logi
 
 ## Source
 - Spec reqs: **AUTH-3** (handle accounts), **AUTH-6**
-- ADRs: [ADR-0005](../../../decisions/adr/0005-identity.md) (Supabase Auth; email magic-link/OTP for handle accounts) · [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md)
+- ADRs: [ADR-0005](../../../decisions/adr/0005-identity.md) (Supabase Auth; email magic-link/OTP for handle accounts) · [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md)
 
 ## Scope
 ### In Scope
@@ -33,13 +34,13 @@ Add an email OTP sign-in path (Supabase `signInWithOtp`) and surface it in `Logi
 - **User-chosen handle/display-name signup form** — decided cut: handles are **auto-derived** by `requireUser`. No `SignupPage`, no handle-set endpoint. Users can rename later (separate ticket if ever needed).
 
 ## Validation & authz (ADR-0007)
-- **Authorization:** our sync still verifies the Supabase JWT server-side via `getUser()` in `requireUser` (Supabase owns the OTP exchange itself).
-- **Business rule:** handle uniqueness is already enforced by `@unique handle` plus the derive-and-retry loop in `requireUser` — no new logic needed.
-- **Integrity:** `User.handle`, `User.email`, `User.supabaseUserId` are each `@unique` in `prisma/schema.prisma`.
+- **Authorization:** our sync still verifies the Supabase JWT server-side via `get_user()` in `require_user` (Supabase owns the OTP exchange itself).
+- **Business rule:** handle uniqueness is already enforced by the unique `handle` constraint plus the derived-handle policy in `require_user` — no new logic needed.
+- **Integrity:** `User.handle`, `User.email`, `User.supabaseUserId` are each unique in `backend/app/models.py`.
 
 ## Current State (on `develop`)
 - `apps/web/src/context/AuthContext.tsx` — `login` is Spotify OAuth only; `loadProfile` already tolerates email-only users (no Spotify provider token).
-- `api/_lib/auth.ts` — `requireUser` auto-creates a handle `User` (derived unique handle, null `spotifyId`) on first login.
+- `backend/app/deps.py` — `require_user` auto-creates a handle `User` (derived unique handle, null `spotifyId`) on first login.
 - `apps/web/src/pages/LoginPage.tsx` — Spotify-only UI; no email entry. No `SignupPage.tsx`.
 - No `lib/spotify-auth.ts` exists (the draft's deletion target); PKCE was already removed in T02.
 
@@ -48,7 +49,7 @@ Add an email OTP sign-in path (Supabase `signInWithOtp`) and surface it in `Logi
 |------|--------|---------|
 | `apps/web/src/context/AuthContext.tsx` | MODIFY | add `loginWithEmail(email)` via `signInWithOtp` |
 | `apps/web/src/pages/LoginPage.tsx` | MODIFY | email input + "check your inbox" state |
-| `api/__tests__/auth.test.ts` | MODIFY | assert `requireUser` creates a handle user (null `spotifyId`) for an email JWT |
+| `backend/tests/test_auth.py` | MODIFY | assert `require_user` creates a handle user (null `spotifyId`) for an email JWT |
 
 ## Testing Checklist
 - [ ] email OTP sign-in returns to the app authenticated

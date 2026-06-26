@@ -7,6 +7,7 @@ tags: [cleanup, infra, secrets]
 blocked_by: []
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Secret hygiene & repo cleanup (T00)

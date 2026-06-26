@@ -7,6 +7,7 @@ tags: [infra, prisma, supabase, serverless, testing]
 blocked_by: []
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Supabase + Prisma + serverless TS + test tooling (T01)

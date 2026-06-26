@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02 so far).
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04 so far).
 
 ## How these relate to the rest of the docs
 
@@ -15,7 +15,7 @@ This directory **supersedes** the old single-file `2026-06-22-brink-implementati
 
 Each file has YAML frontmatter + sections:
 
-- **frontmatter** — `status`, `priority`, `complexity`, `category`, `tags`, `blocked_by`, `blocks`.
+- **frontmatter** — `status`, `priority`, `complexity`, `category`, `owner`, `tags`, `blocked_by`, `blocks`. `owner` is the default reviewer/assignee by code area: **Andrea** (backend — `backend/`, auth, Spotify, DB), **Jonah** (analytics — `analytics/`), **Sebastian** (frontend — `apps/web/`).
 - **Rationale / Summary** — why it exists, what it does.
 - **Source** — requirement IDs + ADRs.
 - **Scope (In / Out)** — explicit boundaries.
@@ -54,6 +54,18 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 | 8 | `061` |
 
 Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-profile spine).
+
+### Backend migration spine (TS/Vercel → FastAPI/Render)
+
+Per [ADR-0010](../../decisions/adr/0010-fastapi-render-backend.md), the backend moves from
+TypeScript/Vercel to FastAPI/Python on Render. This is a sequential chain, not a parallel wave:
+
+`004 (done) → 005 → 006 → 007 → 008`
+
+`004` scaffold · `005` SQLModel + Alembic · `006` auth/crypto port · `007` Render cutover ·
+`008` retire the TS backend + re-point the `01x`/`05x` API tickets. Until `007` lands, the TS
+`api/` still serves production; the social-API tickets (`010`–`014`, `050`, `052`) are
+re-pointed to the FastAPI pattern in `008`.
 
 ## Working a ticket
 

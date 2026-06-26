@@ -7,6 +7,7 @@ tags: [analytics, python, regression, ml]
 blocked_by: [031, 039]
 blocks: [038, 045]
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: Popularity regression + coefficient export (T36)
