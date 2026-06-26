@@ -6,18 +6,30 @@ touching the repo.
 
 ## What Brink is
 
-React/Vite SPA + Vercel serverless functions (TypeScript, Prisma) + **Supabase**
-(Postgres + Auth + Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
+React/Vite SPA + an **API backend** + **Supabase** (Postgres + Auth + Storage) + a
+Python/scikit-learn analytics batch job (GitHub Actions cron).
+
+> **⚠ Backend migration in progress ([ADR-0010](docs/decisions/adr/0010-fastapi-render-backend.md)).**
+> The API is moving from **TypeScript / Vercel serverless + Prisma** to **FastAPI / Python on
+> Render + SQLModel / Alembic** — the team works in Python, not TS. The new backend lives in
+> `backend/` (scaffolded, T04 ✅); the **legacy TS `api/` still serves production** until the
+> cutover (T07). **New backend work targets `backend/` (FastAPI), not `api/`.** Frontend stays
+> React/TS; Supabase is unchanged. Migration spine: `004 → 005 → 006 → 007 → 008` in
+> `docs/plans/tickets/`. This guide still documents the TS path where it's the live one; CLAUDE.md
+> gets its full flip to FastAPI in **T08**.
 
 **Source of truth — read these before planning any work:**
-- `docs/plans/requirements.md` — requirement catalog (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`) + requirement→ticket traceability. Data model: `prisma/schema.prisma`. Decisions: `docs/decisions/`.
+- `docs/plans/requirements.md` — requirement catalog (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`) + requirement→ticket traceability. Data model: `prisma/schema.prisma` (moving to `backend/app/models.py` as SQLModel in T05). Decisions: `docs/decisions/`.
 - `docs/plans/tickets/` — one file per ticket (`backlog/`, `completed/`), derived from the ADRs in `docs/decisions/`. Start at `docs/plans/tickets/README.md` for the dependency waves and reading guide.
 
 ## Layout
 
-- `api/` — Vercel serverless functions (TypeScript). Shared helpers in `api/_lib/`.
-- `apps/web/` — React/Vite SPA frontend.
-- `prisma/` — `schema.prisma` + migrations.
+- `backend/` — **FastAPI app (Python, `uv`-managed)** — the API's new home (ADR-0010). App code
+  in `backend/app/`, tests in `backend/tests/`, migrations in `backend/alembic/` (from T05).
+- `api/` — *legacy* Vercel serverless functions (TypeScript), shared helpers in `api/_lib/`.
+  Still serves production until the T07 cutover; removed wholesale in T08.
+- `apps/web/` — React/Vite SPA frontend (stays TypeScript).
+- `prisma/` — `schema.prisma` + migrations (legacy; replaced by SQLModel/Alembic in T05, removed in T08).
 - `analytics/` — Python pipeline (`uv`-managed). Created in T30.
 - `docs/plans/` — spec + tickets (source of truth above).
 
@@ -29,13 +41,16 @@ Local dev needs **two terminals** (the live deployment stays untouched — do no
 # Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
 cd apps/web && npm run dev
 
-# Terminal 2 — API (serverless handlers on :3001, loads root .env)
-npm run dev:api
+# Terminal 2 — API on :3001 (Vite proxies /api -> :3001)
+#   FastAPI (new backend, ADR-0010 — use this for backend work):
+cd backend && uv run uvicorn app.main:app --reload --port 3001
+#   legacy TS handlers (still serving until T07): npm run dev:api
 ```
 
-- **Test:** `npm test` (root, Jest + Supertest). Python: `cd analytics && uv run pytest`.
+- **Test:** `cd backend && uv run pytest` (FastAPI); `npm test` (root, Jest + Supertest — legacy
+  TS, until T08). Analytics: `cd analytics && uv run pytest`.
 - **Build frontend:** `cd apps/web && npm run build` · **Lint:** `npm run lint`.
-- **Prisma generate:** `npm run prisma:generate`.
+- **Prisma generate (legacy):** `npm run prisma:generate`.
 
 ## Hard rules
 
@@ -94,8 +109,13 @@ These are expectations, not automated guarantees — they set how we work.
   `Superseded by [ADR-NNNN](NNNN-...md)`. This is *why* the log doesn't go stale: history is
   preserved, the current decision is always the latest non-superseded ADR.
 
-## Database migrations (important workaround)
+## Database migrations
 
+**New backend work (T05+) uses SQLModel + Alembic** — edit `backend/app/models.py`, then
+`cd backend && uv run alembic revision --autogenerate -m "..."` and `uv run alembic upgrade head`.
+This replaces the Prisma workaround below.
+
+**Legacy (Prisma) — only while the TS `api/` is still live (removed in T08):**
 `prisma migrate dev` is **interactive and will hang** in this environment — do not use it.
 To make a schema change:
 
@@ -124,13 +144,15 @@ To make a schema change:
 
 ## Ownership & review (CODEOWNERS intent)
 
-- **Andrea** — backend / API / Prisma / auth (`api/`, `prisma/`).
+- **Andrea** — backend / API / auth / DB (`backend/`, legacy `api/`, `prisma/`).
 - **Sebastian** — frontend (`apps/web/`).
 - **Jonah** — analytics (`analytics/`).
 
-The owner of an area is the default reviewer for PRs touching it. **Auth and crypto changes**
-(`api/_lib/auth.ts`, `api/_lib/crypto.ts`, `api/_lib/supabase.ts`, anything touching tokens or
-`TOKEN_ENC_KEY`) need a deliberate second review — don't self-merge them.
+The owner of an area is the default reviewer for PRs touching it (every ticket also has an
+`owner` in its frontmatter). **Auth and crypto changes** — the FastAPI successors
+`backend/app/deps.py`, `backend/app/security/crypto.py`, `backend/app/security/supabase.py` (and
+their legacy TS counterparts `api/_lib/auth.ts`/`crypto.ts`/`supabase.ts`), anything touching
+tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge them.
 
 ## Watch-outs
 
@@ -138,5 +160,7 @@ The owner of an area is the default reviewer for PRs touching it. **Auth and cry
   Server/long-term Spotify access must go through our stored refresh token (snapshot job, T21).
 - `tsx` struggles importing some `.ts` files with top-level await from ad-hoc scripts; prefer
   `.mjs` for throwaway checks, or `node --env-file=.env --import tsx`.
-- Status: T00, T01, T02 are done. Auth verified end-to-end (Spotify login creates a `public.User`
-  row + stores the encrypted refresh token).
+- Status: T00, T01, T02, **T04** done. Auth verified end-to-end (Spotify login creates a
+  `public.User` row + stores the encrypted refresh token). **Backend migration to FastAPI/Render
+  underway (ADR-0010, PR #4 merged)** — next is **T05** (SQLModel + Alembic), then T06 auth/crypto
+  port. The TS `api/` still serves the live app until the T07 cutover.
