@@ -1,6 +1,6 @@
 # ADR-0002: API and persistence on Vercel serverless + Supabase + Prisma
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0010](0010-fastapi-render-backend.md)
 **Date:** 2026-06-22
 **First captured as:** spec decision-log row A
 

@@ -23,6 +23,19 @@ jobs:
           DIRECT_URL: postgresql://user:pass@localhost:5432/db
       - run: npm test
 
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run pytest -q
+
   web:
     runs-on: ubuntu-latest
     defaults:
