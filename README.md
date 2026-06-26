@@ -18,8 +18,8 @@ Built as a course project for McGill University's Desautels Faculty of Managemen
 The detailed, authoritative docs live under `docs/` — read these before planning work:
 
 - **[`CLAUDE.md`](./CLAUDE.md)** — how we work: commands, branch/PR rules, conventions, env, ownership.
-- **`docs/plans/2026-06-22-brink-spec-design.md`** — layered spec, data model, requirement IDs.
-- **`docs/plans/2026-06-22-brink-implementation-tickets.md`** — the 27 tickets (T00–T61) and waves.
+- **[`docs/plans/requirements.md`](./docs/plans/requirements.md)** — requirement catalog (`AUTH-*`, `BE-*`, …) + requirement→ticket traceability. (Data model: `prisma/schema.prisma`.)
+- **[`docs/plans/tickets/`](./docs/plans/tickets/)** — one file per ticket (`backlog/`, `completed/`) + a dependency-waves index.
 - **`docs/decisions/adr/`** — architecture decision records (why we chose what we chose).
 
 ---
@@ -42,7 +42,7 @@ Analytics: Python / scikit-learn batch job (analytics/, GitHub Actions cron) ─
 - **`api/`** — Vercel serverless functions in TypeScript; shared helpers in `api/_lib/`.
 - **`prisma/`** — `schema.prisma` + migrations (the 14-table data model).
 - **`analytics/`** — Python pipeline, `uv`-managed (added in T30).
-- **`docs/`** — spec, tickets, and decision records.
+- **`docs/`** — requirements, tickets, and decision records.
 
 **Auth & data:** users sign in via Supabase Auth (Spotify OAuth). The backend validates the
 Supabase JWT server-side and owns long-term Spotify access by storing an encrypted refresh
