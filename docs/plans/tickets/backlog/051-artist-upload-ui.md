@@ -7,6 +7,7 @@ tags: [frontend, artist, upload, validation]
 blocked_by: [050]
 blocks: []
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Artist upload UI + validation (T51)

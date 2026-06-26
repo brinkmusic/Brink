@@ -7,6 +7,7 @@ tags: [infra, deploy, render, vercel, migration]
 blocked_by: [006]
 blocks: [008]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Chore: Deploy FastAPI to Render + Vercel /api cutover (T07)

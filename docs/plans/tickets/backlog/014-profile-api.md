@@ -7,6 +7,7 @@ tags: [backend, api, profile, analytics, validation]
 blocked_by: [013, 033, 035]
 blocks: [044]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Profile API — live stats + on-demand inference (T14, absorbs T37)

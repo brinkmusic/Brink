@@ -7,6 +7,7 @@ tags: [backend, python, inference, analytics, validation]
 blocked_by: [034, 039]
 blocks: [014, 035]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: On-demand inference core (Python) — taste vector + cluster assignment (T33)

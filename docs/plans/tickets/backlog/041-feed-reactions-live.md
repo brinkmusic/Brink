@@ -7,6 +7,7 @@ tags: [frontend, feed, reactions]
 blocked_by: [010, 011, 013]
 blocks: [060]
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Feed + reactions live (T41)

@@ -15,7 +15,7 @@ This directory **supersedes** the old single-file `2026-06-22-brink-implementati
 
 Each file has YAML frontmatter + sections:
 
-- **frontmatter** — `status`, `priority`, `complexity`, `category`, `tags`, `blocked_by`, `blocks`.
+- **frontmatter** — `status`, `priority`, `complexity`, `category`, `owner`, `tags`, `blocked_by`, `blocks`. `owner` is the default reviewer/assignee by code area: **Andrea** (backend — `backend/`, auth, Spotify, DB), **Jonah** (analytics — `analytics/`), **Sebastian** (frontend — `apps/web/`).
 - **Rationale / Summary** — why it exists, what it does.
 - **Source** — requirement IDs + ADRs.
 - **Scope (In / Out)** — explicit boundaries.

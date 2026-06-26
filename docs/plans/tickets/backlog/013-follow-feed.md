@@ -7,6 +7,7 @@ tags: [backend, api, feed, follow, validation]
 blocked_by: [010]
 blocks: [014, 041, 043]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Follow graph + Feed (T13)

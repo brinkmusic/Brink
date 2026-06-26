@@ -7,6 +7,7 @@ tags: [backend, frontend, artist, engagement]
 blocked_by: [050, 011, 012]
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Artist engagement analytics (T52)

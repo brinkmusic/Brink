@@ -7,6 +7,7 @@ tags: [frontend, comments]
 blocked_by: [012]
 blocks: []
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Comments UI (T42)

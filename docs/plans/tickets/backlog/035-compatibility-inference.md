@@ -7,6 +7,7 @@ tags: [backend, python, inference, compatibility]
 blocked_by: [033]
 blocks: [014]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Compatibility on read (cosine) (T35)

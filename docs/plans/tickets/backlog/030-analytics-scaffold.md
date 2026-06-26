@@ -7,6 +7,7 @@ tags: [analytics, python, uv, infra]
 blocked_by: []
 blocks: [031, 032]
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: Python analytics scaffold + DB access (T30)

@@ -7,6 +7,7 @@ tags: [backend, api, posts, validation]
 blocked_by: []
 blocks: [011, 012, 013, 021, 040, 041]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Posts API + Track upsert (T10)

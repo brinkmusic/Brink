@@ -7,6 +7,7 @@ tags: [spotify, snapshots, scheduling, github-actions]
 blocked_by: [010]
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Scheduled play snapshots, triggered by GitHub Actions (T21)

@@ -7,6 +7,7 @@ tags: [backend, api, spotify, validation]
 blocked_by: []
 blocks: [044]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Currently-playing endpoint (T20)

@@ -7,6 +7,7 @@ tags: [frontend, analytics, cleanup]
 blocked_by: [034, 036]
 blocks: [060]
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Analytics page on real tables + fold Predict (T45)

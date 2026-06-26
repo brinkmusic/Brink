@@ -7,6 +7,7 @@ tags: [qa, testing, load, e2e]
 blocked_by: [060]
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Test sweep + k6 load + cross-browser E2E (T61)

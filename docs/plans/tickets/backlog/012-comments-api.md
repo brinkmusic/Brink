@@ -7,6 +7,7 @@ tags: [backend, api, comments, validation]
 blocked_by: [010]
 blocks: [042, 052]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Comments API (T12)

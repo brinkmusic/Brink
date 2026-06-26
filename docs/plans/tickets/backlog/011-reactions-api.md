@@ -7,6 +7,7 @@ tags: [backend, api, reactions, validation]
 blocked_by: [010]
 blocks: [041, 052]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Reactions API (T11)

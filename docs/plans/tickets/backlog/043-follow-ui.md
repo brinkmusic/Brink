@@ -7,6 +7,7 @@ tags: [frontend, follow]
 blocked_by: [013]
 blocks: []
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Follow UI (T43)

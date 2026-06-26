@@ -7,6 +7,7 @@ tags: [cleanup, docs, prisma, ci, migration]
 blocked_by: [007]
 blocks: []
 parent_ticket: null
+owner: Andrea
 ---
 
 # Chore: Decommission TS backend + sync docs (T08)

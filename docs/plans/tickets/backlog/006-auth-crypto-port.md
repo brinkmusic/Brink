@@ -7,6 +7,7 @@ tags: [auth, crypto, security, fastapi, migration]
 blocked_by: [005]
 blocks: [007]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Port auth + crypto + capture-spotify to FastAPI (T06)

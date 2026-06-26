@@ -7,6 +7,7 @@ tags: [analytics, python, ci, github-actions, scheduling]
 blocked_by: [031, 034, 036]
 blocks: []
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: Pipeline orchestration + GitHub Actions nightly (T38)

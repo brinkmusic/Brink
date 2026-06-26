@@ -7,6 +7,7 @@ tags: [frontend, backend, posts, spotify, validation]
 blocked_by: [010]
 blocks: []
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Post composer + Spotify catalog search (T40)

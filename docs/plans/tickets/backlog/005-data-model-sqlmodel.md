@@ -7,6 +7,7 @@ tags: [infra, sqlmodel, alembic, database, migration]
 blocked_by: [004]
 blocks: [006]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Chore: SQLModel data model + Alembic baseline (T05)

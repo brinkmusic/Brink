@@ -7,6 +7,7 @@ tags: [analytics, python, kmeans, ml]
 blocked_by: [031, 039]
 blocks: [033, 038, 045]
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: K-means training on tracks + ModelArtifact export (T34)

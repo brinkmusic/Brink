@@ -7,6 +7,7 @@ tags: [backend, artist, storage, supabase, validation]
 blocked_by: []
 blocks: [051, 052]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Supabase Storage signed-upload backend (T50)

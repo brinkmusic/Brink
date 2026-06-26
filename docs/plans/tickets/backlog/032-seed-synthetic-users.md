@@ -7,6 +7,7 @@ tags: [analytics, python, data, synthetic]
 blocked_by: [030, 031]
 blocks: []
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: Synthetic user seeding — genre-coherent personas (T32)

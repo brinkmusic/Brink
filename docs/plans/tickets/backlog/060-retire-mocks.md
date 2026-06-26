@@ -7,6 +7,7 @@ tags: [cleanup, mocks, frontend, backend]
 blocked_by: [041, 044, 045]
 blocks: [061]
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Retire mocks + dead paths (T60)

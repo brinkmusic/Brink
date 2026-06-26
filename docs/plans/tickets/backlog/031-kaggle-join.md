@@ -7,6 +7,7 @@ tags: [analytics, python, kaggle, data]
 blocked_by: [030]
 blocks: [032, 034, 036, 038]
 parent_ticket: null
+owner: Jonah
 ---
 
 # Feature: Kaggle ingest + audio-feature join (T31)

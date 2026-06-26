@@ -7,6 +7,7 @@ tags: [infra, fastapi, python, ci, migration]
 blocked_by: []
 blocks: [005]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Chore: FastAPI backend scaffold + ADR-0010 (T04)

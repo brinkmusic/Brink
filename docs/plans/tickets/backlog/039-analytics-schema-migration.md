@@ -7,6 +7,7 @@ tags: [backend, sqlmodel, alembic, schema, analytics, migration]
 blocked_by: [005]
 blocks: [033, 034, 036]
 parent_ticket: null
+owner: Andrea
 ---
 
 # Feature: Analytics schema migration — apply the ADR-0003 on-demand contract (T39)

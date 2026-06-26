@@ -7,6 +7,7 @@ tags: [auth, frontend, email, supabase]
 blocked_by: []
 blocks: []
 parent_ticket: null
+owner: Sebastian
 ---
 
 # Feature: Email (handle) accounts via Supabase OTP (T03)
