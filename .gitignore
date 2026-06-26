@@ -29,3 +29,8 @@ Thumbs.db
 apps/web/tsconfig.tsbuildinfo
 # Office lock files
 ~$*
+
+# Ticket-Driven Development local workspace (never committed)
+.tdd/
+# Knowledge-graph wiki export (local-only, regenerable)
+knowledge/
