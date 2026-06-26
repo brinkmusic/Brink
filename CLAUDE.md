@@ -11,7 +11,7 @@ React/Vite SPA + Vercel serverless functions (TypeScript, Prisma) + **Supabase**
 
 **Source of truth — read these before planning any work:**
 - `docs/plans/2026-06-22-brink-spec-design.md` — layered spec, target vs current, data model, requirement IDs (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`).
-- `docs/plans/2026-06-22-brink-implementation-tickets.md` — 27 tickets (T00–T61) with dependency waves.
+- `docs/plans/tickets/` — one file per ticket (`backlog/`, `completed/`), derived from the ADRs in `docs/decisions/`. Start at `docs/plans/tickets/README.md` for the dependency waves and reading guide.
 
 ## Layout
 
