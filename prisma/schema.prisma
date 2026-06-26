@@ -1,4 +1,4 @@
-// Brink data model. See docs/plans/2026-06-22-brink-spec-design.md §3 Layer 2.
+// Brink data model. Requirements: docs/plans/requirements.md - decisions: docs/decisions/
 generator client {
   provider = "prisma-client-js"
 }

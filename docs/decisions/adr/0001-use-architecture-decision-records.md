@@ -27,19 +27,20 @@ Records are **ADRs** (`adr/`) — a fork in the road, decided at a point in time
 | [0006](0006-scheduling.md) | Scheduling — GitHub Actions cron times both jobs | INFRA |
 | [0007](0007-validation-and-data-integrity.md) | Validation, authorization & data integrity (defense in depth) | BE |
 | [0008](0008-no-content-moderation.md) | No artist-upload content moderation (out of scope) | MEDIA |
+| [0009](0009-medallion-layering.md) | Medallion-style layering for the analytics pipeline | AN / DATA |
 
 ## Open decisions
 
 Forks by layer. ✅ = resolved (where logged); ⬜ = still open; *(default)* = I'll take the noted default unless revisited.
 
 - **AUTH** — ✅ token encryption (AES-256-GCM) · ✅ handle↔Spotify linking → merge into one account (ADR-0005) · ⬜ session strategy *(default: Supabase session defaults)*
-- **BE** — ⬜ schema shape · ⬜ result-table contract incl. `ModelArtifact` (pipeline→app, [ADR-0003](0003-analytics-runtime.md)) · ⬜ API shape *(default: REST)* · ✅ validation/authz/integrity ([ADR-0007](0007-validation-and-data-integrity.md))
+- **BE** — ⬜ schema shape · ✅ result-table contract — on-read inference + self-describing `ModelArtifact`, gold layer ([ADR-0003](0003-analytics-runtime.md) option A, [ADR-0009](0009-medallion-layering.md)) · ⬜ API shape *(default: REST)* · ✅ validation/authz/integrity ([ADR-0007](0007-validation-and-data-integrity.md))
 - **SP** — ✅ snapshot cadence (~2h) + dedup (`userId+playedAt`) · ✅ rate-limit handling ([ADR-0007](0007-validation-and-data-integrity.md))
 - **AN** — ✅ k-selection (elbow + silhouette) · ✅ retrain frequency (nightly, [ADR-0003](0003-analytics-runtime.md)) · ⬜ distance metric *(default: Euclidean on standardized features)*
 - **UI** — ⬜ state / data-fetching approach
 - **MEDIA** — ⬜ signed-upload flow · ✅ size/format limits (≤10 MB JPEG/PNG) · ✅ moderation (none — [ADR-0008](0008-no-content-moderation.md))
 - **INFRA** — ⬜ secrets management *(default: local `.env` + Vercel/GitHub env)* · ⬜ CI *(default: GitHub Actions lint+test on PR)*
-- **DATA** — ✅ synthetic-user generation (genre-coherent personas, [ADR-0004](0004-analytics-data-strategy.md) C3)
+- **DATA** — ✅ synthetic-user generation (genre-coherent personas, [ADR-0004](0004-analytics-data-strategy.md) C3) · ✅ batch data layering (medallion bronze/silver/gold, [ADR-0009](0009-medallion-layering.md))
 
 ## Alternatives considered
 
