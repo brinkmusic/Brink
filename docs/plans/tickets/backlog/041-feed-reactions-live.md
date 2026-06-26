@@ -19,7 +19,7 @@ The feed is the home screen and currently renders mock data via `lib/data.getFee
 
 ## Source
 - Spec reqs: **UI-2**, **UI-3**, **UI-9**
-- ADRs: [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md)
+- ADRs: [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md)
 
 ## Scope
 ### In Scope

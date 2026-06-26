@@ -12,7 +12,7 @@ parent_ticket: null
 # Feature: Pipeline orchestration + GitHub Actions nightly (T38)
 
 ## Rationale
-The Python training steps need to run as one idempotent job on a schedule, with a manual trigger before demos. Per ADR-0006 this runs on GitHub Actions (the team is on Vercel Hobby).
+The Python training steps need to run as one idempotent job on a schedule, with a manual trigger before demos. Per ADR-0006 this runs on GitHub Actions (managed-cron cadence is too coarse, and GitHub Actions keeps the scheduler in-repo).
 
 ## Summary
 An idempotent `run_pipeline.py` structured as explicit **bronze → silver → gold** stages (land raw → conform `Track`/`Play` → train + export `Cluster`/`ModelMetrics`/`ModelArtifact`), each idempotent and logged, plus a GitHub Actions workflow that runs it nightly + on `workflow_dispatch`.

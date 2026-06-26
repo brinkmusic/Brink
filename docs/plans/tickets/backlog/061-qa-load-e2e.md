@@ -15,7 +15,7 @@ parent_ticket: null
 The proposal grades on verification (§6, §11): test coverage, a load test, cross-browser E2E, and explicit success metrics. This is the final QA gate before a release PR to `main`.
 
 ## Summary
-Jest+Supertest coverage on all `/api/*`, pytest on analytics, manual E2E across Chrome/Firefox/Safari, a k6 run at 5 concurrent users, and verification of the success metrics.
+pytest coverage on all `/api/*` (FastAPI) and on analytics, manual E2E across Chrome/Firefox/Safari, a k6 run at 5 concurrent users, and verification of the success metrics.
 
 ## Source
 - Spec: proposal **§6**, **§11**
@@ -23,7 +23,7 @@ Jest+Supertest coverage on all `/api/*`, pytest on analytics, manual E2E across 
 
 ## Scope
 ### In Scope
-- Jest+Supertest coverage across all `/api/*` endpoints.
+- `uv run pytest` coverage across all `/api/*` endpoints (`backend/tests/`).
 - `uv run pytest` green across `analytics/`.
 - Manual E2E on Chrome/Firefox/Safari.
 - k6 load test at 5 concurrent users.
@@ -36,17 +36,17 @@ Jest+Supertest coverage on all `/api/*`, pytest on analytics, manual E2E across 
 - The k6 run exercises rate limiting (per-user/IP caps) — confirm limits behave under load.
 
 ## Current State (on `develop`)
-- Partial tests exist (`api/__tests__/*`). No k6 script, no documented E2E pass.
+- Partial tests exist (`backend/tests/*`, `analytics/tests/*`). No k6 script, no documented E2E pass.
 
 ## Files to Create/Modify
 | File | Action | Purpose |
 |------|--------|---------|
 | `load/k6-script.js` | CREATE | k6 at 5 concurrent users |
-| `api/__tests__/*` | MODIFY | fill coverage gaps |
+| `backend/tests/*` | MODIFY | fill coverage gaps |
 | `docs/qa-checklist.md` | CREATE | E2E + metrics sign-off |
 
 ## Testing Checklist
-- [ ] all `/api/*` covered by Jest+Supertest
+- [ ] all `/api/*` covered by `pytest` (FastAPI TestClient)
 - [ ] `uv run pytest` green
 - [ ] manual E2E pass recorded (Chrome/Firefox/Safari)
 - [ ] k6 at 5 concurrent users meets latency/error targets

@@ -12,37 +12,37 @@ parent_ticket: null
 # Feature: Supabase Storage signed-upload backend (T50)
 
 ## Rationale
-The artist BTS portal needs a way to store uploaded images and create artist posts. Per ADR-0002 storage is Supabase (not Cloudinary), via signed upload URLs minted with the service role.
+The artist BTS portal needs a way to store uploaded images and create artist posts. Storage is Supabase (not Cloudinary) — chosen in ADR-0002, retained under ADR-0010 — via signed upload URLs minted with the service role.
 
 ## Summary
 `POST /api/artist/sign-upload` mints a Supabase Storage signed upload URL; `POST /api/artist/posts` creates an `ArtistPost` with the stored object URL + optional `linkedTrackId`.
 
 ## Source
 - Spec reqs: **MEDIA-1**, **MEDIA-3**, **BE-9**
-- ADRs: [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md) (Supabase Storage) · [ADR-0008](../../../decisions/adr/0008-no-content-moderation.md) (technical validation only) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md)
+- ADRs: [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md) (FastAPI/Supabase; Supabase Storage retained) · [ADR-0008](../../../decisions/adr/0008-no-content-moderation.md) (technical validation only) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md)
 
 ## ⚠ Fix stale schema comment
-`ArtistPost.imageUrl` is commented `// Cloudinary secure URL` — that's stale. ADR-0002 chose Supabase Storage; update the comment to Supabase Storage in this PR.
+`ArtistPost.imageUrl` carries a stale `Cloudinary secure URL` comment. The choice is Supabase Storage; update the comment to Supabase Storage on the `ArtistPost` model in `backend/app/models.py` in this PR.
 
 ## Scope
 ### In Scope
-- `api/artist/sign-upload.ts` — mint a Supabase Storage signed upload URL (service role) for the private `artist-images` bucket; enforce JPEG/PNG ≤ 10 MB intent in the contract.
-- `api/artist/posts.ts` — create an `ArtistPost` (image object URL + caption + optional `linkedTrackId`).
-- Update the `ArtistPost.imageUrl` schema comment.
+- `backend/app/routers/artist.py` (`POST /api/artist/sign-upload`) — mint a Supabase Storage signed upload URL (service role) for the private `artist-images` bucket; enforce JPEG/PNG ≤ 10 MB intent in the contract.
+- `backend/app/routers/artist.py` (`POST /api/artist/posts`) — create an `ArtistPost` (image object URL + caption + optional `linkedTrackId`).
+- Update the `ArtistPost.imageUrl` model comment.
 
 ### Out of Scope
 - The upload UI (T51); engagement analytics (T52).
 - **Content moderation — none (ADR-0008).** Technical validation only.
 
 ## Validation & authz (ADR-0007 + ADR-0008)
-- **Authorization:** `requireUser` + **ownership** — only the owning artist mints uploads / creates their `ArtistPost`.
+- **Authorization:** `require_user` + **ownership** — only the owning artist mints uploads / creates their `ArtistPost`.
 - **Business rule (technical only):** uploads ≤ 10 MB, JPEG/PNG. **No NSFW/abuse scanning, no approval queue** (ADR-0008 — closed demo, team-controlled).
 - **Integrity:** FK `ArtistPost.artistUserId → User`.
 
 ## Current State (on `develop`)
-- `prisma/schema.prisma` `ArtistPost { artistUserId, imageUrl, caption, linkedTrackId }` (imageUrl comment stale).
-- `api/_lib/supabase.ts` + `SUPABASE_SERVICE_ROLE_KEY` in env (CLAUDE.md). `requireUser` exists.
-- No `api/artist/*` yet.
+- `backend/app/models.py` `ArtistPost { artistUserId, imageUrl, caption, linkedTrackId }` (imageUrl comment stale).
+- `backend/app/security/supabase.py` + `SUPABASE_SERVICE_ROLE_KEY` in env (CLAUDE.md). `require_user` exists.
+- No artist router (`backend/app/routers/artist.py`) yet.
 
 ## Manual (user)
 - Create a **private** Supabase Storage bucket `artist-images`. (`SUPABASE_SERVICE_ROLE_KEY` already in env.)
@@ -50,10 +50,9 @@ The artist BTS portal needs a way to store uploaded images and create artist pos
 ## Files to Create/Modify
 | File | Action | Purpose |
 |------|--------|---------|
-| `api/artist/sign-upload.ts` | CREATE | mint signed upload URL |
-| `api/artist/posts.ts` | CREATE | create `ArtistPost` |
-| `prisma/schema.prisma` | MODIFY | fix `imageUrl` comment (Cloudinary → Supabase Storage) |
-| `api/__tests__/artist.test.ts` | CREATE | tests |
+| `backend/app/routers/artist.py` | CREATE | `sign-upload` + `posts` routes |
+| `backend/app/models.py` | MODIFY | fix `imageUrl` comment (Cloudinary → Supabase Storage) |
+| `backend/tests/test_artist.py` | CREATE | tests |
 
 ## Testing Checklist
 - [ ] sign-upload returns a valid signed URL for the owning artist

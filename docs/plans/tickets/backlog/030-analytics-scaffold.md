@@ -12,14 +12,14 @@ parent_ticket: null
 # Feature: Python analytics scaffold + DB access (T30)
 
 ## Rationale
-The whole analytics layer (the graded ML centerpiece) lives in a Python package that doesn't exist yet. This ticket creates the `uv`-managed project and the database access helper everything else builds on. It also proves the architectural constraint from ADR-0003: the pipeline reads Postgres directly over the wire protocol (the reason D1/SQLite was rejected in ADR-0002).
+The whole analytics layer (the graded ML centerpiece) lives in a Python package that doesn't exist yet. This ticket creates the `uv`-managed project and the database access helper everything else builds on. It also proves the architectural constraint from ADR-0003: the pipeline reads Postgres directly over the wire protocol (the reason D1/SQLite was rejected — see ADR-0002, retained under ADR-0010; Supabase Postgres is unchanged).
 
 ## Summary
 `uv init` an `analytics/` package with scikit-learn/pandas/SQLAlchemy/psycopg, a `db.py` that connects to Supabase via `DATABASE_URL`, and a passing `pytest` that reads a table count.
 
 ## Source
 - Spec reqs: **AN-8** (partial), **INFRA-4** (partial)
-- ADRs: [ADR-0003](../../../decisions/adr/0003-analytics-runtime.md) (Python batch reads Postgres over the wire) · [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md)
+- ADRs: [ADR-0003](../../../decisions/adr/0003-analytics-runtime.md) (Python batch reads Postgres over the wire) · [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md)
 
 ## Scope
 ### In Scope

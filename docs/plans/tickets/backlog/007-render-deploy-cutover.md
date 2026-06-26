@@ -71,3 +71,9 @@ end-to-end against the new backend.
 Branch off `develop` as `chore/T07-render-deploy-cutover`; one PR into `develop`.
 Production deploys from `main` (CLAUDE.md) — the Render env + `main` release PR are coordinated
 so the cutover and the env vars land together. Keep the TS `api/` until this is verified (T08).
+
+**⚠ `/api/state` coordination:** the rewrite sends **all** `/api/*` to Render, but the legacy
+jsonblob `/api/state` (still used by the frontend mock path) is not reimplemented in FastAPI.
+Before this cutover, either retire that path (T60) or keep `/api/state` on Vercel via a narrower
+rewrite as a temporary shim. Decide with the team; don't cut over while the frontend still calls
+`/api/state` or it will 404.

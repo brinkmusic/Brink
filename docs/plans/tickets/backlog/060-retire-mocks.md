@@ -19,7 +19,7 @@ Delete `mocks/feed.ts`, `mocks/stats.ts`, the jsonblob `api/state.js`, the heuri
 
 ## Source
 - Spec reqs: **DATA-4**, **BE-2** (final), **UI-9**
-- ADRs: [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md) (jsonblob superseded)
+- ADRs: [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md) (jsonblob superseded) · [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md) (TS backend retired in T08)
 
 ## Scope
 ### In Scope
@@ -60,3 +60,5 @@ Delete `mocks/feed.ts`, `mocks/stats.ts`, the jsonblob `api/state.js`, the heuri
 
 ## Notes
 Branch off `develop` as `feat/T60-retire-mocks`; one PR back into `develop` (never `main`).
+
+**Cutover sequencing (ADR-0010):** the jsonblob `/api/state` (`api/state.js`) is served by the legacy TS backend and called by the frontend mock path. The FastAPI backend does **not** reimplement `/api/state`. So this retirement must land **before** the Render cutover (T07) routes `/api/*` away from Vercel, or `/api/state` will 404. Coordinate T60 with T07/T08; the remaining TS `api/` is removed wholesale in T08.

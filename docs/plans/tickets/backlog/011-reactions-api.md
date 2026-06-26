@@ -19,12 +19,12 @@ A `POST`/`DELETE` endpoint on a post to add or remove the authenticated user's r
 
 ## Source
 - Spec reqs: **BE-5**
-- ADRs: [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md) (Prisma/Supabase) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md) (validation/authz on every API ticket)
+- ADRs: [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md) (FastAPI/SQLModel/Supabase) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md) (validation/authz on every API ticket)
 
 ## Scope
 ### In Scope
-- `POST /api/posts/[id]/reactions` — add a reaction `{ type }` for the authenticated user (idempotent).
-- `DELETE /api/posts/[id]/reactions` — remove that user's reaction of `{ type }`.
+- `POST /api/posts/{id}/reactions` — add a reaction `{ type }` for the authenticated user (idempotent).
+- `DELETE /api/posts/{id}/reactions` — remove that user's reaction of `{ type }`.
 - Return fresh per-type reaction counts for the post.
 
 ### Out of Scope
@@ -32,23 +32,23 @@ A `POST`/`DELETE` endpoint on a post to add or remove the authenticated user's r
 - Comments (T12), feed (T13).
 
 ## Validation & authz (ADR-0007 — required on this ticket)
-- **Schema (zod):** `type` parsed against the `ReactionType` enum (`HEART | FIRE | SPARKLE`); `[id]` path param validated; bad shape → 400 via `fail()`.
+- **Schema (Pydantic):** `type` parsed against the `ReactionType` enum (`HEART | FIRE | SPARKLE`); `{id}` path param validated; bad shape → 400 via `fail()`.
 - **Business rule:** one reaction per `(user, post, type)` — the app checks/upserts so a double-react is a no-op (idempotent), not an error.
-- **Authorization:** `requireUser` gates both verbs; `userId` is the authenticated user, never client-supplied. (Removing only your own reaction.)
+- **Authorization:** `require_user` gates both verbs; `userId` is the authenticated user, never client-supplied. (Removing only your own reaction.)
 - **Integrity:** `@@unique([postId, userId, type])` makes duplicates structurally impossible even if the app check is skipped; FKs cascade-delete with the post/user.
 - **Rate limiting:** write endpoint → reuse the per-user cap helper from T10.
 
 ## Current State (on `develop`)
-- `prisma/schema.prisma`: `Reaction` with `@@unique([postId, userId, type])`; `enum ReactionType { HEART FIRE SPARKLE }`; FKs `onDelete: Cascade`.
-- `api/_lib/respond.ts` exposes `ok(res, data, status)` / `fail(res, message, status)`.
-- `api/_lib/auth.ts` `requireUser` exists.
-- No `api/posts/[id]/reactions.ts` yet. The post target comes from T10 (`blocked_by: [010]`).
+- `backend/app/models.py`: `Reaction` with a unique constraint on `(postId, userId, type)`; `ReactionType` enum (`HEART FIRE SPARKLE`); FKs `ondelete=CASCADE`.
+- `backend/app/responses.py` exposes `ok(data, status)` / `fail(message, status)`.
+- `backend/app/deps.py` `require_user` exists.
+- No reactions router (`backend/app/routers/reactions.py`) yet. The post target comes from T10 (`blocked_by: [010]`).
 
 ## Files to Create/Modify
 | File | Action | Purpose |
 |------|--------|---------|
-| `api/posts/[id]/reactions.ts` | CREATE | `POST` add / `DELETE` remove + fresh counts |
-| `api/__tests__/reactions.test.ts` | CREATE | endpoint tests |
+| `backend/app/routers/reactions.py` | CREATE | `POST` add / `DELETE` remove + fresh counts |
+| `backend/tests/test_reactions.py` | CREATE | endpoint tests |
 
 ## Testing Checklist
 - [ ] `POST` without a session → 401

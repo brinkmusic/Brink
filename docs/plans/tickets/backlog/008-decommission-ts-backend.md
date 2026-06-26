@@ -25,17 +25,19 @@ FastAPI patterns.
 - ADRs: [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md)
 - Reqs: INFRA-2 (tooling/docs consistency)
 
-## Scope
-### In Scope
-- Remove `api/*.ts` + `api/__tests__/`, `scripts/dev-api.ts`, `prisma/`, and root
-  `package.json` backend deps (`jest`, `ts-jest`, `supertest`, `@vercel/node`, `tsx`, `prisma`,
+- Remove the entire legacy TS backend: the `api/` directory (handlers, `_lib/`, `__tests__/`,
+  and the jsonblob `state.js`), `scripts/dev-api.ts`, `prisma/`, and root `package.json`
+  backend deps (`jest`, `ts-jest`, `supertest`, `@vercel/node`, `tsx`, `prisma`,
   `@prisma/client`, `express`, `@supabase/supabase-js`). Remove the `dev:api` / `prisma:*` scripts.
+  (The frontend's `/api/state` mock path must already be retired — that's T60, which must precede
+  the T07 cutover; see T60's cutover-sequencing note.)
 - `.github/workflows/ci.yml`: delete the Node `test` job (keep `api` Python, `web`, `secrets`).
 - `CLAUDE.md`: Layout (`backend/` FastAPI/Python), Commands (uvicorn, `uv run pytest`), the
   Database-migrations section (Alembic — **delete the Prisma `migrate dev` hang workaround**),
   the stack one-liner, and ownership note (api/ → backend/).
-- Re-point the backlog API tickets (010, 011, 012, 013, 014, 050, 052, …) from "Vercel TS handler
-  + `respond.ts`/`auth.ts`" to "FastAPI router + `require_user` dependency + `backend/app/...`".
+- **Verify** no downstream ticket or doc still references the TS stack. The backlog API tickets
+  were already re-pointed to the FastAPI pattern in T04's PR (#4); this ticket just confirms that
+  and fixes any stragglers.
 
 ### Out of Scope
 - Frontend code (unchanged throughout). Analytics tickets (already Python).

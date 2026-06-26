@@ -19,11 +19,11 @@ A `Composer` component plus a `GET /api/search` Spotify catalog-search endpoint 
 
 ## Source
 - Spec reqs: **UI-1**
-- ADRs: [ADR-0002](../../../decisions/adr/0002-api-and-persistence.md) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md) (search is an expensive endpoint → rate-limited)
+- ADRs: [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md) · [ADR-0007](../../../decisions/adr/0007-validation-and-data-integrity.md) (search is an expensive endpoint → rate-limited)
 
 ## Scope
 ### In Scope
-- `api/search.ts` — Spotify client-credentials catalog search (no user token needed).
+- `backend/app/routers/search.py` — Spotify client-credentials catalog search (no user token needed).
 - `apps/web/src/components/Composer.tsx` — search UI + caption + publish via `POST /api/posts` (T10).
 - Wire into `FeedPage`.
 
@@ -31,22 +31,22 @@ A `Composer` component plus a `GET /api/search` Spotify catalog-search endpoint 
 - Posts endpoint (T10); the feed render (T41).
 
 ## Validation & authz (ADR-0007 — required on this ticket)
-- **Schema (zod):** validate the `q` query param; empty → 400.
+- **Schema (Pydantic):** validate the `q` query param; empty → 400.
 - **Rate limiting:** catalog search is an expensive endpoint → per-user/IP cap via the shared store (ADR-0007 §5).
-- **Authorization:** publishing goes through `POST /api/posts` (`requireUser`); search itself may be open but rate-limited.
+- **Authorization:** publishing goes through `POST /api/posts` (`require_user`); search itself may be open but rate-limited.
 
 ## Current State (on `develop`)
 - `apps/web/src/pages/FeedPage.tsx` imports `getFeed` from `lib/data` (mock).
-- `lib/spotify-api.ts` exists (client helpers). No `api/search.ts`, no `Composer.tsx`.
+- `lib/spotify-api.ts` exists (client helpers). No search router (`backend/app/routers/search.py`), no `Composer.tsx`.
 - Posts endpoint comes from T10 (`blocked_by: [010]`).
 
 ## Files to Create/Modify
 | File | Action | Purpose |
 |------|--------|---------|
-| `api/search.ts` | CREATE | Spotify client-credentials catalog search |
+| `backend/app/routers/search.py` | CREATE | Spotify client-credentials catalog search |
 | `apps/web/src/components/Composer.tsx` | CREATE | search + caption + publish |
 | `apps/web/src/pages/FeedPage.tsx` | MODIFY | mount the composer |
-| `api/__tests__/search.test.ts` | CREATE | search endpoint tests |
+| `backend/tests/test_search.py` | CREATE | search endpoint tests |
 
 ## Testing Checklist
 - [ ] empty `q` → 400
@@ -62,4 +62,4 @@ A `Composer` component plus a `GET /api/search` Spotify catalog-search endpoint 
 - [x] Scope boundaries defined
 
 ## Notes
-Branch off `develop` as `feat/T40-composer`; one PR back into `develop` (never `main`). Owner: Sebastian (UI) + Andrea (`api/search.ts`).
+Branch off `develop` as `feat/T40-composer`; one PR back into `develop` (never `main`). Owner: Sebastian (UI) + Andrea (`backend/app/routers/search.py`).
