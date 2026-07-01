@@ -1,27 +1,52 @@
+# Dependabot VERSION updates (routine "a newer version exists" PRs).
+# Tuned for low noise: monthly, grouped into one PR per area, and skipping breaking
+# MAJOR upgrades (patch/minor only). Real security fixes are handled separately by
+# Dependabot "security updates" (enabled in repo Settings, not here) and are NOT limited
+# by this file — a known vulnerability still gets flagged and patched.
 version: 2
 updates:
-  # Root npm = the legacy TS api/ + tooling. Most of this goes away in T08; ignore the
-  # deps we're deliberately removing so Dependabot stops proposing pointless bumps.
+  # Root npm = the legacy TS api/ + tooling (mostly removed in T08).
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     target-branch: develop
     open-pull-requests-limit: 5
+    groups:
+      root-npm:
+        patterns: ["*"]
     ignore:
+      # Skip breaking major-version bumps — they're the ones that break the build.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Legacy deps removed in T08 — no point updating at all.
       - dependency-name: prisma
       - dependency-name: "@prisma/client"
       - dependency-name: "@vercel/node"
       - dependency-name: supertest
       - dependency-name: "@types/supertest"
+  # Frontend npm (apps/web) = the live app.
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
-      interval: weekly
+      interval: monthly
     target-branch: develop
     open-pull-requests-limit: 5
+    groups:
+      web-npm:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  # GitHub Actions.
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     target-branch: develop
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
