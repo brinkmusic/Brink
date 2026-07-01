@@ -4,8 +4,8 @@
 # code uses to run queries. WHY keep it in one file: everything talks to the
 # database the same way, and the tricky connection setup lives in exactly one place.
 
-import re
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import Engine, text
 from sqlmodel import Session, create_engine
@@ -17,11 +17,15 @@ def normalize_url(url: str) -> str:
     # The database address Supabase gives us is written for the old Prisma tool, so
     # we tweak it for our Python driver:
     #  1. tell it to use "psycopg" (our Python-to-Postgres driver).
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
     #  2. remove the "pgbouncer=true" flag, which is a Prisma-only hint our driver
-    #     doesn't understand and would choke on.
-    url = re.sub(r"^postgresql://", "postgresql+psycopg://", url)
-    url = re.sub(r"[?&]pgbouncer=true", "", url)
-    return url
+    #     doesn't understand. We rebuild the address from its parts and drop just
+    #     that one setting, so any OTHER settings stay intact and correctly joined
+    #     (a plain text delete could leave a broken "&" behind if it weren't last).
+    parts = urlsplit(url)
+    kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k != "pgbouncer"]
+    return urlunsplit(parts._replace(query=urlencode(kept)))
 
 
 # Builds the database engine once and reuses it (@lru_cache = build-once-then-reuse).

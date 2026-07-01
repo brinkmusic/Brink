@@ -213,3 +213,10 @@ def downgrade() -> None:
     op.drop_table('Compatibility')
     op.drop_table('Cluster')
     # ### end Alembic commands ###
+    # Alembic's auto-generated downgrade drops the tables but NOT the enum "types"
+    # (PostSource, ReactionType) that Postgres created for the source/type columns.
+    # Without this, tearing down and rebuilding a fresh database would fail on the
+    # second build with "type already exists". checkfirst=True = "skip if missing".
+    bind = op.get_bind()
+    sa.Enum(name='PostSource').drop(bind, checkfirst=True)
+    sa.Enum(name='ReactionType').drop(bind, checkfirst=True)
