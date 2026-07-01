@@ -5,11 +5,13 @@ description = "Brink API — FastAPI backend (ADR-0010)."
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.13",
+    "cryptography>=43",
     "cuid2>=2.0",
     "fastapi>=0.115",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.5",
     "sqlmodel>=0.0.22",
+    "supabase>=2.9",
     "uvicorn[standard]>=0.32",
 ]
 
