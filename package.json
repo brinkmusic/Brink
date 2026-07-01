@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.9.0",
+    "@types/node": "^26.1.0",
     "@types/supertest": "^6.0.2",
     "@vercel/node": "^3.2.24",
     "express": "^5.2.1",
