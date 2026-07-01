@@ -90,9 +90,19 @@ These are expectations, not automated guarantees — they set how we work.
   logic lives in `api/_lib/` (backend) and `apps/web/src` shared modules (frontend) — extend
   or import it; don't copy-paste or write a second version of something that already exists. If
   you find duplication, factor it out as part of the change.
-- **Comments: explain *why*, never *what*.** No docstrings or boilerplate comment blocks. Code
-  should read on its own; add a comment only when the reason for something is non-obvious. Use
-  JSDoc only on exported `api/_lib/` helpers where the types don't fully convey the contract.
+- **Comments: explain both *what* and *why*, written for a reader new to the language/stack.**
+  This repo is read by a mixed team including a non-technical owner, so code must be *followable
+  by someone who doesn't already know* Python/SQLModel/FastAPI/React. This deliberately overrides
+  the usual "why, not what" convention. Concretely:
+  - Every file that does real work opens with a short **`WHAT THIS FILE IS`** comment (2–5 lines,
+    plain English) covering its purpose and why it exists.
+  - Add a brief plain-language note on each non-trivial block: what it does, why it's there, and
+    what any unfamiliar syntax/concept means (e.g. foreign keys, decorators, `Optional`). Explain
+    a recurring idea *once* (e.g. in a file header) rather than repeating it on every line.
+  - Favor clarity over brevity — stating the *what* is expected here, not a smell. But don't
+    narrate truly trivial lines, and keep comments **accurate**: a stale/wrong comment is worse
+    than none, so update comments in the same change as the code.
+  This is a project standard for Brink; individual contributors' global preferences don't override it.
 - **Guard against regressions.** A bug fix starts with a failing test that reproduces the bug,
   then the fix. Changes to shared code (`api/_lib/`, `prisma/schema.prisma`) have a wide blast
   radius — call out in the PR what depends on them, and run the full suite (`npm test`).
@@ -160,7 +170,9 @@ tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge 
   Server/long-term Spotify access must go through our stored refresh token (snapshot job, T21).
 - `tsx` struggles importing some `.ts` files with top-level await from ad-hoc scripts; prefer
   `.mjs` for throwaway checks, or `node --env-file=.env --import tsx`.
-- Status: T00, T01, T02, **T04** done. Auth verified end-to-end (Spotify login creates a
+- Status: T00, T01, T02, T04, **T05** done. Auth verified end-to-end (Spotify login creates a
   `public.User` row + stores the encrypted refresh token). **Backend migration to FastAPI/Render
-  underway (ADR-0010, PR #4 merged)** — next is **T05** (SQLModel + Alembic), then T06 auth/crypto
-  port. The TS `api/` still serves the live app until the T07 cutover.
+  underway (ADR-0010).** T05 landed the 14 SQLModel tables (`backend/app/models.py`), the
+  engine/session + config (`backend/app/db.py`, `config.py`), an Alembic baseline stamped against
+  the live schema, and restored `db` reachability on `GET /api/health` — next is **T06** (auth/crypto
+  port). The TS `api/` still serves the live app until the T07 cutover.
