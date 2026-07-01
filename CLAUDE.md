@@ -186,8 +186,9 @@ tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge 
 - **Backend:** FastAPI on **Render** (`backend/`, config in `render.yaml`) — build `uv sync`,
   start `uvicorn app.main:app`. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
   `SPOTIFY_*`, `TOKEN_ENC_KEY`) live only in Render, never committed.
-- **Wiring:** `vercel.json` rewrites `/api/:path*` → the Render URL, so the browser still calls
-  same-origin `/api/*` (no CORS). Render is pointed at `develop` for now; switch it to `main` for
-  production once the release PR lands.
+- **Wiring:** the Vercel project's **root directory is `apps/web`** (so Vercel never builds the
+  legacy `api/` functions or needs Prisma). `apps/web/vercel.json` rewrites `/api/:path*` → the
+  Render URL, so the browser still calls same-origin `/api/*` (no CORS). Both Render and Vercel
+  currently deploy from `develop`.
 - **Note:** the legacy POC `/api/state` (jsonblob) is *not* reimplemented in FastAPI and stops
   working after this cutover — its social features are replaced by the real API in T10–T14.
