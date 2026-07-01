@@ -1,16 +1,27 @@
 version: 2
 updates:
+  # Root npm = the legacy TS api/ + tooling. Most of this goes away in T08; ignore the
+  # deps we're deliberately removing so Dependabot stops proposing pointless bumps.
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    target-branch: develop
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: prisma
+      - dependency-name: "@prisma/client"
+      - dependency-name: "@vercel/node"
+      - dependency-name: supertest
+      - dependency-name: "@types/supertest"
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
       interval: weekly
+    target-branch: develop
     open-pull-requests-limit: 5
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    target-branch: develop
