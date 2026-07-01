@@ -170,9 +170,11 @@ tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge 
   Server/long-term Spotify access must go through our stored refresh token (snapshot job, T21).
 - `tsx` struggles importing some `.ts` files with top-level await from ad-hoc scripts; prefer
   `.mjs` for throwaway checks, or `node --env-file=.env --import tsx`.
-- Status: T00, T01, T02, T04, **T05** done. Auth verified end-to-end (Spotify login creates a
+- Status: T00, T01, T02, T04, T05, **T06** done. Auth verified end-to-end (Spotify login creates a
   `public.User` row + stores the encrypted refresh token). **Backend migration to FastAPI/Render
-  underway (ADR-0010).** T05 landed the 14 SQLModel tables (`backend/app/models.py`), the
-  engine/session + config (`backend/app/db.py`, `config.py`), an Alembic baseline stamped against
-  the live schema, and restored `db` reachability on `GET /api/health` — next is **T06** (auth/crypto
-  port). The TS `api/` still serves the live app until the T07 cutover.
+  underway (ADR-0010).** T05 landed the 14 SQLModel tables + Alembic baseline; T06 ported the
+  security core to Python — AES-256-GCM token crypto (`backend/app/security/crypto.py`, byte-compatible
+  with the old TS format), the Supabase admin client + `require_user` dependency
+  (`backend/app/security/supabase.py`, `backend/app/deps.py`), and `POST /api/auth/capture-spotify`
+  (`backend/app/routers/auth.py`). Next is **T07** (Render deploy + cutover). The TS `api/` still
+  serves the live app until that cutover.

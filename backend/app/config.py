@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     database_url: str            # required: how the app connects to the database
     direct_url: Optional[str] = None  # optional: a direct connection used for migrations
 
+    # Auth + crypto settings (added in T06). All required in a real run; they live in
+    # the same root .env. supabase_* let the server verify logins and act as admin;
+    # token_enc_key encrypts the Spotify tokens we store.
+    supabase_url: Optional[str] = None
+    supabase_service_role_key: Optional[str] = None
+    token_enc_key: Optional[str] = None
+
 
 # Returns the settings. @lru_cache means "build this once, then reuse it" — we don't
 # re-read the .env file every time something needs a setting.
