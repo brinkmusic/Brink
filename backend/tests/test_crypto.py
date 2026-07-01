@@ -13,7 +13,9 @@ from app.security import crypto
 
 # A real ciphertext produced by the legacy Node/TypeScript crypto.ts, captured once.
 # Decrypting this with the matching key MUST return the original text.
-TS_KEY_B64 = "DDgucS0Bj9D7jMYszgzIr5uymWddcZz0c4ZlEOHcuo8="
+# gitleaks:allow — this is a throwaway key generated just for this test vector, NOT a
+# real secret and used nowhere else. The annotation tells the secret scanner to skip it.
+TS_KEY_B64 = "DDgucS0Bj9D7jMYszgzIr5uymWddcZz0c4ZlEOHcuo8="  # gitleaks:allow
 TS_PLAINTEXT = "AQCpt_test-spotify-refresh-token_9f3"
 TS_BLOB = "xULODjNkeXqY48No.FaPjg5vyqQCZJaBzOzaIxw==.WNTphX/DrMZI4jJqJfO9cN5p2W3xL7B21RgEdz7xLG5nR2ZC"
 
