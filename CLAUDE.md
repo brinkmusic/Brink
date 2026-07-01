@@ -176,5 +176,19 @@ tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge 
   security core to Python — AES-256-GCM token crypto (`backend/app/security/crypto.py`, byte-compatible
   with the old TS format), the Supabase admin client + `require_user` dependency
   (`backend/app/security/supabase.py`, `backend/app/deps.py`), and `POST /api/auth/capture-spotify`
-  (`backend/app/routers/auth.py`). Next is **T07** (Render deploy + cutover). The TS `api/` still
-  serves the live app until that cutover.
+  (`backend/app/routers/auth.py`). **T07** (in progress) deploys the FastAPI app to Render and
+  rewrites Vercel `/api/*` to it — the Render service (`brink-xg7p.onrender.com`) is live with
+  `/api/health` returning `db: true`. The TS `api/` stays in the repo as a fallback until T08.
+
+## Deployment topology (ADR-0010, T07)
+
+- **Frontend:** Vercel serves the React SPA (`apps/web`). Production deploys from `main`.
+- **Backend:** FastAPI on **Render** (`backend/`, config in `render.yaml`) — build `uv sync`,
+  start `uvicorn app.main:app`. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
+  `SPOTIFY_*`, `TOKEN_ENC_KEY`) live only in Render, never committed.
+- **Wiring:** the Vercel project's **root directory is `apps/web`** (so Vercel never builds the
+  legacy `api/` functions or needs Prisma). `apps/web/vercel.json` rewrites `/api/:path*` → the
+  Render URL, so the browser still calls same-origin `/api/*` (no CORS). Both Render and Vercel
+  currently deploy from `develop`.
+- **Note:** the legacy POC `/api/state` (jsonblob) is *not* reimplemented in FastAPI and stops
+  working after this cutover — its social features are replaced by the real API in T10–T14.
