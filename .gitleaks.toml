@@ -1,0 +1,15 @@
+title = "Brink gitleaks config"
+
+# Keep gitleaks' full default rule set...
+[extend]
+useDefault = true
+
+# ...then narrowly allow one known non-secret: the throwaway AES-256-GCM key used only
+# as a unit-test vector in backend/tests/test_crypto.py. It is generated for the test,
+# is not a real credential, and is used nowhere else. Allowlisting the exact value (not
+# the whole file) keeps the scanner strict everywhere else.
+[allowlist]
+description = "Throwaway AES test vector (backend/tests/test_crypto.py) — not a real secret"
+regexes = [
+  '''DDgucS0Bj9D7jMYszgzIr5uymWddcZz0c4ZlEOHcuo8=''',
+]

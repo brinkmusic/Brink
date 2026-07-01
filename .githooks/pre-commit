@@ -1,0 +1,24 @@
+#!/bin/sh
+# Brink pre-commit secret guard. See CLAUDE.md "Never commit secrets".
+# Enable with: git config core.hooksPath .githooks  (npm install does this for you).
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+# 1. Never commit real .env files (.env.example is fine).
+blocked=$(printf '%s\n' "$staged" | grep -E '(^|/)\.env($|\.)' | grep -vE '\.example$' || true)
+if [ -n "$blocked" ]; then
+  echo "pre-commit: refusing to commit env file(s):"
+  printf '  %s\n' $blocked
+  echo "These are git-ignored on purpose. Unstage them and keep secrets out of git."
+  exit 1
+fi
+
+# 2. If gitleaks is installed locally, scan the staged diff. (CI scans regardless.)
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner || {
+    echo "pre-commit: gitleaks found a potential secret in staged changes. Fix or unstage it."
+    exit 1
+  }
+fi
+
+exit 0

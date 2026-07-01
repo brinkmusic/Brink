@@ -33,12 +33,9 @@ export default function LoginPage() {
 
         {status === "misconfigured" && (
           <p className="mt-4 max-w-lg rounded-lg border border-brink-hot/40 bg-brink-hot/10 p-3 text-xs text-brink-hot">
-            <strong>Setup needed:</strong> create <code>apps/web/.env.local</code>{" "}
-            (copy from <code>.env.example</code>) and set{" "}
-            <code>VITE_SPOTIFY_CLIENT_ID</code>. Also add{" "}
-            <code>http://127.0.0.1:5173/callback</code> to your Spotify app's
-            Redirect URIs at developer.spotify.com/dashboard, and open the app
-            at <code>http://127.0.0.1:5173</code> (not localhost).
+            <strong>Setup needed:</strong> set <code>VITE_SUPABASE_URL</code> and{" "}
+            <code>VITE_SUPABASE_ANON_KEY</code> in <code>apps/web/.env</code>, then
+            restart the dev server.
           </p>
         )}
 
@@ -62,8 +59,8 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-8 text-[11px] text-brink-mute">
-          Brink only reads listening data; it never posts on your behalf. Auth uses
-          PKCE — your credentials never touch our servers.
+          Brink only reads listening data; it never posts on your behalf. Sign-in is
+          handled by Spotify via Supabase — your credentials never touch our servers.
         </p>
       </div>
     </div>

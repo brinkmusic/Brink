@@ -1,35 +1,27 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { completeLogin } from "../lib/spotify-auth";
-import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 
+// Supabase's client auto-detects the OAuth response in the URL and exchanges it
+// for a session. We just wait for that session, then move on to the feed.
 export default function CallbackPage() {
   const navigate = useNavigate();
-  const { refresh } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    const errParam = params.get("error");
-    if (errParam) {
-      setError(errParam);
-      return;
-    }
-    if (!code) {
-      setError("No auth code returned from Spotify");
-      return;
-    }
-    (async () => {
-      try {
-        await completeLogin(code);
-        await refresh();
-        navigate("/feed", { replace: true });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Token exchange failed");
-      }
-    })();
-  }, [navigate, refresh]);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, "?"));
+    const search = new URLSearchParams(window.location.search);
+    const errDesc = search.get("error_description") || hash.get("error_description");
+    if (errDesc) setError(errDesc);
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) navigate("/feed", { replace: true });
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate("/feed", { replace: true });
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [navigate]);
 
   if (error) {
     return (

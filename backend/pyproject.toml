@@ -1,0 +1,26 @@
+[project]
+name = "brink-api"
+version = "0.1.0"
+description = "Brink API — FastAPI backend (ADR-0010)."
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13",
+    "cryptography>=43",
+    "cuid2>=2.0",
+    "fastapi>=0.115",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.5",
+    "sqlmodel>=0.0.22",
+    "supabase>=2.9",
+    "uvicorn[standard]>=0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
