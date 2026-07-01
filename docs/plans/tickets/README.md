@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04 so far).
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T06; T07 in progress).
 
 ## How these relate to the rest of the docs
 
@@ -60,12 +60,12 @@ Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-p
 Per [ADR-0010](../../decisions/adr/0010-fastapi-render-backend.md), the backend moves from
 TypeScript/Vercel to FastAPI/Python on Render. This is a sequential chain, not a parallel wave:
 
-`004 (done) → 005 → 006 → 007 → 008`
+`004–006 (done) → 007 (in progress) → 008`
 
-`004` scaffold · `005` SQLModel + Alembic · `006` auth/crypto port · `007` Render cutover ·
-`008` retire the TS backend + re-point the `01x`/`05x` API tickets. Until `007` lands, the TS
-`api/` still serves production; the social-API tickets (`010`–`014`, `050`, `052`) are
-re-pointed to the FastAPI pattern in `008`.
+`004` scaffold · `005` SQLModel + Alembic · `006` auth/crypto port · `007` Render deploy + Vercel
+cutover · `008` retire the TS backend + re-point the `01x`/`05x` API tickets. The FastAPI backend is
+live on Render; the TS `api/` stays as a fallback until `008`. The social-API tickets (`010`–`014`,
+`050`, `052`) are re-pointed to the FastAPI pattern in `008`.
 
 ## Working a ticket
 
