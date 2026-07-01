@@ -1,0 +1,41 @@
+# WHAT THIS FILE IS
+# The Render deployment config for the FastAPI backend (ADR-0010, ticket T07). It is a
+# versioned record of how the "brink-api" web service is set up. The live service was
+# created via the Render dashboard; this file is the source of truth for its settings
+# and lets the service be recreated as a Render "Blueprint" if needed.
+#
+# Secrets are NOT stored here. Every env var below is marked `sync: false`, meaning its
+# value is entered by hand in the Render dashboard (Environment tab) and never committed.
+
+services:
+  - type: web
+    name: brink-api
+    runtime: python
+    plan: free
+    region: ohio          # US East, matches the Supabase (us-east-1) database
+    branch: develop       # switch to `main` for production once the release PR lands
+    rootDir: backend
+    # Install uv (our Python package manager), then install exactly the locked deps
+    # (no dev/test tools in production).
+    buildCommand: "pip install uv && uv sync --frozen --no-dev"
+    # Run the FastAPI app. Render provides the port to listen on via $PORT.
+    startCommand: "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      # These are set by hand in the Render dashboard (never committed):
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: TOKEN_ENC_KEY
+        sync: false
