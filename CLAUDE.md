@@ -170,25 +170,26 @@ tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge 
   Server/long-term Spotify access must go through our stored refresh token (snapshot job, T21).
 - `tsx` struggles importing some `.ts` files with top-level await from ad-hoc scripts; prefer
   `.mjs` for throwaway checks, or `node --env-file=.env --import tsx`.
-- Status: T00, T01, T02, T04, T05, **T06** done. Auth verified end-to-end (Spotify login creates a
-  `public.User` row + stores the encrypted refresh token). **Backend migration to FastAPI/Render
-  underway (ADR-0010).** T05 landed the 14 SQLModel tables + Alembic baseline; T06 ported the
-  security core to Python — AES-256-GCM token crypto (`backend/app/security/crypto.py`, byte-compatible
-  with the old TS format), the Supabase admin client + `require_user` dependency
-  (`backend/app/security/supabase.py`, `backend/app/deps.py`), and `POST /api/auth/capture-spotify`
-  (`backend/app/routers/auth.py`). **T07** (in progress) deploys the FastAPI app to Render and
-  rewrites Vercel `/api/*` to it — the Render service (`brink-xg7p.onrender.com`) is live with
-  `/api/health` returning `db: true`. The TS `api/` stays in the repo as a fallback until T08.
+- Status: T00, T01, T02, T04, T05, T06, **T07** done — the FastAPI/Render migration is live in
+  production end-to-end. The React SPA is on **Vercel** (`brink-theta.vercel.app`), FastAPI on
+  **Render** (`brink-xg7p.onrender.com`, `/api/health` → `db: true`), and Spotify login works on
+  the live site (Supabase OAuth → capture-spotify → encrypted token). The repo now lives at
+  **`brinkmusic/Brink`** (transferred from `j-jwalker`). The TS `api/` + Prisma stay as a fallback
+  until **T08** (next) removes them. T05 = SQLModel + Alembic; T06 = AES-256-GCM crypto
+  (`backend/app/security/crypto.py`), Supabase admin + `require_user` (`backend/app/deps.py`),
+  `POST /api/auth/capture-spotify`.
 
 ## Deployment topology (ADR-0010, T07)
 
-- **Frontend:** Vercel serves the React SPA (`apps/web`). Production deploys from `main`.
+- **Frontend:** Vercel serves the React SPA at `brink-theta.vercel.app` (project root `apps/web`),
+  deploying from `main`. Supabase Auth **URL config** must list the Vercel URL in Site URL +
+  Redirect URLs, or Spotify login can't return to the deployed site.
 - **Backend:** FastAPI on **Render** (`backend/`, config in `render.yaml`) — build `uv sync`,
   start `uvicorn app.main:app`. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
   `SPOTIFY_*`, `TOKEN_ENC_KEY`) live only in Render, never committed.
 - **Wiring:** the Vercel project's **root directory is `apps/web`** (so Vercel never builds the
   legacy `api/` functions or needs Prisma). `apps/web/vercel.json` rewrites `/api/:path*` → the
-  Render URL, so the browser still calls same-origin `/api/*` (no CORS). Both Render and Vercel
-  currently deploy from `develop`.
+  Render URL, so the browser still calls same-origin `/api/*` (no CORS). Vercel deploys the
+  frontend from `main`; Render deploys the backend from `develop`.
 - **Note:** the legacy POC `/api/state` (jsonblob) is *not* reimplemented in FastAPI and stops
   working after this cutover — its social features are replaced by the real API in T10–T14.
