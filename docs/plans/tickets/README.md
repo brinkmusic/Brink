@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T06; T07 in progress).
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08). The FastAPI/Render migration is complete; the legacy TS backend is removed.
 
 ## How these relate to the rest of the docs
 
@@ -55,20 +55,20 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 
 Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-profile spine).
 
-### Backend migration spine (TS/Vercel → FastAPI/Render)
+### Backend migration spine (TS/Vercel → FastAPI/Render) — ✅ complete
 
-Per [ADR-0010](../../decisions/adr/0010-fastapi-render-backend.md), the backend moves from
-TypeScript/Vercel to FastAPI/Python on Render. This is a sequential chain, not a parallel wave:
+Per [ADR-0010](../../decisions/adr/0010-fastapi-render-backend.md), the backend moved from
+TypeScript/Vercel to FastAPI/Python on Render. This ran as a sequential chain, now finished:
 
-`004–006 (done) → 007 (in progress) → 008`
+`004 → 005 → 006 → 007 → 008` (all done)
 
 `004` scaffold · `005` SQLModel + Alembic · `006` auth/crypto port · `007` Render deploy + Vercel
-cutover · `008` retire the TS backend + re-point the `01x`/`05x` API tickets. The FastAPI backend is
-live on Render; the TS `api/` stays as a fallback until `008`. The social-API tickets (`010`–`014`,
-`050`, `052`) are re-pointed to the FastAPI pattern in `008`.
+cutover · `008` retire the TS backend + doc sync. The FastAPI backend is live on Render and the
+legacy TS `api/` is removed. The social-API tickets (`010`–`014`, `050`, `052`) target the FastAPI
+pattern (`backend/app/...`).
 
 ## Working a ticket
 
-Per `CLAUDE.md`: branch off `develop` as `<type>/T<NN>-<slug>`, **one ticket = one PR into `develop`** (never `main`), TDD with a failing test first. The owner of the touched area (Andrea = api/prisma, Sebastian = apps/web, Jonah = analytics) is the default reviewer.
+Per `CLAUDE.md`: branch off `develop` as `<type>/T<NN>-<slug>`, **one ticket = one PR into `develop`** (never `main`), TDD with a failing test first. The owner of the touched area (Andrea = backend, Sebastian = apps/web, Jonah = analytics) is the default reviewer.
 
 > The `.tdd/` directory (if present) is an optional local tooling workspace for the maintainer and is gitignored — it is **not** the source of truth. These files are.

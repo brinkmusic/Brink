@@ -50,9 +50,7 @@ Analytics: Python / scikit-learn batch job (analytics/, GitHub Actions cron) ─
 ```
 
 - **`apps/web/`** — React + TypeScript + Vite SPA (frontend), deployed on Vercel.
-- **`backend/`** — FastAPI app (Python, `uv`-managed); the API's new home (ADR-0010).
-- **`api/`** — *legacy* Vercel serverless functions (TypeScript); being retired (ADR-0010).
-- **`prisma/`** — *legacy* `schema.prisma`; superseded by `backend/app/models.py` (SQLModel).
+- **`backend/`** — the API: FastAPI app (Python, `uv`-managed), on Render.
 - **`analytics/`** — Python pipeline, `uv`-managed (added in T30).
 - **`docs/`** — requirements, tickets, and decision records.
 
@@ -72,14 +70,11 @@ Andrea for the values.
 # Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
 cd apps/web && npm install && npm run dev
 
-# Terminal 2 — API on :3001
-#   FastAPI (new backend, use for backend work):
+# Terminal 2 — API on :3001 (FastAPI)
 cd backend && uv run uvicorn app.main:app --reload --port 3001
-#   legacy TS handlers (still serving until the cutover): npm install && npm run dev:api
 ```
 
-- **Test:** `cd backend && uv run pytest` (FastAPI); `npm test` (Jest — legacy TS).
-  Analytics: `cd analytics && uv run pytest`.
+- **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest`.
 - **Build frontend:** `cd apps/web && npm run build`
 
 See CLAUDE.md for the env-var list and migration details (SQLModel + Alembic).
