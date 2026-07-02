@@ -4,16 +4,12 @@
 # default { "detail": ... } shape. WHY: the frontend has one rule for reading results
 # and will break silently if some errors bypass the envelope (ADR-0010, ADR-0007 §1).
 
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app, raise_server_exceptions=False)
+# The `client` fixture (a fake HTTP client) comes from conftest.py.
 
 
 # When a request body is malformed JSON, FastAPI would normally return a 422 with
 # { "detail": [...] }. After our fix it must return 400 { "error": "..." }.
-def test_malformed_json_returns_400_envelope():
+def test_malformed_json_returns_400_envelope(client):
     res = client.post(
         "/api/auth/capture-spotify",
         content="{bad json",
@@ -27,7 +23,7 @@ def test_malformed_json_returns_400_envelope():
 
 # A path that doesn't exist should return 404 { "error": "..." }, not the default
 # { "detail": "Not Found" }.
-def test_unknown_path_returns_404_envelope():
+def test_unknown_path_returns_404_envelope(client):
     res = client.get("/api/does-not-exist")
     assert res.status_code == 404
     body = res.json()
