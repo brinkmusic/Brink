@@ -40,7 +40,7 @@ cd apps/web && npm run dev
 cd backend && uv run uvicorn app.main:app --reload --port 3001
 ```
 
-- **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest`.
+- **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest` (after T30 — `analytics/` does not exist yet).
 - **Build frontend:** `cd apps/web && npm run build` · **Lint:** `cd apps/web && npm run lint`.
 
 ## Hard rules
@@ -127,8 +127,8 @@ is a no-op on the existing DB. `alembic check` reports any drift between the mod
   `SUPABASE_SERVICE_ROLE_KEY`, `SPOTIFY_CLIENT_ID`/`SECRET`, `TOKEN_ENC_KEY`.
 - `apps/web/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - **Getting the values (onboarding):** `.env` files are git-ignored and never shared in the
-  repo. Copy `.env.example`, then get the real secret values from the Vercel/GitHub project
-  env or ask Andrea. Don't paste secrets into chat, issues, or commits.
+  repo. Copy `.env.example`, then get the real secret values from the Render (backend) /
+  Vercel (frontend) / GitHub env or ask Andrea. Don't paste secrets into chat, issues, or commits.
 - **Git hooks:** running `npm install` points git at `.githooks/` (a pre-commit secret guard).
   If you skipped install, run `git config core.hooksPath .githooks` once.
 

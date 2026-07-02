@@ -18,7 +18,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
-| BE-2 | Replace `api/state.js` (jsonblob) + delete dead `lib/api.ts`. | T00, T60 | ◻ |
+| BE-2 | Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, 404s since T08) + dead front-end stubs. | T60 | ◻ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ◻ |
 | BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ◻ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ◻ |
@@ -77,7 +77,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 7 — Infrastructure & Scheduling (INFRA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| INFRA-1 | Vercel project: SPA + `/api/*`; env vars set, no secrets in repo. | T01 | ✅ |
+| INFRA-1 † | Vercel project: SPA + `/api/*` rewrite to Render; env vars set, no secrets in repo. | T01, T07 | ✅ |
 | INFRA-2 | Supabase provisioned; pooled URLs; migrations in CI; Data API disabled. | T01 | ✅ |
 | INFRA-3 † | Snapshot trigger on a fixed cadence. *(GitHub Actions, not Vercel Cron)* | T21 | ◻ |
 | INFRA-4 | GitHub Actions runs the Python pipeline against Supabase. | T30, T38 | ◻ |
@@ -106,6 +106,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 
 ## Superseded spec text
 The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagged † above) evolved after it was written — defer to the ADRs:
+- **INFRA-1** — original spec assumed Vercel serverless (`api/`) as the backend. ADR-0010 moved the API to FastAPI on Render; Vercel now serves only the SPA and rewrites `/api/*` to the Render URL ([ADR-0010](../decisions/adr/0010-fastapi-render-backend.md)).
 - **AN-2/4/5/7/9** — per-user analytics are computed **on read in TS**, not materialized; `UserStats`/`TasteVector`/`Compatibility` tables and `User.clusterId` are dropped, `ModelArtifact` added ([ADR-0003](../decisions/adr/0003-analytics-runtime.md), [ADR-0009](../decisions/adr/0009-medallion-layering.md)).
 - **SP-2 / INFRA-3** — snapshot is triggered by **GitHub Actions**, not Vercel Cron ([ADR-0006](../decisions/adr/0006-scheduling.md)).
 - **AUTH-3** — handle is **auto-derived**; no signup form / custom-handle flow.
