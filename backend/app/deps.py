@@ -4,18 +4,27 @@
 # creating that user the first time they ever sign in. Any endpoint that needs a
 # logged-in user asks for this (via FastAPI's Depends), so the check lives in one place.
 #
-# Ported 1:1 from the old api/_lib/auth.ts so behavior (and the generated handle) is
-# identical to what production already does.
+# Ported from the old api/_lib/auth.ts (removed in T08; see ADR-0010). The handle-
+# generation logic is preserved exactly. Two deliberate differences from the TS version:
+#   1. ValueError from admin() (missing SUPABASE_URL/KEY) propagates as 500 rather than
+#      being swallowed into a silent 401 — misconfiguration must be visible in logs.
+#   2. The first-sign-in INSERT is wrapped to handle a concurrent-request race: if two
+#      requests arrive simultaneously for the same new user, the losing INSERT hits the
+#      unique constraint; we roll back and return the winner's row instead of 500ing.
 
+import logging
 import re
 import unicodedata
 
 from fastapi import Depends, Request
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.db import get_session
 from app.models import User
 from app.security import supabase
+
+logger = logging.getLogger(__name__)
 
 
 # A small error type carrying an HTTP status. When raised, an app-wide handler
@@ -49,11 +58,18 @@ def _slugify(s: str) -> str:
 def require_user(request: Request, session: Session = Depends(get_session)) -> User:
     token = _bearer_token(request)
 
-    # Ask Supabase to validate the token and tell us who it belongs to. Any failure
-    # (bad token, network error, no user) means "not a valid session" -> 401.
+    # Ask Supabase to validate the token and tell us who it belongs to.
+    # - ValueError means a configuration problem (e.g. SUPABASE_URL not set) — let it
+    #   propagate so the server 500s and the missing config is visible in Render logs.
+    # - Any other exception (network error, bad/expired token) means "not a valid
+    #   session" → 401. We log the original error at DEBUG so it's diagnosable without
+    #   leaking details to the caller.
     try:
         su = supabase.get_user_from_token(token)
+    except ValueError:
+        raise  # misconfiguration — must surface as 500, not a silent 401
     except Exception:
+        logger.debug("token verification failed", exc_info=True)
         raise AuthError("invalid session")
     if su is None:
         raise AuthError("invalid session")
@@ -86,7 +102,18 @@ def require_user(request: Request, session: Session = Depends(get_session)) -> U
         avatar_url=meta.get("avatar_url") or meta.get("picture"),
         spotify_id=(meta.get("provider_id") or meta.get("sub")) if is_spotify else None,
     )
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    return user
+    try:
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+    except IntegrityError:
+        # Two concurrent requests for the same new user both passed the select above
+        # (both saw "no row"), then both tried to INSERT. The DB correctly rejected
+        # the second one via the supabaseUserId unique constraint. Roll back our failed
+        # transaction and return the row the first request already created.
+        session.rollback()
+        existing = session.exec(select(User).where(User.supabase_user_id == su.id)).first()
+        if existing:
+            return existing
+        raise  # genuinely unexpected — re-raise for a 500

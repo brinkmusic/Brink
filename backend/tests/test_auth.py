@@ -118,6 +118,73 @@ def test_capture_success_upserts_encrypted_token(monkeypatch):
     session.commit.assert_called_once()
 
 
+# --- require_user hardening (T71 findings H2, MB1) --------------------------------
+
+# When two requests for the same brand-new user arrive simultaneously, the second
+# INSERT hits the unique constraint. The fix: catch IntegrityError, rollback, and
+# re-select the row the first request already created — no 500.
+def test_concurrent_first_signin_race_is_handled(monkeypatch):
+    from sqlalchemy.exc import IntegrityError
+
+    su = SimpleNamespace(
+        id="race-aabbcc",
+        email="race@example.com",
+        user_metadata={},
+        app_metadata={},
+    )
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su)
+
+    # The user that the "winner" request already created.
+    existing = User(id="u-winner", handle="listener-raceaa", display_name="Listener",
+                    created_at=datetime.now(timezone.utc))
+
+    session = MagicMock()
+    call_count = 0
+
+    def exec_side_effect(stmt):
+        nonlocal call_count
+        result = MagicMock()
+        # First select: user not found yet (both requests miss simultaneously).
+        # Second select (after rollback): winner's row is now present.
+        result.first.return_value = None if call_count == 0 else existing
+        call_count += 1
+        return result
+
+    session.exec.side_effect = exec_side_effect
+    # Simulate the loser's INSERT hitting the unique constraint.
+    session.commit.side_effect = IntegrityError("stmt", {}, Exception("dup key"))
+
+    user = require_user(_request("Bearer loser"), session=session)
+
+    assert user is existing
+    session.rollback.assert_called_once()
+
+
+# When the Supabase client raises (e.g. network error, expired token), require_user
+# should return 401 — same as returning None, but testing the exception code path.
+def test_token_verification_exception_raises_401(monkeypatch):
+    def raise_network_error(token):
+        raise Exception("connection refused")
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", raise_network_error)
+    with pytest.raises(AuthError) as exc:
+        require_user(_request("Bearer x"), session=MagicMock())
+    assert exc.value.status == 401
+
+
+# When admin() raises ValueError (missing SUPABASE_URL/KEY), that is a server
+# misconfiguration — it must NOT be swallowed into a silent 401. It should propagate
+# so Render logs show the real problem (finding MB1).
+def test_misconfiguration_propagates_not_401(monkeypatch):
+    def raise_config_error(token):
+        raise ValueError("SUPABASE_URL not set")
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", raise_config_error)
+    with pytest.raises(ValueError):
+        require_user(_request("Bearer any"), session=MagicMock())
+
+
+# --- POST /api/auth/capture-spotify (endpoint tests, via a fake HTTP client) -----
+
+
 # An unauthenticated request -> the AuthError handler returns our 401 { error } shape.
 def test_capture_unauthenticated_returns_401_envelope():
     def raise_auth_error():
