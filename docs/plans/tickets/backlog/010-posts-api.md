@@ -4,7 +4,7 @@ priority: High
 complexity: Medium
 category: Feature
 tags: [backend, api, posts, validation]
-blocked_by: []
+blocked_by: [070]
 blocks: [011, 012, 013, 021, 040, 041]
 parent_ticket: null
 owner: Andrea
@@ -65,8 +65,13 @@ FastAPI routes to create a post and list a user's posts, upserting the reference
 - [x] Summary is specific and actionable
 - [x] Files to Create/Modify is populated
 - [x] Testing Checklist has items
-- [x] Dependencies identified (T01, T02 done; rate-limit helper implemented here)
+- [x] Dependencies identified (T01, T02 done; T70 envelope handlers must merge first; rate-limit helper implemented here)
 - [x] Scope boundaries defined
 
 ## Notes
 Branch off `develop` as `feat/T10-posts-api`; one PR back into `develop` (never `main`). Rate-limit middleware (ADR-0007 §5, Postgres-backed store) is cross-cutting — factor the per-user cap into a `backend/app/` helper so later endpoints reuse it.
+
+Per the [2026-07-02 code review](../../reviews/2026-07-02-code-review-t00-t08.md) (patterns §5–6), this ticket also sets three precedents the rest of the social API copies:
+- **Response DTO/casing:** define per-endpoint Pydantic response models with camelCase aliases in one shared place — do **not** return SQLModel table models raw (snake_case JSON + column leaks; `SpotifyToken` must never be serializable). This resolves the casing decision deferred at T06; capture it as a short ADR if the approach is load-bearing.
+- **Strict request schemas:** required, typed fields; envelope-shaped 400s come from T70's global handlers. Don't copy capture-spotify's all-Optional parity pattern.
+- **Router convention:** `APIRouter(prefix="/api/posts", tags=["posts"])` rather than hard-coded literal paths.
