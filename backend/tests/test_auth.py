@@ -1,14 +1,14 @@
 # WHAT THIS FILE IS
-# Checks the login gatekeeper (app/deps.py) and the capture-spotify endpoint. These
-# run without a real database or a real Supabase by "faking" those pieces (see the
-# MagicMock sessions and the monkeypatched Supabase lookup), so they're fast and safe.
+# Checks the login gatekeeper (app/deps.py) and the capture-spotify endpoint. The
+# require_user unit tests call it directly with a fake (MagicMock) session; the endpoint
+# tests use the shared `client` + `as_user` fixtures from conftest.py, which fake both
+# the logged-in user and the database session so the tests are fast and network-free.
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app import deps
 from app.db import get_session
@@ -25,12 +25,40 @@ def _request(auth_header=None):
     return SimpleNamespace(headers=headers)
 
 
+def _su(**overrides):
+    # Build a fake Supabase user (what get_user_from_token returns). Defaults describe a
+    # brand-new user with no metadata; pass overrides to exercise specific branches.
+    base = dict(
+        id="00000000-1111-2222-3333-444444444444",
+        email=None,
+        user_metadata={},
+        app_metadata={},
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def _new_user_session():
+    # A fake DB session whose lookup finds no existing user, so require_user takes the
+    # first-sign-in creation path.
+    session = MagicMock()
+    session.exec.return_value.first.return_value = None
+    return session
+
+
 # --- require_user (unit tests, called directly) ---------------------------------
 
 # No "Authorization: Bearer ..." header -> rejected with 401.
 def test_missing_bearer_raises_401():
     with pytest.raises(AuthError) as exc:
         require_user(_request(None), session=MagicMock())
+    assert exc.value.status == 401
+
+
+# A non-Bearer scheme ("Authorization: Token abc") is malformed -> 401, not a 500.
+def test_non_bearer_authorization_header_raises_401():
+    with pytest.raises(AuthError) as exc:
+        require_user(_request("Token abc"), session=MagicMock())
     assert exc.value.status == 401
 
 
@@ -44,7 +72,7 @@ def test_invalid_token_raises_401(monkeypatch):
 
 # First sign-in creates a User with the exact handle policy: slug + 6 chars of the id.
 def test_first_signin_creates_user_with_handle_policy(monkeypatch):
-    su = SimpleNamespace(
+    su = _su(
         id="abcdef12-3456-7890-abcd-ef1234567890",
         email="jane@example.com",
         # Spotify puts provider_id in user_metadata; the provider name in app_metadata.
@@ -52,10 +80,8 @@ def test_first_signin_creates_user_with_handle_policy(monkeypatch):
         app_metadata={"provider": "spotify"},
     )
     monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su)
-    session = MagicMock()
-    session.exec.return_value.first.return_value = None  # no existing user found
 
-    user = require_user(_request("Bearer good"), session=session)
+    user = require_user(_request("Bearer good"), session=_new_user_session())
 
     assert user.handle == "jane-doe-abcdef"  # slug("Jane Doe") + first 6 of id (no hyphens)
     assert user.display_name == "Jane Doe"
@@ -63,59 +89,41 @@ def test_first_signin_creates_user_with_handle_policy(monkeypatch):
     assert user.email == "jane@example.com"
     assert user.avatar_url == "http://img/a.png"
     assert user.spotify_id == "spot123"
-    session.add.assert_called_once()
-    session.commit.assert_called_once()
 
 
-# --- POST /api/auth/capture-spotify (endpoint tests, via a fake HTTP client) -----
+# --- display-name fallback chain (finding L4) ------------------------------------
+# full_name -> name -> email prefix -> "Listener"; and an unslugifiable name -> "user".
+
+# No full_name but a name -> use the name.
+def test_display_name_falls_back_to_name(monkeypatch):
+    su = _su(user_metadata={"name": "Only Name"})
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su)
+    user = require_user(_request("Bearer x"), session=_new_user_session())
+    assert user.display_name == "Only Name"
 
 
-@pytest.fixture(autouse=True)
-def _clear_overrides():
-    # Undo any dependency fakes after each test so they don't leak into other tests.
-    yield
-    app.dependency_overrides.clear()
+# No name at all but an email -> use the part before the "@".
+def test_display_name_falls_back_to_email_prefix(monkeypatch):
+    su = _su(email="alice@example.com")
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su)
+    user = require_user(_request("Bearer x"), session=_new_user_session())
+    assert user.display_name == "alice"
 
 
-def _fake_logged_in_user():
-    return User(id="user-1", handle="h", display_name="d", created_at=datetime.now(timezone.utc))
+# No name and no email -> the constant fallback "Listener".
+def test_display_name_falls_back_to_listener(monkeypatch):
+    su = _su()
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su)
+    user = require_user(_request("Bearer x"), session=_new_user_session())
+    assert user.display_name == "Listener"
 
 
-# Missing a token -> 400 with the exact legacy message.
-def test_capture_missing_tokens_returns_400():
-    app.dependency_overrides[require_user] = _fake_logged_in_user
-    app.dependency_overrides[get_session] = lambda: MagicMock()
-    res = TestClient(app).post("/api/auth/capture-spotify", json={"access_token": "only-one"})
-    assert res.status_code == 400
-    assert res.json() == {"error": "missing spotify tokens"}
-
-
-# Success -> stores an ENCRYPTED token row and returns { data: { captured: true } }.
-def test_capture_success_upserts_encrypted_token(monkeypatch):
-    from app.routers import auth as auth_router
-
-    # Replace real encryption with a visible stand-in so we can assert it was applied.
-    monkeypatch.setattr(auth_router, "encrypt", lambda s: f"enc({s})")
-    session = MagicMock()
-    session.get.return_value = None  # no existing token row -> create one
-
-    app.dependency_overrides[require_user] = _fake_logged_in_user
-    app.dependency_overrides[get_session] = lambda: session
-
-    res = TestClient(app).post(
-        "/api/auth/capture-spotify",
-        json={"access_token": "AT", "refresh_token": "RT", "scopes": "user-read"},
-    )
-
-    assert res.status_code == 200
-    assert res.json() == {"data": {"captured": True}}
-    added = session.add.call_args[0][0]  # the SpotifyToken we saved
-    assert isinstance(added, SpotifyToken)
-    assert added.user_id == "user-1"
-    assert added.access_token == "enc(AT)"    # stored encrypted, never in the clear
-    assert added.refresh_token == "enc(RT)"
-    assert added.scopes == "user-read"
-    session.commit.assert_called_once()
+# A display name that slugifies to nothing (all punctuation) -> handle base "user".
+def test_handle_uses_user_prefix_when_slug_empty(monkeypatch):
+    su = _su(id="deadbeef-0000-1111-2222-333344445555", user_metadata={"full_name": "!!!"})
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su)
+    user = require_user(_request("Bearer x"), session=_new_user_session())
+    assert user.handle == "user-deadbe"  # "user" + first 6 of id (hyphens removed)
 
 
 # --- require_user hardening (T71 findings H2, MB1) --------------------------------
@@ -126,12 +134,7 @@ def test_capture_success_upserts_encrypted_token(monkeypatch):
 def test_concurrent_first_signin_race_is_handled(monkeypatch):
     from sqlalchemy.exc import IntegrityError
 
-    su = SimpleNamespace(
-        id="race-aabbcc",
-        email="race@example.com",
-        user_metadata={},
-        app_metadata={},
-    )
+    su = _su(id="race-aabbcc", email="race@example.com")
     monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su)
 
     # The user that the "winner" request already created.
@@ -182,17 +185,85 @@ def test_misconfiguration_propagates_not_401(monkeypatch):
         require_user(_request("Bearer any"), session=MagicMock())
 
 
-# --- POST /api/auth/capture-spotify (endpoint tests, via a fake HTTP client) -----
+# --- POST /api/auth/capture-spotify (endpoint tests, via the shared fixtures) -----
+
+
+def _fake_logged_in_user():
+    return User(id="user-1", handle="h", display_name="d", created_at=datetime.now(timezone.utc))
+
+
+# Missing a token -> 400 with the exact legacy message.
+def test_capture_missing_tokens_returns_400(client, as_user):
+    as_user(_fake_logged_in_user())
+    res = client.post("/api/auth/capture-spotify", json={"access_token": "only-one"})
+    assert res.status_code == 400
+    assert res.json() == {"error": "missing spotify tokens"}
+
+
+# Success (no existing row) -> CREATE: adds an ENCRYPTED token row, returns captured:true.
+def test_capture_success_upserts_encrypted_token(client, as_user, monkeypatch):
+    from app.routers import auth as auth_router
+
+    # Replace real encryption with a visible stand-in so we can assert it was applied.
+    monkeypatch.setattr(auth_router, "encrypt", lambda s: f"enc({s})")
+    session = MagicMock()
+    session.get.return_value = None  # no existing token row -> create one
+    as_user(_fake_logged_in_user(), session=session)
+
+    res = client.post(
+        "/api/auth/capture-spotify",
+        json={"access_token": "AT", "refresh_token": "RT", "scopes": "user-read"},
+    )
+
+    assert res.status_code == 200
+    assert res.json() == {"data": {"captured": True}}
+    added = session.add.call_args[0][0]  # the SpotifyToken we saved
+    assert isinstance(added, SpotifyToken)
+    assert added.user_id == "user-1"
+    assert added.access_token == "enc(AT)"    # stored encrypted, never in the clear
+    assert added.refresh_token == "enc(RT)"
+    assert added.scopes == "user-read"
+    session.commit.assert_called_once()
+
+
+# Success (row already exists) -> UPDATE: overwrites fields in place, does NOT re-add.
+# This is the path every login after the first takes (finding MB5). It also pins the
+# expiry format: naive UTC (no tzinfo), ~1 hour ahead, matching legacy rows.
+def test_capture_update_branch_overwrites_without_add(client, as_user, monkeypatch):
+    from app.routers import auth as auth_router
+
+    monkeypatch.setattr(auth_router, "encrypt", lambda s: f"enc({s})")
+    existing = SpotifyToken(user_id="user-1", access_token="old", refresh_token="old", scopes="old")
+    session = MagicMock()
+    session.get.return_value = existing  # row already exists -> update path
+    as_user(_fake_logged_in_user(), session=session)
+
+    res = client.post(
+        "/api/auth/capture-spotify",
+        json={"access_token": "AT", "refresh_token": "RT", "scopes": "new-scope"},
+    )
+
+    assert res.status_code == 200
+    session.add.assert_not_called()          # updated in place, not re-added
+    session.commit.assert_called_once()
+    assert existing.access_token == "enc(AT)"
+    assert existing.refresh_token == "enc(RT)"
+    assert existing.scopes == "new-scope"
+    # Expiry stored naive (no timezone) and about an hour ahead — legacy-row parity.
+    assert existing.expires_at.tzinfo is None
+    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    delta = existing.expires_at - now_naive
+    assert timedelta(minutes=55) < delta < timedelta(minutes=65)
 
 
 # An unauthenticated request -> the AuthError handler returns our 401 { error } shape.
-def test_capture_unauthenticated_returns_401_envelope():
+def test_capture_unauthenticated_returns_401_envelope(client):
     def raise_auth_error():
         raise AuthError("invalid session")
 
     app.dependency_overrides[require_user] = raise_auth_error
     app.dependency_overrides[get_session] = lambda: MagicMock()
-    res = TestClient(app).post(
+    res = client.post(
         "/api/auth/capture-spotify", json={"access_token": "a", "refresh_token": "b"}
     )
     assert res.status_code == 401

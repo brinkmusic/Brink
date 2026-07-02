@@ -4,17 +4,13 @@
 # without needing a real database during the test. To do that we "fake" the
 # database check (see monkeypatch below).
 
-from fastapi.testclient import TestClient
-
 from app import db
-from app.main import app
 
-# A test client that can send fake requests to our app, no real server needed.
-client = TestClient(app)
+# The `client` fixture (a fake HTTP client) comes from conftest.py.
 
 
 # Case 1: database is reachable.
-def test_health_returns_ok_and_db_true(monkeypatch):
+def test_health_returns_ok_and_db_true(client, monkeypatch):
     # monkeypatch temporarily replaces the real db_ping with one that just returns
     # True, so this test doesn't touch a real database.
     monkeypatch.setattr(db, "db_ping", lambda: True)
@@ -24,7 +20,7 @@ def test_health_returns_ok_and_db_true(monkeypatch):
 
 
 # Case 2: database is unreachable.
-def test_health_returns_500_when_db_unreachable(monkeypatch):
+def test_health_returns_500_when_db_unreachable(client, monkeypatch):
     # Replace db_ping with one that raises an error, simulating a database outage.
     def boom() -> bool:
         raise RuntimeError("boom")
