@@ -153,8 +153,10 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   legacy TypeScript backend is fully removed. The React SPA is on **Vercel**
   (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`, `/api/health` →
   `db: true`), and Spotify login works on the live site (Supabase OAuth → capture-spotify →
-  encrypted token). Repo: **`brinkmusic/Brink`** (public). Next feature work: the social API
-  (T10 posts → T11–T14) on FastAPI.
+  encrypted token). Repo: **`brinkmusic/Brink`** (public). A 2026-07-02 code review of the shipped
+  surface produced a remediation wave (T70–T78, see
+  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`); **T70 blocks T10**. Next feature work:
+  the social API (T10 posts → T11–T14) on FastAPI.
 
 ## Deployment topology (ADR-0010, T07)
 
