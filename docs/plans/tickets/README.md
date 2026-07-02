@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08). The FastAPI/Render migration is complete; the legacy TS backend is removed.
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, T70, T71, T77, T78). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave.
 
 ## How these relate to the rest of the docs
 
@@ -44,7 +44,7 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 
 | Wave | Tickets |
 |---|---|
-| **0 (ready)** | `003` `010`\* `020` `030` `039` `050` |
+| **0 (ready)** | `003` `010` `020` `030` `039` `050` |
 | 1 | `011` `012` `013` `021` `031` `040` `051` |
 | 2 | `032` `034` `036` `041` `042` `043` `052` |
 | 3 | `033` `038` `045` |
@@ -56,19 +56,15 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 
 Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-profile spine).
 
-\* `010` is additionally blocked by `070` (error-envelope handlers) — see the remediation wave below.
-
 ### Review-remediation wave (2026-07-02) — `070`–`078`
 
 A full code review of the T00–T08 surface ([findings report](../reviews/2026-07-02-code-review-t00-t08.md))
-produced nine remediation tickets. All are independent (parallel-safe) except: `070`/`071` → `073`
-(same test files), `075` → `076` (same `AuthContext.tsx`), and **`070` → `010`** (the social API
-must land on envelope-complete error handling). Each ticket cites its finding IDs (H*/MB*/MF*/MI*/L*)
-from the report, which is the traceability root.
+produced nine remediation tickets. Each ticket cites its finding IDs (H*/MB*/MF*/MI*/L*) from the
+report, which is the traceability root.
 
-| Ready now | Then |
+| Done ✅ | Remaining |
 |---|---|
-| `070` `071` `072` `074` `075` `077` `078` | `073` (after 070+071) · `076` (after 075) · `010` (after 070) |
+| `070` `071` `077` `078` | `072` `074` `075` · `073` (after 070+071 ✅) · `076` (after 075) |
 
 ### Backend migration spine (TS/Vercel → FastAPI/Render) — ✅ complete
 

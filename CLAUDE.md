@@ -149,14 +149,12 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   Server/long-term Spotify access must go through our stored refresh token (snapshot job, T21).
 - The DB still has a `_prisma_migrations` table (Prisma's old bookkeeping); Alembic ignores it
   (`backend/alembic/env.py`). Harmless — it can be dropped whenever.
-- Status: T00–T02, T04–T06, **T07–T08** done — the FastAPI/Render migration is complete and the
-  legacy TypeScript backend is fully removed. The React SPA is on **Vercel**
-  (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`, `/api/health` →
-  `db: true`), and Spotify login works on the live site (Supabase OAuth → capture-spotify →
-  encrypted token). Repo: **`brinkmusic/Brink`** (public). A 2026-07-02 code review of the shipped
-  surface produced a remediation wave (T70–T78, see
-  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`); **T70 blocks T10**. Next feature work:
-  the social API (T10 posts → T11–T14) on FastAPI.
+- Status: T00–T02, T04–T08, **T70–T71, T77–T78** done — FastAPI/Render migration complete, TS
+  backend removed, error envelope hardened, auth race fixed, CI hygiene done. The React SPA is on
+  **Vercel** (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`,
+  `/api/health` → `db: true`), Spotify login works end-to-end. Repo: **`brinkmusic/Brink`**
+  (public). Remaining remediation: T72, T73, T74, T75, T76 (see
+  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **Next feature work: T10 (posts API).**
 
 ## Deployment topology (ADR-0010, T07)
 
