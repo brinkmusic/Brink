@@ -32,4 +32,5 @@ def test_health_returns_500_when_db_unreachable(monkeypatch):
     monkeypatch.setattr(db, "db_ping", boom)
     res = client.get("/api/health")
     assert res.status_code == 500  # 500 = server error
-    assert "error" in res.json()
+    # Exact constant message — no raw driver details leaked (finding MB4).
+    assert res.json() == {"error": "db unreachable"}
