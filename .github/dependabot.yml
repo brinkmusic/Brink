@@ -31,3 +31,19 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+  # Backend Python deps (FastAPI, cryptography, supabase, etc.).
+  # Dependabot does not yet support "uv" as an ecosystem — "pip" is the closest
+  # supported value and covers packages declared in pyproject.toml. When Dependabot
+  # adds native uv support, change ecosystem to "uv" here.
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: monthly
+    target-branch: develop
+    open-pull-requests-limit: 5
+    groups:
+      backend-python:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
