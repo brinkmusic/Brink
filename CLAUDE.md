@@ -6,51 +6,42 @@ touching the repo.
 
 ## What Brink is
 
-React/Vite SPA + an **API backend** + **Supabase** (Postgres + Auth + Storage) + a
-Python/scikit-learn analytics batch job (GitHub Actions cron).
+React/Vite SPA (Vercel) + a **FastAPI/Python API** (Render) + **Supabase** (Postgres + Auth +
+Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
 
-> **⚠ Backend migration in progress ([ADR-0010](docs/decisions/adr/0010-fastapi-render-backend.md)).**
-> The API is moving from **TypeScript / Vercel serverless + Prisma** to **FastAPI / Python on
-> Render + SQLModel / Alembic** — the team works in Python, not TS. The new backend lives in
-> `backend/` (scaffolded, T04 ✅); the **legacy TS `api/` still serves production** until the
-> cutover (T07). **New backend work targets `backend/` (FastAPI), not `api/`.** Frontend stays
-> React/TS; Supabase is unchanged. Migration spine: `004 → 005 → 006 → 007 → 008` in
-> `docs/plans/tickets/`. This guide still documents the TS path where it's the live one; CLAUDE.md
-> gets its full flip to FastAPI in **T08**.
+> **Stack:** the API is a **FastAPI / Python** app (SQLModel + Alembic) on **Render**; the
+> React/Vite SPA is on **Vercel** and calls it same-origin via an `/api/*` rewrite; **Supabase**
+> provides Postgres, Auth, and Storage. See
+> [ADR-0010](docs/decisions/adr/0010-fastapi-render-backend.md) for how the backend moved here from
+> an earlier TypeScript/Vercel/Prisma stack (removed in T08). All backend work is in `backend/`.
 
 **Source of truth — read these before planning any work:**
-- `docs/plans/requirements.md` — requirement catalog (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`) + requirement→ticket traceability. Data model: `prisma/schema.prisma` (moving to `backend/app/models.py` as SQLModel in T05). Decisions: `docs/decisions/`.
+- `docs/plans/requirements.md` — requirement catalog (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`) + requirement→ticket traceability. Data model: `backend/app/models.py` (SQLModel). Decisions: `docs/decisions/`.
 - `docs/plans/tickets/` — one file per ticket (`backlog/`, `completed/`), derived from the ADRs in `docs/decisions/`. Start at `docs/plans/tickets/README.md` for the dependency waves and reading guide.
 
 ## Layout
 
-- `backend/` — **FastAPI app (Python, `uv`-managed)** — the API's new home (ADR-0010). App code
-  in `backend/app/`, tests in `backend/tests/`, migrations in `backend/alembic/` (from T05).
-- `api/` — *legacy* Vercel serverless functions (TypeScript), shared helpers in `api/_lib/`.
-  Still serves production until the T07 cutover; removed wholesale in T08.
-- `apps/web/` — React/Vite SPA frontend (stays TypeScript).
-- `prisma/` — `schema.prisma` + migrations (legacy; replaced by SQLModel/Alembic in T05, removed in T08).
+- `backend/` — **the API: FastAPI app (Python, `uv`-managed)**. App code in `backend/app/`, tests
+  in `backend/tests/`, DB migrations in `backend/alembic/`.
+- `apps/web/` — React/Vite SPA frontend (TypeScript).
 - `analytics/` — Python pipeline (`uv`-managed). Created in T30.
 - `docs/plans/` — spec + tickets (source of truth above).
 
 ## Commands
 
-Local dev needs **two terminals** (the live deployment stays untouched — do not run `vercel dev`):
+Local dev needs **two terminals**. Local reads the root `.env` (the `brink-dev` Supabase project),
+so it never touches production.
 
 ```
 # Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
 cd apps/web && npm run dev
 
 # Terminal 2 — API on :3001 (Vite proxies /api -> :3001)
-#   FastAPI (new backend, ADR-0010 — use this for backend work):
 cd backend && uv run uvicorn app.main:app --reload --port 3001
-#   legacy TS handlers (still serving until T07): npm run dev:api
 ```
 
-- **Test:** `cd backend && uv run pytest` (FastAPI); `npm test` (root, Jest + Supertest — legacy
-  TS, until T08). Analytics: `cd analytics && uv run pytest`.
-- **Build frontend:** `cd apps/web && npm run build` · **Lint:** `npm run lint`.
-- **Prisma generate (legacy):** `npm run prisma:generate`.
+- **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest`.
+- **Build frontend:** `cd apps/web && npm run build` · **Lint:** `cd apps/web && npm run lint`.
 
 ## Hard rules
 
@@ -63,13 +54,14 @@ cd backend && uv run uvicorn app.main:app --reload --port 3001
    Branch off the latest `develop`, keep them short-lived, and **delete the branch after its PR
    merges**. Don't let a branch drift far behind `develop` — rebase or re-sync instead.
 3. **Never commit secrets.** `.env` (root) and `apps/web/.env` are git-ignored and stay that way.
-   Secrets live only in those files locally and in Vercel/GitHub env. If you ever see a secret
-   in tracked files, stop and flag it.
+   Secrets live only in those files locally and in the Render (backend) / Vercel (frontend) / GitHub
+   env. If you ever see a secret in tracked files, stop and flag it.
 4. **TDD (expected practice).** Write a failing test first, then minimal code to pass,
    with frequent small commits. Claude Code agents should use the `test-driven-development`
    skill; everyone else follows the same loop by hand. This is the expected workflow, not an
-   automated guarantee — CI (`.github/workflows/ci.yml`) runs `npm test` on every PR and is
-   what actually blocks untested code. Don't execute multiple tickets at once.
+   automated guarantee — CI (`.github/workflows/ci.yml`) runs the backend tests (`uv run pytest`),
+   the frontend build, and a secret scan on every PR, and is what actually blocks untested code.
+   Don't execute multiple tickets at once.
 5. **Don't widen scope.** Build exactly what the ticket/requirement specifies — no extra
    features, abstractions, or error handling beyond what's asked.
 6. **Auth:** validate Supabase JWTs server-side via `getUser()` (no JWT secret). We own
@@ -87,7 +79,7 @@ These are expectations, not automated guarantees — they set how we work.
 - **Smallest change that satisfies the ticket.** Surface follow-ups as notes; don't silently
   build them.
 - **Reuse before reinventing.** Search for an existing helper before writing a new one. Shared
-  logic lives in `api/_lib/` (backend) and `apps/web/src` shared modules (frontend) — extend
+  logic lives in `backend/app/` (backend) and `apps/web/src` shared modules (frontend) — extend
   or import it; don't copy-paste or write a second version of something that already exists. If
   you find duplication, factor it out as part of the change.
 - **Comments: explain both *what* and *why*, written for a reader new to the language/stack.**
@@ -104,8 +96,9 @@ These are expectations, not automated guarantees — they set how we work.
     than none, so update comments in the same change as the code.
   This is a project standard for Brink; individual contributors' global preferences don't override it.
 - **Guard against regressions.** A bug fix starts with a failing test that reproduces the bug,
-  then the fix. Changes to shared code (`api/_lib/`, `prisma/schema.prisma`) have a wide blast
-  radius — call out in the PR what depends on them, and run the full suite (`npm test`).
+  then the fix. Changes to shared code (`backend/app/db.py`, `backend/app/models.py`,
+  `backend/app/deps.py`) have a wide blast radius — call out in the PR what depends on them, and
+  run the full suite (`cd backend && uv run pytest`).
 - **Commit messages:** Conventional Commits — `type(scope): summary`
   (`feat`, `fix`, `chore`, `docs`, `ci`, `test`, `refactor`). Scope is usually the ticket id,
   e.g. `feat(T10): add posts endpoint`.
@@ -121,28 +114,15 @@ These are expectations, not automated guarantees — they set how we work.
 
 ## Database migrations
 
-**New backend work (T05+) uses SQLModel + Alembic** — edit `backend/app/models.py`, then
+Schema changes use **SQLModel + Alembic**: edit `backend/app/models.py`, then
 `cd backend && uv run alembic revision --autogenerate -m "..."` and `uv run alembic upgrade head`.
-This replaces the Prisma workaround below.
-
-**Legacy (Prisma) — only while the TS `api/` is still live (removed in T08):**
-`prisma migrate dev` is **interactive and will hang** in this environment — do not use it.
-To make a schema change:
-
-1. Edit `prisma/schema.prisma`.
-2. Generate a migration SQL file with a non-interactive diff:
-   ```
-   npx prisma migrate diff \
-     --from-schema-datasource prisma/schema.prisma \
-     --to-schema-datamodel prisma/schema.prisma \
-     --script > prisma/migrations/<timestamp>_<name>/migration.sql
-   ```
-3. Apply with `npm run prisma:deploy` (`prisma migrate deploy`).
+Alembic was baselined against the live schema in T05 (stamped, not recreated), so `upgrade head`
+is a no-op on the existing DB. `alembic check` reports any drift between the models and the DB.
 
 ## Environment
 
 - Supabase project `brink-dev` (ref `ljzwskfhiviunmqxerwu`). Data API disabled — tables are
-  reached only through Prisma.
+  reached only through the backend's ORM (SQLModel/SQLAlchemy).
 - Root `.env`: `DATABASE_URL`/`DIRECT_URL` (Supabase pooler 6543/5432), `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`, `SPOTIFY_CLIENT_ID`/`SECRET`, `TOKEN_ENC_KEY`.
 - `apps/web/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
@@ -154,30 +134,27 @@ To make a schema change:
 
 ## Ownership & review (CODEOWNERS intent)
 
-- **Andrea** — backend / API / auth / DB (`backend/`, legacy `api/`, `prisma/`).
+- **Andrea** — backend / API / auth / DB (`backend/`).
 - **Sebastian** — frontend (`apps/web/`).
 - **Jonah** — analytics (`analytics/`).
 
 The owner of an area is the default reviewer for PRs touching it (every ticket also has an
-`owner` in its frontmatter). **Auth and crypto changes** — the FastAPI successors
-`backend/app/deps.py`, `backend/app/security/crypto.py`, `backend/app/security/supabase.py` (and
-their legacy TS counterparts `api/_lib/auth.ts`/`crypto.ts`/`supabase.ts`), anything touching
-tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge them.
+`owner` in its frontmatter). **Auth and crypto changes** — `backend/app/deps.py`,
+`backend/app/security/crypto.py`, `backend/app/security/supabase.py`, anything touching tokens or
+`TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge them.
 
 ## Watch-outs
 
 - Spotify `provider_token` from the browser lasts ~1h and is **not** refreshed by Supabase.
   Server/long-term Spotify access must go through our stored refresh token (snapshot job, T21).
-- `tsx` struggles importing some `.ts` files with top-level await from ad-hoc scripts; prefer
-  `.mjs` for throwaway checks, or `node --env-file=.env --import tsx`.
-- Status: T00, T01, T02, T04, T05, T06, **T07** done — the FastAPI/Render migration is live in
-  production end-to-end. The React SPA is on **Vercel** (`brink-theta.vercel.app`), FastAPI on
-  **Render** (`brink-xg7p.onrender.com`, `/api/health` → `db: true`), and Spotify login works on
-  the live site (Supabase OAuth → capture-spotify → encrypted token). The repo now lives at
-  **`brinkmusic/Brink`** (transferred from `j-jwalker`). The TS `api/` + Prisma stay as a fallback
-  until **T08** (next) removes them. T05 = SQLModel + Alembic; T06 = AES-256-GCM crypto
-  (`backend/app/security/crypto.py`), Supabase admin + `require_user` (`backend/app/deps.py`),
-  `POST /api/auth/capture-spotify`.
+- The DB still has a `_prisma_migrations` table (Prisma's old bookkeeping); Alembic ignores it
+  (`backend/alembic/env.py`). Harmless — it can be dropped whenever.
+- Status: T00–T02, T04–T06, **T07–T08** done — the FastAPI/Render migration is complete and the
+  legacy TypeScript backend is fully removed. The React SPA is on **Vercel**
+  (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`, `/api/health` →
+  `db: true`), and Spotify login works on the live site (Supabase OAuth → capture-spotify →
+  encrypted token). Repo: **`brinkmusic/Brink`** (public). Next feature work: the social API
+  (T10 posts → T11–T14) on FastAPI.
 
 ## Deployment topology (ADR-0010, T07)
 
@@ -187,9 +164,10 @@ tokens or `TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge 
 - **Backend:** FastAPI on **Render** (`backend/`, config in `render.yaml`) — build `uv sync`,
   start `uvicorn app.main:app`. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
   `SPOTIFY_*`, `TOKEN_ENC_KEY`) live only in Render, never committed.
-- **Wiring:** the Vercel project's **root directory is `apps/web`** (so Vercel never builds the
-  legacy `api/` functions or needs Prisma). `apps/web/vercel.json` rewrites `/api/:path*` → the
-  Render URL, so the browser still calls same-origin `/api/*` (no CORS). Vercel deploys the
-  frontend from `main`; Render deploys the backend from `develop`.
-- **Note:** the legacy POC `/api/state` (jsonblob) is *not* reimplemented in FastAPI and stops
-  working after this cutover — its social features are replaced by the real API in T10–T14.
+- **Wiring:** the Vercel project's **root directory is `apps/web`** (it builds only the SPA).
+  `apps/web/vercel.json` rewrites `/api/:path*` → the Render URL, so the browser still calls
+  same-origin `/api/*` (no CORS). Vercel deploys the frontend from `main`; Render deploys the
+  backend from `develop`.
+- **Note:** the frontend still calls a legacy POC `/api/state` path (`apps/web/src/lib/backend.ts`)
+  that FastAPI does not implement, so it 404s; those mock social features are replaced by the real
+  API in T10–T14, and the `/api/state` calls are removed in T60.

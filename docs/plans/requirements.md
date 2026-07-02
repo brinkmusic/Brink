@@ -1,6 +1,6 @@
 # Brink — Requirements & Traceability
 
-The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement → ticket** map. This replaces the old `brink-spec-design.md`: decisions now live in [`docs/decisions/`](../decisions/), the data model in [`prisma/schema.prisma`](../../prisma/schema.prisma), and the implementation plan in [`tickets/`](tickets/). This file is the glue that proves the proposal's scope is covered.
+The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement → ticket** map. This replaces the old `brink-spec-design.md`: decisions now live in [`docs/decisions/`](../decisions/), the data model in [`backend/app/models.py`](../../backend/app/models.py) (SQLModel), and the implementation plan in [`tickets/`](tickets/). This file is the glue that proves the proposal's scope is covered.
 
 **Status:** ✅ done · ◻ backlog · **†** = original spec text superseded by a later decision (see [Superseded](#superseded-spec-text)).
 
@@ -17,7 +17,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 2 — Backend API + Data Model (BE)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| BE-1 | Supabase Postgres + Prisma schema migrated; pooled URLs in env. | T01 | ✅ |
+| BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Replace `api/state.js` (jsonblob) + delete dead `lib/api.ts`. | T00, T60 | ◻ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ◻ |
 | BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ◻ |
@@ -27,7 +27,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-8 | `GET /api/users/:id/profile` — stats + cluster + compatibility. | T14 | ◻ |
 | BE-9 | `POST /api/artist/posts` — create BTS post + optional track. | T50 | ◻ |
 | BE-10 | All mutations: session-gated, validated, consistent error JSON. | every API ticket (ADR-0007) | ◻ |
-| BE-11 | Serverless connection pooling configured. | T01 | ✅ |
+| BE-11 | Connection pooling (Supabase pooler) configured. | T01, T05 | ✅ |
 
 ## Layer 3 — Spotify Integration (SP)
 | ID | Acceptance | Ticket(s) | Status |

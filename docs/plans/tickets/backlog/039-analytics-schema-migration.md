@@ -40,7 +40,7 @@ Add a self-describing `ModelArtifact` table; drop `TasteVector`, `Compatibility`
 ### Out of Scope
 - Writing the artifact (T34/T36) or reading it (T33/T14).
 
-## Migration procedure (Alembic — replaces the old Prisma `migrate diff` workaround)
+## Migration procedure (Alembic)
 1. Edit `backend/app/models.py` as above (add `ModelArtifact`; drop the listed models/fields; set schemas).
 2. Autogenerate the revision: `cd backend && uv run alembic revision --autogenerate -m "analytics contract"`; review the generated SQL (create `bronze`/`silver`/`gold` schemas; the table moves/drops are intentional).
 3. Apply with `uv run alembic upgrade head`.
