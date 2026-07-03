@@ -3,7 +3,8 @@
 #   POST /api/auth/capture-spotify
 # Supabase hands the browser the Spotify tokens once (just after login). The browser
 # forwards them here, and we store them ENCRYPTED so a background job can later use
-# them to fetch the user's listening history. Ported 1:1 from api/auth/capture-spotify.ts.
+# them to fetch the user's listening history. Ported from the old
+# api/auth/capture-spotify.ts (removed in T08; see ADR-0010).
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -21,8 +22,12 @@ from app.security.crypto import encrypt
 router = APIRouter()
 
 
-# The expected request body. All optional so we can return our own clear 400 below
-# when a token is missing, rather than a generic validation error.
+# The expected request body. All fields Optional so we can return our own clear 400
+# below when a token is missing, rather than a generic validation error.
+# LEGACY-PARITY EXCEPTION — do not copy this into new endpoints. The all-Optional shape
+# exists only to reproduce the old backend's exact 400 message. Per ADR-0007 (layer 1)
+# and T70's handlers, T10+ request schemas declare required, typed fields and let the
+# RequestValidationError handler return the clean 400.
 class CaptureBody(BaseModel):
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
