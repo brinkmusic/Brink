@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Low
 complexity: Low
 category: Chore

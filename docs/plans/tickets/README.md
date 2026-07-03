@@ -64,7 +64,7 @@ report, which is the traceability root.
 
 | Done ✅ | Remaining |
 |---|---|
-| `070` `071` `077` `078` | `072` `074` `075` · `073` (after 070+071 ✅) · `076` (after 075) |
+| `070` `071` `072` `073` `074` `077` `078` | `075` · `076` (after 075) |
 
 ### Backend migration spine (TS/Vercel → FastAPI/Render) — ✅ complete
 
