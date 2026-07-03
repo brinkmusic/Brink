@@ -50,9 +50,13 @@ def decrypt(blob: str) -> str:
     parts = blob.split(".")
     if len(parts) != 3 or not all(parts):
         raise ValueError("malformed ciphertext")
-    iv, tag, ct = (base64.b64decode(p) for p in parts)
-    # Re-join ciphertext + tag the way Python's AESGCM expects, then decrypt. If the
-    # key is wrong or the data was tampered with, this raises (an invalid-tag error).
+    # validate=True makes base64 decoding STRICT: stray non-base64 characters raise
+    # binascii.Error (a subclass of ValueError) instead of being silently dropped.
+    # This keeps the exception contract crisp for callers (T21 is the first real one):
+    #   - ValueError  -> the blob's FORMAT is bad (wrong shape / not base64)
+    #   - InvalidTag  -> the format is fine but the data was tampered with or the key
+    #                    is wrong (raised by AESGCM.decrypt below)
+    iv, tag, ct = (base64.b64decode(p, validate=True) for p in parts)
     plaintext = AESGCM(_key()).decrypt(iv, ct + tag, None)
     return plaintext.decode("utf-8")
 

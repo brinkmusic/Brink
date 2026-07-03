@@ -8,8 +8,14 @@ import base64
 from types import SimpleNamespace
 
 import pytest
+from cryptography.exceptions import InvalidTag
 
 from app.security import crypto
+
+# A second, unrelated 32-byte key (base64), built from fixed bytes so the test is
+# repeatable. Used to prove that decrypting with the WRONG key fails loudly instead
+# of silently returning garbage. gitleaks:allow — throwaway test material.
+OTHER_KEY_B64 = base64.b64encode(b"\x11" * 32).decode()  # gitleaks:allow
 
 # A real ciphertext produced by the legacy Node/TypeScript crypto.ts, captured once.
 # Decrypting this with the matching key MUST return the original text.
@@ -50,4 +56,71 @@ def test_malformed_ciphertext_raises(monkeypatch):
 def test_wrong_key_length_raises(monkeypatch):
     _use_key(monkeypatch, base64.b64encode(b"too-short").decode())
     with pytest.raises(ValueError):
+        crypto.encrypt("x")
+
+
+def _tamper_part(blob, index):
+    # Take a valid 3-part blob, flip one byte inside part `index` (0=iv, 1=tag,
+    # 2=ciphertext), and re-encode. The result is still valid base64 — so it passes
+    # the format check — but the contents are corrupted, which is what AES-GCM's
+    # authentication tag is designed to catch.
+    parts = blob.split(".")
+    raw = bytearray(base64.b64decode(parts[index]))
+    raw[0] ^= 0x01  # flip the lowest bit of the first byte
+    parts[index] = base64.b64encode(bytes(raw)).decode("ascii")
+    return ".".join(parts)
+
+
+# Tampering with ANY part of a stored blob must be detected — GCM's whole point is
+# integrity. A corrupted iv, tag, or ciphertext each raises InvalidTag, never a
+# silently-wrong plaintext.
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_tampered_blob_raises_invalid_tag(monkeypatch, index):
+    _use_key(monkeypatch, TS_KEY_B64)
+    tampered = _tamper_part(TS_BLOB, index)
+    with pytest.raises(InvalidTag):
+        crypto.decrypt(tampered)
+
+
+# Decrypting with a different (but valid-length) key must fail, not return garbage.
+def test_wrong_key_raises_invalid_tag(monkeypatch):
+    _use_key(monkeypatch, TS_KEY_B64)
+    blob = crypto.encrypt("secret-value")
+    _use_key(monkeypatch, OTHER_KEY_B64)
+    with pytest.raises(InvalidTag):
+        crypto.decrypt(blob)
+
+
+# The iv must be fresh on every encryption. A fixed/reused nonce is the classic
+# catastrophic GCM failure, so encrypting the same plaintext twice must produce
+# different iv parts (and therefore different blobs).
+def test_iv_is_unique_per_encryption(monkeypatch):
+    _use_key(monkeypatch, TS_KEY_B64)
+    a = crypto.encrypt("same-plaintext")
+    b = crypto.encrypt("same-plaintext")
+    assert a != b
+    assert a.split(".")[0] != b.split(".")[0]  # iv parts differ
+
+
+# Stray non-base64 characters in an otherwise 3-part blob are a malformed-format
+# error (ValueError), NOT a tamper error — callers distinguish the two.
+def test_non_base64_part_raises_value_error(monkeypatch):
+    _use_key(monkeypatch, TS_KEY_B64)
+    parts = TS_BLOB.split(".")
+    parts[2] = "!!!" + parts[2]  # not valid base64
+    with pytest.raises(ValueError):
+        crypto.decrypt(".".join(parts))
+
+
+# A blob with an empty part ("a..c") is malformed, rejected before any crypto runs.
+def test_empty_part_raises_value_error(monkeypatch):
+    _use_key(monkeypatch, TS_KEY_B64)
+    with pytest.raises(ValueError):
+        crypto.decrypt("a..c")
+
+
+# Missing TOKEN_ENC_KEY surfaces as a clear ValueError, not a confusing crypto error.
+def test_missing_key_raises_value_error(monkeypatch):
+    _use_key(monkeypatch, "")
+    with pytest.raises(ValueError, match="TOKEN_ENC_KEY not set"):
         crypto.encrypt("x")
