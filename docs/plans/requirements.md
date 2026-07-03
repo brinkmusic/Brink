@@ -19,7 +19,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, 404s since T08) + dead front-end stubs. | T60 | ◻ |
-| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ◻ |
+| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
 | BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ◻ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ◻ |
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ◻ |
@@ -34,7 +34,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | SP-1 | Currently-playing endpoint + "now playing" surface. | T20 | ◻ |
 | SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ◻ |
-| SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ◻ |
+| SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ✅ |
 | SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ◻ |
 | SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ◻ |
 
