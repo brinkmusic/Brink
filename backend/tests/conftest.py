@@ -19,10 +19,35 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine
 
 from app.db import get_session
 from app.deps import require_user
 from app.main import app
+from app.models import Post, RateLimitHit, Track, User
+
+
+@pytest.fixture
+def db_session():
+    # A real, throwaway SQLite database held in memory — used by tests whose correctness
+    # depends on actual database behavior (upserts, ordering, rate-limit counting) that a
+    # MagicMock can't fake (see the NOTE FOR T10+ above). We create ONLY the tables these
+    # tests touch: the analytics tables use Postgres-only JSONB columns that SQLite can't
+    # build, and we don't need them here.
+    # StaticPool keeps ONE shared connection for this in-memory database. WHY: an in-memory
+    # SQLite gives each connection its own private DB, and the endpoint under test runs in a
+    # different thread than this fixture — without StaticPool the endpoint would open a second
+    # connection and see an empty database ("no such table").
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    tables = [m.__table__ for m in (User, Track, Post, RateLimitHit)]
+    SQLModel.metadata.create_all(engine, tables=tables)
+    with Session(engine) as session:
+        yield session
 
 
 @pytest.fixture

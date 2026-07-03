@@ -17,8 +17,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import verify_required_settings
 from app.deps import AuthError
+from app.rate_limit import RateLimitError
 from app.responses import fail
-from app.routers import auth, health
+from app.routers import auth, health, posts
 
 
 # Runs once when the server boots (and shuts down). We use it to fail fast on missing
@@ -35,11 +36,18 @@ app = FastAPI(title="Brink API", lifespan=lifespan)
 
 app.include_router(health.router)  # GET /api/health
 app.include_router(auth.router)    # POST /api/auth/capture-spotify
+app.include_router(posts.router)   # POST /api/posts, GET /api/posts?userId=
 
 
 # Auth failures (e.g. missing or invalid session token) → 401 { "error": ... }.
 @app.exception_handler(AuthError)
 def _handle_auth_error(request: Request, exc: AuthError):
+    return fail(exc.message, exc.status)
+
+
+# Rate-limit refusals → 429 { "error": ... }. Same envelope shape as every other error.
+@app.exception_handler(RateLimitError)
+def _handle_rate_limit_error(request: Request, exc: RateLimitError):
     return fail(exc.message, exc.status)
 
 

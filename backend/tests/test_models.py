@@ -26,11 +26,12 @@ EXPECTED_TABLES = {
     "Cluster",
     "Compatibility",
     "ModelMetrics",
+    "RateLimitHit",  # added in T10 for rate limiting (ADR-0011)
 }
 
 
-# All 14 tables are present (no more, no fewer).
-def test_all_fourteen_tables_registered():
+# All expected tables are present (no more, no fewer).
+def test_all_expected_tables_registered():
     assert set(SQLModel.metadata.tables) == EXPECTED_TABLES
 
 
