@@ -27,7 +27,7 @@ Delete `mocks/feed.ts`, `mocks/stats.ts`, the heuristic `lib/analytics.ts`, and 
 - Remove `apps/web/src/mocks/feed.ts`, `apps/web/src/mocks/stats.ts`.
 - Remove `apps/web/src/lib/data.ts` (mock feed) and `apps/web/src/lib/analytics.ts` (heuristic) once unreferenced.
 - Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, which 404s since T08; replaced by real API calls in T10–T14).
-- Remove orphaned exports from `apps/web/src/lib/spotify-api.ts` that are unreferenced after the live paths land.
+- Prune the now-orphaned exports `getTopTracks`, `getTopArtists`, `getRecentlyPlayed` from `apps/web/src/lib/spotify-api.ts` — their only callers live in `lib/data.ts`, which this ticket deletes. Keep `getMe`: it survives because `context/AuthContext.tsx` still uses it.
 - Grep-verify no remaining imports.
 
 ### Out of Scope
