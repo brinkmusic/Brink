@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, T70, T71, T77, T78). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave.
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T10**, T70–T74, T77, T78). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.**
 
 ## How these relate to the rest of the docs
 
@@ -53,6 +53,12 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 | 6 | `044` |
 | 7 | `060` |
 | 8 | `061` |
+
+**Ready to start now** (all `blocked_by` merged, as of T10):
+- `003` (Sebastian) · `020` `039` `050` (Andrea) · `030` (Jonah) — these never had blockers.
+- **Newly unblocked by T10:** `011` `012` `013` `021` (Andrea) · **`040` — post composer + Spotify catalog search (Sebastian).**
+
+The wave numbers below are *dependency depth*, not live status — a ticket is startable as soon as its `blocked_by` are merged, which is what the "Ready to start now" list above reflects. Update that list whenever a wave of blockers merges.
 
 Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-profile spine).
 
