@@ -317,6 +317,27 @@ class ArtistPost(SQLModel, table=True):
     created_at: datetime = _created_at()
 
 
+# One row per "limited action" performed, used to stop spam/abuse (ADR-0011). Before a
+# write endpoint (e.g. creating a post) runs, we count recent rows here for this
+# (subject, action) pair; too many in the time window -> the request is refused. WHY a
+# generic (subject, action) shape instead of a post-specific table: later write endpoints
+# (search, upload) reuse the SAME table + helper with a different action string. In a real
+# production app this counting would live in Redis, not Postgres — this table is the one
+# piece we'd swap (see ADR-0011).
+class RateLimitHit(SQLModel, table=True):
+    __tablename__ = "RateLimitHit"
+    # One combined index so the helper's "count recent hits for this subject+action" query
+    # is fast (it filters on all three columns).
+    __table_args__ = (
+        Index("RateLimitHit_subject_action_createdAt_idx", "subject", "action", "createdAt"),
+    )
+
+    id: str = _pk_cuid()
+    subject: str = Field(sa_column=Column("subject", Text, nullable=False))  # who (usually a user id)
+    action: str = Field(sa_column=Column("action", Text, nullable=False))    # what (e.g. "post_create")
+    created_at: datetime = _created_at()
+
+
 # ---------------------------------------------------------------------------
 # The tables below are RESULTS written by the Python analytics job (not by users).
 # JSONB columns hold flexible structured data (lists/objects), like a mini
