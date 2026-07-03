@@ -9,15 +9,29 @@
 # even FastAPI's built-in errors (bad request bodies, unknown paths) use that same
 # shape instead of FastAPI's default { "detail": ... } format (ADR-0010, ADR-0007 §1).
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.config import verify_required_settings
 from app.deps import AuthError
 from app.responses import fail
 from app.routers import auth, health
 
-app = FastAPI(title="Brink API")
+
+# Runs once when the server boots (and shuts down). We use it to fail fast on missing
+# secrets: a misdeployed instance crashes here instead of serving 500s per request.
+# In tests this never fires (the TestClient isn't used as a context manager) and the
+# check has its own pytest escape hatch anyway — see config.verify_required_settings.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    verify_required_settings()
+    yield
+
+
+app = FastAPI(title="Brink API", lifespan=lifespan)
 
 app.include_router(health.router)  # GET /api/health
 app.include_router(auth.router)    # POST /api/auth/capture-spotify

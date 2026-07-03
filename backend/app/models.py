@@ -11,8 +11,9 @@
 #
 # WHY it looks the way it does: our database was originally created by a tool
 # called Prisma, which named the tables in PascalCase ("User", "SpotifyToken")
-# and the columns in camelCase ("displayName", "createdAt"). We can't rename the
-# real database yet (the old code still reads it), so we keep those exact names.
+# and the columns in camelCase ("displayName", "createdAt"). Real data already lives
+# in those columns, so renaming them is a live-data migration we've deliberately
+# deferred (see the T08 notes) — until then we keep the exact database names.
 # But in Python we prefer snake_case ("display_name"), so each column below says
 # both: the Python name we use in our code, and the real database name in quotes.
 #
@@ -112,6 +113,18 @@ def _fk(
     )
 
 
+# Shortcut for the "createdAt" timestamp column that most tables share: the database
+# stamps it with the current time on insert (server_default CURRENT_TIMESTAMP). Defined
+# once here so the five tables that use it don't each repeat the same four lines. Each
+# call builds a FRESH Column (SQLAlchemy Columns can't be shared between tables).
+def _created_at() -> Any:
+    return Field(
+        sa_column=Column(
+            "createdAt", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP")
+        )
+    )
+
+
 # A person on Brink. This is the central table — most others link back to it.
 class User(SQLModel, table=True):
     __tablename__ = "User"  # the real table name in the database
@@ -151,11 +164,7 @@ class User(SQLModel, table=True):
     )
     # When the account was created. The database fills this in with the current
     # time automatically (server_default CURRENT_TIMESTAMP).
-    created_at: datetime = Field(
-        sa_column=Column(
-            "createdAt", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP")
-        )
-    )
+    created_at: datetime = _created_at()
     # Which taste "cluster" this user was grouped into by the analytics job.
     # ondelete SET NULL: if a cluster is deleted, keep the user but clear this link.
     cluster_id: Optional[str] = Field(
@@ -245,11 +254,7 @@ class Post(SQLModel, table=True):
     source: PostSource = Field(
         sa_column=Column("source", SAEnum(PostSource, name="PostSource"), nullable=False)
     )
-    created_at: datetime = Field(
-        sa_column=Column(
-            "createdAt", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP")
-        )
-    )
+    created_at: datetime = _created_at()
 
 
 # A reaction (heart / fire / sparkle) that a user left on a post.
@@ -278,11 +283,7 @@ class Comment(SQLModel, table=True):
     post_id: str = Field(sa_column=_fk("postId", "Post.id", ondelete="CASCADE"))
     user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE"))
     body: str = Field(sa_column=Column("body", Text, nullable=False))
-    created_at: datetime = Field(
-        sa_column=Column(
-            "createdAt", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP")
-        )
-    )
+    created_at: datetime = _created_at()
 
 
 # "User A follows User B." Both columns together are the unique ID (you can't
@@ -297,11 +298,7 @@ class Follow(SQLModel, table=True):
     following_id: str = Field(
         sa_column=_fk("followingId", "User.id", ondelete="CASCADE", primary_key=True)
     )
-    created_at: datetime = Field(
-        sa_column=Column(
-            "createdAt", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP")
-        )
-    )
+    created_at: datetime = _created_at()
 
 
 # A post made by an artist account (a promotional image + caption, optionally
@@ -317,11 +314,7 @@ class ArtistPost(SQLModel, table=True):
     linked_track_id: Optional[str] = Field(
         default=None, sa_column=Column("linkedTrackId", Text, nullable=True)
     )
-    created_at: datetime = Field(
-        sa_column=Column(
-            "createdAt", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP")
-        )
-    )
+    created_at: datetime = _created_at()
 
 
 # ---------------------------------------------------------------------------
