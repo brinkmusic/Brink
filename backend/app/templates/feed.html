@@ -1,0 +1,43 @@
+{#
+  WHAT THIS FILE IS
+  The feed page: a running list of the songs people have shared. Each card shows the
+  track, who shared it, and when. The posts come from the database (the Post + Track
+  rows the T10 API creates). When there are none yet, we show a friendly empty state
+  instead of a blank page.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stack">
+  <div>
+    <h1 class="section-title">The feed</h1>
+    <p class="hero-sub">What people are playing right now 🎶</p>
+  </div>
+
+  {% if posts %}
+    <div class="stack">
+      {% for p in posts %}
+      <article class="post">
+        <div class="post-art">
+          {% if p.album_art %}
+            <img src="{{ p.album_art }}" alt="" />
+          {% endif %}
+        </div>
+        <div class="post-body">
+          <p class="post-track">{{ p.title }}</p>
+          <p class="post-artist">{{ p.artist }}</p>
+          {% if p.caption %}
+            <p class="post-caption">"{{ p.caption }}"</p>
+          {% endif %}
+          <p class="post-meta">shared {{ p.when }}</p>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card empty">
+      <p>No songs shared yet. When people start posting, their tracks land right here. 🎧</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

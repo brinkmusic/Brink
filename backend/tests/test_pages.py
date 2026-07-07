@@ -32,3 +32,45 @@ def test_stylesheet_is_served(client):
     res = client.get("/static/brink.css")
     assert res.status_code == 200
     assert "text/css" in res.headers["content-type"]
+
+
+# ---- Feed page (reads the posts the T10 API creates) ----
+
+from app.db import get_session
+from app.main import app
+from app.models import Post, PostSource, Track
+
+
+# With real posts in the database, the feed renders them — proving the page is wired
+# to the actual Post/Track data (not showing hardcoded content). We seed a throwaway
+# in-memory database (the `db_session` fixture) and point the app at it.
+def test_feed_shows_real_posts(client, db_session):
+    track = Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino")
+    post = Post(
+        user_id="u_demo",
+        track_id="t_redbone",
+        caption="a whole vibe",
+        source=PostSource.MANUAL,
+    )
+    db_session.add(track)
+    db_session.add(post)
+    db_session.commit()
+
+    # Make the feed page use our seeded in-memory database for this test.
+    app.dependency_overrides[get_session] = lambda: db_session
+
+    res = client.get("/feed")
+    assert res.status_code == 200
+    body = res.text
+    assert "Redbone" in body            # the track title
+    assert "Childish Gambino" in body   # the artist
+    assert "a whole vibe" in body       # the caption
+
+
+# With no posts, the feed still returns a page (never crashes) and shows the empty
+# state — important because that is exactly what a brand-new or offline app looks like.
+def test_feed_empty_state(client, db_session):
+    app.dependency_overrides[get_session] = lambda: db_session  # empty database
+    res = client.get("/feed")
+    assert res.status_code == 200
+    assert "No songs shared yet" in res.text
