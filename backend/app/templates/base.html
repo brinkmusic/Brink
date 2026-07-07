@@ -1,0 +1,52 @@
+{#
+  WHAT THIS FILE IS
+  The shared page frame every Brink page reuses: the <head>, the top navigation
+  bar, and a slot in the middle where each page drops its own content. WHY: so we
+  write the header/nav/theme once, and each page (feed, profile, ...) only writes
+  the part that's unique to it. Other templates say `{% extends "base.html" %}` and
+  fill the `{% block content %}` slot below.
+#}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {# The browser-tab title. `page_title` is passed in by the route; if a page
+       forgets to set one, we fall back to "Brink". #}
+    <title>{{ page_title | default("Brink") }}</title>
+    {# Brink's colours + basic styling. Served as a static file (see main.py). #}
+    <link rel="stylesheet" href="/static/brink.css" />
+  </head>
+  <body>
+    {# ---- Top navigation bar ----
+       On the public landing page this is intentionally simple: the brand, a couple
+       of in-page links, and the sign-in button. Once a visitor logs in, later steps
+       swap this for the in-app nav (Feed, Profile, ...) — those pages don't exist
+       yet, so we don't link to them here (a dead link would just error). #}
+    <header class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="/">brink</a>
+        <nav class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#how">How it works</a>
+        </nav>
+        {# The real Spotify sign-in gets wired to this button in a later step. #}
+        <a class="btn btn-spotify" href="#">Log in with Spotify</a>
+      </div>
+    </header>
+
+    {# ---- Page content slot ----
+       Each page fills this in. Everything between here and endblock is replaced. #}
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+
+    {# ---- Footer ---- #}
+    <footer class="footer">
+      <div class="footer-inner">
+        <span class="brand">brink</span>
+        <span class="footer-tag">Music, but social. 🎶</span>
+      </div>
+    </footer>
+  </body>
+</html>
