@@ -19,7 +19,7 @@ from app.config import verify_required_settings
 from app.deps import AuthError
 from app.rate_limit import RateLimitError
 from app.responses import fail
-from app.routers import auth, comments, feed, follow, health, now_playing, posts, reactions
+from app.routers import auth, comments, feed, follow, health, now_playing, posts, reactions, snapshot
 
 
 # Runs once when the server boots (and shuts down). We use it to fail fast on missing
@@ -42,6 +42,7 @@ app.include_router(comments.router)   # POST/GET /api/posts/{id}/comments
 app.include_router(follow.router)     # POST/DELETE /api/follow/{userId}
 app.include_router(feed.router)       # GET /api/feed
 app.include_router(now_playing.router)  # GET /api/me/now-playing
+app.include_router(snapshot.router)     # POST /api/snapshot (cron-triggered)
 
 
 # Auth failures (e.g. missing or invalid session token) → 401 { "error": ... }.

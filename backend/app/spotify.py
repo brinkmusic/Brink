@@ -13,6 +13,7 @@
 # ever decrypt them into memory for the moment we need them, and re-encrypt before saving.
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -30,6 +31,13 @@ SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 
 # Spotify Web API endpoint for the user's currently-playing track.
 CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
+
+# Spotify Web API endpoint for the user's recently-played tracks (last 50 max) — the snapshot tap.
+RECENTLY_PLAYED_URL = "https://api.spotify.com/v1/me/player/recently-played"
+
+# If Spotify says "too many requests" (429), wait at most this long before the single retry, so a
+# rate-limit never turns into a long hang.
+MAX_BACKOFF_SECONDS = 10
 
 # Refresh a little BEFORE the token truly expires, so we never hand back one that dies mid-request.
 EXPIRY_BUFFER_SECONDS = 60
@@ -124,6 +132,46 @@ def get_currently_playing(session: Session, user_id: str) -> Optional[dict]:
             "popularity": item.get("popularity"),
         },
     }
+
+
+def _sleep(seconds: float) -> None:
+    # Thin wrapper around time.sleep so tests can patch it out (no real waiting in the suite).
+    time.sleep(seconds)
+
+
+def get_recently_played(session: Session, user_id: str, limit: int = 50) -> Optional[dict]:
+    # Return this user's recently-played tracks as Spotify's raw JSON, or None when we can't get it
+    # (no linked Spotify, a failed refresh, or a persistent error). None (never an exception) lets
+    # the snapshot job simply skip that user and move on. Handles Spotify's 429 "too many requests"
+    # with a single bounded backoff+retry instead of crashing.
+    token = get_valid_access_token(session, user_id)
+    if token is None:
+        return None
+
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{RECENTLY_PLAYED_URL}?limit={limit}"
+    for attempt in range(2):  # one initial try, plus one retry after a 429 backoff
+        try:
+            response = httpx.get(url, headers=headers, timeout=10)
+        except httpx.HTTPError:
+            logger.warning("spotify recently-played request errored", exc_info=True)
+            return None
+
+        if response.status_code == 200:
+            return response.json()
+
+        if response.status_code == 429 and attempt == 0:
+            # Respect Spotify's Retry-After (seconds) if present, capped so we never hang long.
+            retry_after = response.headers.get("Retry-After")
+            delay = min(int(retry_after), MAX_BACKOFF_SECONDS) if (retry_after or "").isdigit() else MAX_BACKOFF_SECONDS
+            logger.warning("spotify recently-played 429; backing off %ss then retrying", delay)
+            _sleep(delay)
+            continue
+
+        logger.warning("spotify recently-played returned %s", response.status_code)
+        return None
+
+    return None  # exhausted the retry (still rate-limited)
 
 
 def _request_refreshed_token(refresh_token: str) -> Optional[dict]:

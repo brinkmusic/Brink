@@ -47,6 +47,7 @@ from typing import Any, Optional
 
 from cuid2 import Cuid
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -424,7 +425,11 @@ class SpotifyRecentlyPlayedRaw(SQLModel, table=True):
     # Plain text (not a foreign key): bronze is a decoupled, immutable landing zone — it must be able
     # to hold raw rows even if the referenced user/track isn't conformed into silver yet.
     user_id: str = Field(sa_column=Column("user_id", Text, nullable=False))
-    payload: Any = Field(sa_column=Column("payload", JSONB, nullable=False))  # the raw Spotify API response
+    # JSONB in Postgres (prod); the `.with_variant(JSON, "sqlite")` makes the same column a plain
+    # JSON type under SQLite so the in-memory test DB can build this table (SQLite has no JSONB).
+    payload: Any = Field(
+        sa_column=Column("payload", JSONB().with_variant(JSON(), "sqlite"), nullable=False)
+    )  # the raw Spotify API response
     fetched_at: datetime = Field(
         sa_column=Column("fetched_at", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP"))
     )
@@ -436,7 +441,9 @@ class KaggleTracksRaw(SQLModel, table=True):
     __table_args__ = {"schema": "bronze"}
 
     id: str = _pk_cuid()
-    payload: Any = Field(sa_column=Column("payload", JSONB, nullable=False))  # the raw Kaggle row
+    payload: Any = Field(
+        sa_column=Column("payload", JSONB().with_variant(JSON(), "sqlite"), nullable=False)
+    )  # the raw Kaggle row
     ingested_at: datetime = Field(
         sa_column=Column("ingested_at", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP"))
     )

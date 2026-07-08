@@ -229,8 +229,14 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   the unused `UserStats`/`TasteVector`/`Compatibility` + `User.clusterId` (ADR-0003/0009). The
   migration is **hand-written and applied manually by Andrea on `brink-dev`** (SET SCHEMA preserves
   rows). This unblocks **T21** (bronze/silver now exist) and the analytics spine (033/034/036).
-  **Next backend feature: T21 (snapshot); T14 (profile) is still gated on the analytics spine
-  (T35).**
+  **T21 (Spotify play snapshot) done** — `POST /api/snapshot` (cron-authed by `X-Cron-Secret`)
+  lands each Spotify-linked user's recently-played into `bronze.spotify_recently_played_raw`, then
+  conforms to silver (`upsert_track` + `Play` deduped on `userId+playedAt`); one bounded 429
+  backoff; `.github/workflows/snapshot.yml` triggers it ~every 2h (satisfies SP-2/SP-4/SP-5/
+  INFRA-3). **Deploy step for Andrea:** set `CRON_SECRET` on Render + add `SNAPSHOT_URL`/
+  `CRON_SECRET` GitHub repo secrets, or the cron 401s. **Next backend feature: T50 (artist
+  storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still
+  gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 
