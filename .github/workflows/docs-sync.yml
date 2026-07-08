@@ -11,7 +11,10 @@
 # every PR regardless of who — or which AI agent — wrote it.
 #
 # Escape hatch: a change that genuinely needs no docs (a pure refactor, a test-only change)
-# gets the `no-docs` label on the PR, which skips this job.
+# gets the `no-docs` label on the PR, which makes the check pass immediately. The label is
+# checked INSIDE the job (not via a job-level `if` skip) on purpose: when docs-sync is a
+# required status check, a skipped job never reports a result and would leave the PR stuck
+# "pending" forever — an always-running job that early-exits 0 always reports a conclusion.
 
 name: Docs sync
 
@@ -25,10 +28,6 @@ on:
 jobs:
   docs-sync:
     runs-on: ubuntu-latest
-    # Skip the whole job when the author has declared this change needs no docs.
-    # `labels.*.name` is the list of label names on the PR; `contains(...)` is true if
-    # `no-docs` is among them.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-docs') }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,10 +38,20 @@ jobs:
         env:
           # The branch this PR targets (usually `develop`).
           BASE: ${{ github.event.pull_request.base.ref }}
+          # 'true' when the PR carries the `no-docs` escape-hatch label, else 'false'.
+          # `labels.*.name` is the list of label names on the PR; `contains(...)` tests it.
+          HAS_NO_DOCS: ${{ contains(github.event.pull_request.labels.*.name, 'no-docs') }}
         run: |
           # `set -euo pipefail`: stop on the first error, treat unset vars as errors, and
           # fail a pipeline if any stage fails — so a bug in this script can't pass silently.
           set -euo pipefail
+
+          # Escape hatch, checked in-job so a required check always reports (see header note):
+          # if the author labeled this PR `no-docs`, the change is declared doc-free — pass.
+          if [ "$HAS_NO_DOCS" = "true" ]; then
+            echo "no-docs label present — docs-sync check passes for this PR."
+            exit 0
+          fi
 
           # Make sure we have the base branch locally, then list every file this PR changes
           # relative to where it branched off (the `...` merge-base form).

@@ -37,7 +37,8 @@ good at: teach (CLAUDE.md/skills) → surface (Claude hook) → **gate (CI)**.
 - `.github/workflows/docs-sync.yml` — the gate. On every PR, diff the changed files; if
   substantive code (`backend/app/`, `apps/web/src/`, `analytics/`, minus tests/lockfiles/assets)
   changed but no doc (`docs/**`, `CLAUDE.md`, any `README.md`) did, fail with a message pointing
-  at the rule. Escape hatch: a `no-docs` label skips the job for genuine no-doc changes.
+  at the rule. Escape hatch: a `no-docs` label makes the check pass for genuine no-doc changes
+  (checked in-job, not a job-level skip, so the check still reports when it's a required check).
 - `.claude/settings.json` (committed, team-shared) — a `SessionStart` hook that surfaces the
   doc-sync norm and points at the get-me-started skill, so every teammate's Claude agent gets it
   automatically with no per-machine setup.
