@@ -206,8 +206,13 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
   `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
   counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
-  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **Next backend feature: T20
-  (now-playing) or T21 (snapshot); T14 (profile) is still gated on the analytics spine (T35).**
+  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **T22 (Spotify token refresh) done** —
+  `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
+  (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
+  unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against
+  T02). This was a missing prerequisite discovered while starting T20 — both **T20 (now-playing)**
+  and **T21 (snapshot)** build on it and are now genuinely unblocked. **Next backend feature: T20 or
+  T21; T14 (profile) is still gated on the analytics spine (T35).**
 
 ## Deployment topology (ADR-0010, T07)
 
