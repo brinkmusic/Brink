@@ -33,10 +33,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | SP-1 | Currently-playing endpoint + "now playing" surface. | T20 | ◻ |
-| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ◻ |
+| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ✅ |
 | SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ✅ |
-| SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ◻ |
-| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ◻ |
+| SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ✅ |
+| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ✅ |
 
 ## Layer 4 — Analytics & Data Science (AN)
 | ID | Acceptance | Ticket(s) | Status |
@@ -79,7 +79,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | INFRA-1 † | Vercel project: SPA + `/api/*` rewrite to Render; env vars set, no secrets in repo. | T01, T07 | ✅ |
 | INFRA-2 | Supabase provisioned; pooled URLs; migrations in CI; Data API disabled. | T01 | ✅ |
-| INFRA-3 † | Snapshot trigger on a fixed cadence. *(GitHub Actions, not Vercel Cron)* | T21 | ◻ |
+| INFRA-3 † | Snapshot trigger on a fixed cadence. *(GitHub Actions, not Vercel Cron)* | T21 | ✅ |
 | INFRA-4 | GitHub Actions runs the Python pipeline against Supabase. | T30, T38 | ◻ |
 | INFRA-5 | Secret hygiene: `.gitignore` enforced; secrets in env only. | T00 | ✅ |
 

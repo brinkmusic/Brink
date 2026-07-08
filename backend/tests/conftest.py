@@ -25,7 +25,18 @@ from sqlmodel import Session, SQLModel, create_engine
 from app.db import get_session
 from app.deps import require_user
 from app.main import app
-from app.models import Comment, Follow, Post, RateLimitHit, Reaction, SpotifyToken, Track, User
+from app.models import (
+    Comment,
+    Follow,
+    Play,
+    Post,
+    RateLimitHit,
+    Reaction,
+    SpotifyRecentlyPlayedRaw,
+    SpotifyToken,
+    Track,
+    User,
+)
 
 
 @pytest.fixture
@@ -52,7 +63,10 @@ def db_session():
     engine = engine.execution_options(
         schema_translate_map={"bronze": None, "silver": None, "gold": None}
     )
-    tables = [m.__table__ for m in (User, Track, Post, Reaction, Comment, Follow, SpotifyToken, RateLimitHit)]
+    tables = [m.__table__ for m in (
+        User, Track, Play, Post, Reaction, Comment, Follow, SpotifyToken,
+        SpotifyRecentlyPlayedRaw, RateLimitHit,
+    )]
     SQLModel.metadata.create_all(engine, tables=tables)
     with Session(engine) as session:
         yield session
