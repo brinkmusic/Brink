@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # Spotify's OAuth token endpoint — where a refresh token is exchanged for a new access token.
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 
+# Spotify Web API endpoint for the user's currently-playing track.
+CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
+
 # Refresh a little BEFORE the token truly expires, so we never hand back one that dies mid-request.
 EXPIRY_BUFFER_SECONDS = 60
 
@@ -71,6 +74,56 @@ def get_valid_access_token(session: Session, user_id: str) -> Optional[str]:
     session.add(row)
     session.commit()
     return access_token
+
+
+def get_currently_playing(session: Session, user_id: str) -> Optional[dict]:
+    # Return what this user is currently playing on Spotify as a small normalized dict, or None when
+    # there's nothing to show. None (never an exception) is deliberate — the endpoint turns it into a
+    # friendly empty state, so a Spotify outage / unlinked account never becomes a 500.
+    #
+    # The returned shape (snake_case, so the router can build its response DTO directly):
+    #   {"is_playing": bool, "track": {"spotify_id", "title", "artist_name", "album_art_url",
+    #                                  "popularity"}}
+    token = get_valid_access_token(session, user_id)
+    if token is None:
+        # No linked Spotify (or a failed refresh) — nothing to play.
+        return None
+
+    try:
+        response = httpx.get(
+            CURRENTLY_PLAYING_URL,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+    except httpx.HTTPError:
+        logger.warning("spotify currently-playing request errored", exc_info=True)
+        return None
+
+    # 204 = "nothing is playing right now"; anything other than 200 = an error we degrade past.
+    if response.status_code == 204 or response.status_code != 200:
+        return None
+
+    data = response.json()
+    item = data.get("item")
+    if not item:
+        # `item` is null when the user is playing something without a track (e.g. an ad or a
+        # podcast episode) — we only surface real tracks.
+        return None
+
+    # Pull the fields our "now playing" badge needs out of Spotify's larger response.
+    artist_name = ", ".join(a.get("name", "") for a in item.get("artists", []))
+    images = item.get("album", {}).get("images", [])
+    album_art_url = images[0]["url"] if images else None
+    return {
+        "is_playing": bool(data.get("is_playing", False)),
+        "track": {
+            "spotify_id": item["id"],
+            "title": item["name"],
+            "artist_name": artist_name,
+            "album_art_url": album_art_url,
+            "popularity": item.get("popularity"),
+        },
+    }
 
 
 def _request_refreshed_token(refresh_token: str) -> Optional[dict]:

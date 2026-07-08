@@ -211,8 +211,12 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
   unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against
   T02). This was a missing prerequisite discovered while starting T20 — both **T20 (now-playing)**
-  and **T21 (snapshot)** build on it and are now genuinely unblocked. **Next backend feature: T20 or
-  T21; T14 (profile) is still gated on the analytics spine (T35).**
+  and **T21 (snapshot)** build on it and are now genuinely unblocked. **T20 (now-playing) done** —
+  `GET /api/me/now-playing` (login-gated) + `spotify.get_currently_playing`, returning the
+  normalized currently-playing track or `{ data: null }` for the empty/degraded cases (nothing
+  playing, no linked Spotify, Spotify error) — the backend half of SP-1/UI-10 (the surface is T44).
+  **Next backend feature: T21 (snapshot); T14 (profile) is still gated on the analytics spine
+  (T35).**
 
 ## Deployment topology (ADR-0010, T07)
 
