@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -77,8 +77,8 @@ The feed is the app's home surface, and it must be driven by a real follow graph
 - **Deliberately deferred:** feed **pagination** (the ticket's "if any" — not built; follow-up if
   the feed grows) and no-follow **suggestions** (out of scope — new users see only their own posts).
 - **Close-out** (move backlog→completed, flip **BE-4**/**BE-7** in requirements.md, update the
-  CLAUDE.md status line + tickets README) is a **follow-up PR** after this merges, per the T10/T30
-  precedent.
+  CLAUDE.md status line + tickets README) is folded into **this PR** (pre-merge close-out, per T93)
+  rather than a separate follow-up.
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
