@@ -11,9 +11,9 @@
 # callers aren't forced to use aliases.
 
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 from pydantic.alias_generators import to_camel
 
 from app.models import PostSource, ReactionType
@@ -54,6 +54,16 @@ class ReactionBody(CamelModel):
     type: ReactionType
 
 
+# The comment text for POST /api/posts/{id}/comments. StringConstraints does the ADR-0007
+# validation up front (the Comment table has no length limit of its own):
+#   strip_whitespace -> leading/trailing spaces are removed before checking AND when stored,
+#   min_length=1     -> a blank or whitespace-only body is rejected as a 400,
+#   max_length=2000  -> an over-long body is rejected as a 400.
+# There is deliberately no user field: the author is always the authenticated caller.
+class CommentBody(CamelModel):
+    body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+
+
 # --- Responses ---------------------------------------------------------------------
 
 # The linked-track part of a post response.
@@ -82,3 +92,18 @@ class PostOut(CamelModel):
 class ReactionCountsOut(CamelModel):
     post_id: str
     counts: dict[str, int]
+
+
+# The public bits of a comment's author (never the whole User row — no email, ids, etc.).
+class AuthorOut(CamelModel):
+    display_name: str
+    handle: str
+    avatar_url: Optional[str] = None
+
+
+# A comment as the API returns it: its own fields plus the nested author. Explicit allow-list.
+class CommentOut(CamelModel):
+    id: str
+    body: str
+    created_at: datetime
+    author: AuthorOut
