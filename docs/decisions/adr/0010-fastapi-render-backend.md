@@ -1,6 +1,6 @@
 # ADR-0010: API on FastAPI (Python) + Render, persistence via SQLModel/Alembic
 
-**Status:** Accepted
+**Status:** Accepted (frontend decision later amended by [ADR-0013](0013-python-frontend.md))
 **Date:** 2026-06-26
 **Supersedes:** [ADR-0002](0002-api-and-persistence.md)
 

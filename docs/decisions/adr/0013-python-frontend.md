@@ -45,12 +45,17 @@ in `apps/web/`** once the Python pages reach parity.
   both the API and the pages, so the `apps/web/vercel.json` `/api/*` rewrite is no longer needed.
 - **Supabase is unchanged** — Postgres, Auth, and Storage all stay exactly as-is.
 
-The frontend tickets (T40–T45, T51, T60) are re-pointed from "React component" to "Jinja
-template + HTMX + a FastAPI page route," and their owner (Sebastian) works in Python from here.
+The frontend tickets (T40–T45, T51, T60) move from "React component" to "Jinja template + HTMX +
+a FastAPI page route," and their owner (Sebastian) works in Python from here. **Tracked follow-up:**
+re-pointing the wording in those individual ticket files is done as each ticket is picked up, not in
+this ADR's first PR (same pattern as deferred ticket close-outs), so the claim here is not stranded.
 
-This ADR is delivered incrementally. The first slice is the public landing page (this PR):
-the Jinja + static-file plumbing plus a `/` route, touching none of the backend's data, auth,
-or models. Login wiring and the live-data screens follow in subsequent PRs.
+This ADR is delivered incrementally. The first slice is the landing page + a read-only feed (this
+PR): the Jinja + static-file plumbing plus `/` and `/feed` routes, touching none of the backend's
+data-writing, auth, or models. **Server-side Spotify login is deferred to [T09](../../plans/tickets/backlog/009-server-side-spotify-login.md)**
+(owned by Andrea, auth/crypto area) — ADR-0013 removes the SPA's Supabase JS client, so login is
+rebuilt server-side there; T09 is blocked by this PR merging. The remaining live-data screens follow
+in subsequent PRs.
 
 ## Alternatives considered
 
