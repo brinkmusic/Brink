@@ -58,6 +58,7 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 **Ready to start now** (all `blocked_by` merged, as of T12):
 - `003` (Sebastian) · `020` `039` `050` (Andrea) · `030` (Jonah) — these never had blockers.
 - **Newly unblocked by T10:** `013` `021` (Andrea) · **`040` — post composer + Spotify catalog search (Sebastian).** (`011`, `012` done.)
+- **Gated:** `009` — server-side Spotify login for the Jinja frontend (Andrea, auth/crypto) — queued behind the ADR-0013 Jinja shell (PR #60); startable once that merges.
 
 The wave numbers below are *dependency depth*, not live status — a ticket is startable as soon as its `blocked_by` are merged, which is what the "Ready to start now" list above reflects. Update that list whenever a wave of blockers merges.
 
