@@ -16,7 +16,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
-from app.models import PostSource
+from app.models import PostSource, ReactionType
 
 
 # The base every request/response shape inherits from. It turns snake_case Python field
@@ -47,6 +47,13 @@ class CreatePostBody(CamelModel):
     caption: Optional[str] = None
 
 
+# The body of POST/DELETE /api/posts/{id}/reactions. `type` is parsed against the
+# ReactionType enum, so any value other than HEART/FIRE/SPARKLE is rejected as a 400.
+# There is deliberately no user field: the reactor is always the authenticated caller.
+class ReactionBody(CamelModel):
+    type: ReactionType
+
+
 # --- Responses ---------------------------------------------------------------------
 
 # The linked-track part of a post response.
@@ -67,3 +74,11 @@ class PostOut(CamelModel):
     source: PostSource
     created_at: datetime
     track: TrackOut
+
+
+# What the reaction endpoints return: the post's id plus a count for EVERY reaction type
+# (including zeros), so the frontend always gets the same stable shape to render badges from.
+# `counts` is a plain map like {"HEART": 3, "FIRE": 1, "SPARKLE": 0}.
+class ReactionCountsOut(CamelModel):
+    post_id: str
+    counts: dict[str, int]
