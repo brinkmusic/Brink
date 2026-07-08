@@ -23,6 +23,9 @@ def normalize_url(url: str) -> str:
     # Same fix as backend/app/db.py: Supabase's URL is written for Prisma-style
     # tools, so we (1) name our Python driver explicitly and (2) drop the
     # "pgbouncer=true" hint, which our driver doesn't understand and rejects.
+    # NOTE: this is a copy, not a shared import — analytics/ and backend/ are
+    # separate uv projects with their own venvs/deploys. If Supabase's pooler
+    # URL format ever changes, update the fix in BOTH files.
     if url.startswith("postgresql://"):
         url = "postgresql+psycopg://" + url[len("postgresql://") :]
     parts = urlsplit(url)
