@@ -153,7 +153,10 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   backend removed, error envelope hardened, auth race fixed, CI hygiene done, review-remediation
   test/polish landed. **T10 (posts API) done** — `POST /api/posts` + `GET /api/posts?userId=`,
   track upsert, and the reusable Postgres-backed rate-limit helper (ADR-0011) + camelCase response
-  DTOs (ADR-0012) are the first social-API precedents. The React SPA is on
+  DTOs (ADR-0012) are the first social-API precedents. **T11 (reactions) done** —
+  `POST`/`DELETE /api/posts/{id}/reactions` (idempotent add / own-only remove) returning fresh
+  per-type counts (`ReactionCountsOut`), reusing the T10 rate-limit + DTO patterns (satisfies
+  BE-5). The React SPA is on
   **Vercel** (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`,
   `/api/health` → `db: true`), Spotify login works end-to-end. Repo: **`brinkmusic/Brink`**
   (public). Remaining remediation: T75, T76 (see
@@ -162,7 +165,7 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   (`.claude/skills/`), plus the **`docs-sync` CI gate** (`.github/workflows/docs-sync.yml`) that
   fails any PR changing source without touching docs (`no-docs` label = escape hatch). `develop`
   and `main` are now branch-protected: PR required, up to date, checks `api/web/secrets/docs-sync`
-  green, admins included. **Next feature work: T11 (reactions).**
+  green, admins included. **Next feature work: T12 (comments).**
 
 ## Deployment topology (ADR-0010, T07)
 

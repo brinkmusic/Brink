@@ -21,7 +21,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, 404s since T08) + dead front-end stubs. | T60 | ◻ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
 | BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ◻ |
-| BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ◻ |
+| BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ◻ |
 | BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ◻ |
 | BE-8 | `GET /api/users/:id/profile` — stats + cluster + compatibility. | T14 | ◻ |

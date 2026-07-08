@@ -19,7 +19,7 @@ from app.config import verify_required_settings
 from app.deps import AuthError
 from app.rate_limit import RateLimitError
 from app.responses import fail
-from app.routers import auth, health, posts
+from app.routers import auth, health, posts, reactions
 
 
 # Runs once when the server boots (and shuts down). We use it to fail fast on missing
@@ -37,6 +37,7 @@ app = FastAPI(title="Brink API", lifespan=lifespan)
 app.include_router(health.router)  # GET /api/health
 app.include_router(auth.router)    # POST /api/auth/capture-spotify
 app.include_router(posts.router)   # POST /api/posts, GET /api/posts?userId=
+app.include_router(reactions.router)  # POST/DELETE /api/posts/{id}/reactions
 
 
 # Auth failures (e.g. missing or invalid session token) → 401 { "error": ... }.
