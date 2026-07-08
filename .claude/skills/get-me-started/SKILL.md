@@ -61,12 +61,16 @@ confirm the matching doc was touched **in the same PR's file list**:
 - When an ADR says it "amends" or "supersedes" another, open the older ADR and confirm its
   `Status:` line was actually updated. "Amends" in the new ADR is not enough on its own.
 
-**Don't false-flag the deferred close-out pattern.** Brink deliberately closes a ticket in a
-*follow-up* PR (move `backlog/ → completed/`, flip traceability, update `CLAUDE.md` status) rather
-than in the feature PR — this is the established T10/T30 precedent. If a PR body explicitly says
-the close-out is a separate follow-up, that's on-pattern: note the pending follow-up, don't call
-it a violation. Real drift is a change that *silently* leaves the docs contradicting the code with
-no plan to reconcile.
+**Expect close-out folded into the feature PR (T93).** Brink now closes a ticket *in the same PR
+that implements it*: the feature PR should also move the ticket `backlog/ → completed/`, flip its
+traceability rows, and update the `CLAUDE.md` status line (the `close-out` skill does this
+pre-merge). So for a PR that finishes a ticket, a code diff with **no** matching ticket/requirements
+move is now a **flag** (a missing close-out), not on-pattern — the reverse of the old post-merge
+model. Two exceptions are still legitimate and should NOT be flagged: (1) a PR body that *explicitly*
+says close-out is a deliberate deferred follow-up (allowed for very large PRs or ones owned by
+someone not doing the bookkeeping — just note the pending follow-up), and (2) a PR that doesn't
+finish a ticket (partial/scaffold work). Real drift is a finished ticket whose docs *silently* stay
+in `backlog/` with the requirement rows unflipped and no stated reason.
 
 Sort your findings by severity: **contradiction** (a doc now states the opposite of reality) >
 **missing update** (a doc that should have moved didn't) > **pending follow-up** (deferred on
