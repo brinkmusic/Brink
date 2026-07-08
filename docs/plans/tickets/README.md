@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T10**, T70–T74, T77, T78, **T90, T91**). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T91 are the developer-tooling wave: the `get-me-started` session-warmup skill and the `docs-sync` CI gate that enforces "docs in the same PR."
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T10**, T70–T74, T77, T78, **T90–T92**). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T92 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," and the `close-out` skill that runs the ticket close-out ritual.
 
 ## How these relate to the rest of the docs
 
