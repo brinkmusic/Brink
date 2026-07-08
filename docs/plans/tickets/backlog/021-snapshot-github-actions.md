@@ -4,7 +4,7 @@ priority: Medium
 complexity: High
 category: Feature
 tags: [spotify, snapshots, scheduling, github-actions]
-blocked_by: [010]
+blocked_by: [010, 039]
 blocks: []
 parent_ticket: null
 owner: Andrea

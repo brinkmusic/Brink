@@ -11,22 +11,30 @@ from app import models
 
 # The exact set of tables we expect to exist. If a table is added or removed
 # without updating this, the first test below fails on purpose.
+# NOTE (T39, ADR-0009 medallion layering): tables now live in Postgres SCHEMAS, so
+# metadata keys are schema-qualified ("silver.Track"), except the public social/auth
+# tables which stay unqualified. `UserStats`/`TasteVector`/`Compatibility` were dropped
+# (computed on read now — ADR-0003); `ModelArtifact` + the bronze raw tables were added.
 EXPECTED_TABLES = {
+    # public schema — identity + social + rate limiting
     "User",
     "SpotifyToken",
-    "Track",
-    "Play",
     "Post",
     "Reaction",
     "Comment",
     "Follow",
     "ArtistPost",
-    "UserStats",
-    "TasteVector",
-    "Cluster",
-    "Compatibility",
-    "ModelMetrics",
     "RateLimitHit",  # added in T10 for rate limiting (ADR-0011)
+    # silver schema — conformed play/track data
+    "silver.Track",
+    "silver.Play",
+    # gold schema — analytics results / model artifacts
+    "gold.Cluster",
+    "gold.ModelMetrics",
+    "gold.ModelArtifact",  # added in T39 (self-describing model params)
+    # bronze schema — raw immutable landing
+    "bronze.spotify_recently_played_raw",
+    "bronze.kaggle_tracks_raw",
 }
 
 
@@ -57,10 +65,6 @@ def test_composite_primary_keys():
         "followerId",
         "followingId",
     }
-    assert {c.name for c in models.Compatibility.__table__.primary_key.columns} == {
-        "userAId",
-        "userBId",
-    }
 
 
 # The "what happens on delete" rules are set correctly for a few key links.
@@ -72,10 +76,24 @@ def test_cascade_and_restrict_delete_rules():
 
     assert ondelete(models.SpotifyToken.user_id) == "CASCADE"   # delete user -> delete their token
     assert ondelete(models.Play.track_id) == "RESTRICT"         # can't delete a song still in use
-    assert ondelete(models.User.cluster_id) == "SET NULL"       # delete cluster -> clear the link
 
 
 def test_snake_case_attrs_map_to_camelcase_columns():
-    # The ORM attribute is snake_case; the actual DB column stays camelCase.
+    # The ORM attribute is snake_case; the actual DB column stays camelCase (legacy Prisma tables).
     assert models.User.display_name.property.columns[0].name == "displayName"
-    assert models.UserStats.total_plays_30d.property.columns[0].name == "totalPlays30d"
+    assert models.Track.album_art_url.property.columns[0].name == "albumArtUrl"
+
+
+def test_medallion_schemas_assigned():
+    # T39: the moved/new tables carry their medallion schema (ADR-0009).
+    assert models.Track.__table__.schema == "silver"
+    assert models.Play.__table__.schema == "silver"
+    assert models.Cluster.__table__.schema == "gold"
+    assert models.ModelMetrics.__table__.schema == "gold"
+    assert models.ModelArtifact.__table__.schema == "gold"
+
+
+def test_model_artifact_new_table_uses_snake_case_columns():
+    # New (non-Prisma) tables use snake_case columns directly — no camelCase legacy alias.
+    assert models.ModelArtifact.feature_order.property.columns[0].name == "feature_order"
+    assert {c.name for c in models.ModelArtifact.__table__.primary_key.columns} == {"model_name"}

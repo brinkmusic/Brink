@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Tech-Debt
@@ -59,9 +59,26 @@ Add a self-describing `ModelArtifact` table; drop `TasteVector`, `Compatibility`
 | `backend/alembic/versions/<rev>_analytics_contract.py` | CREATE | generated Alembic migration |
 
 ## Testing Checklist
-- [ ] `uv run alembic upgrade head` applies cleanly on `brink-dev`
-- [ ] models import; metadata reflects the new `ModelArtifact` and removed models; `bronze`/`silver`/`gold` schemas created
-- [ ] `uv run pytest` still green (no code referenced the dropped models)
+- [ ] `uv run alembic upgrade head` applies cleanly on `brink-dev` — **pending: Andrea applies the migration manually after merge** (agreed: I build the migration, owner runs the live apply)
+- [x] models import; metadata reflects the new `ModelArtifact` and removed models; `bronze`/`silver`/`gold` schemas created
+- [x] `uv run pytest` still green (no code referenced the dropped models) — full suite 103 passed
+
+## Implementation notes (as built)
+- `backend/app/models.py`: added `ModelArtifact` (gold, snake_case columns) + bronze raw tables
+  `spotify_recently_played_raw` / `kaggle_tracks_raw`; moved `Track`/`Play` → `silver`,
+  `Cluster`/`ModelMetrics` → `gold`; dropped `UserStats`/`TasteVector`/`Compatibility` +
+  `User.clusterId`. Post/Play FK targets to Track are now `silver.Track.spotifyId`.
+- **Migration is HAND-WRITTEN** (`alembic/versions/d3f9a1c05b27_...`): uses `CREATE SCHEMA` +
+  `ALTER TABLE ... SET SCHEMA` so the existing `Track`/`Play` rows are **preserved** —
+  autogenerate would have modelled the move as drop+create and lost data.
+- **Tests:** `test_models.py` updated to the new contract (schema-qualified table set, medallion
+  schema assertions, dropped-table removals); `conftest.py` maps the schemas to none for SQLite via
+  `schema_translate_map`.
+- **Follow-up flagged:** `env.py` needs `include_schemas=True` before the next `--autogenerate`, or
+  Alembic won't see the schema-qualified tables. Noted in CLAUDE.md + the PR.
+- No requirement-catalog row to flip (T39 is decision-driven, listed under "Tickets without a
+  legacy requirement ID"). Unblocks **T21** (bronze/silver now exist) and the analytics spine
+  (033/034/036).
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable

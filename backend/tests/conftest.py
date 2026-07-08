@@ -44,6 +44,14 @@ def db_session():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    # T39 (ADR-0009): some models now live in Postgres schemas (silver.Track, silver.Play, ...).
+    # SQLite has no schemas, so we tell SQLAlchemy to translate every medallion schema to "no
+    # schema" (None) for tests — the schema-qualified tables collapse into the one in-memory DB,
+    # and cross-schema foreign keys (e.g. Post -> silver.Track) resolve within it. Real Postgres
+    # ignores this map and uses the actual schemas.
+    engine = engine.execution_options(
+        schema_translate_map={"bronze": None, "silver": None, "gold": None}
+    )
     tables = [m.__table__ for m in (User, Track, Post, Reaction, Comment, Follow, SpotifyToken, RateLimitHit)]
     SQLModel.metadata.create_all(engine, tables=tables)
     with Session(engine) as session:
