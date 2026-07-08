@@ -55,7 +55,7 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 | 7 | `060` |
 | 8 | `061` |
 
-**Ready to start now** (all `blocked_by` merged, as of T10):
+**Ready to start now** (all `blocked_by` merged, as of T12):
 - `003` (Sebastian) · `020` `039` `050` (Andrea) · `030` (Jonah) — these never had blockers.
 - **Newly unblocked by T10:** `013` `021` (Andrea) · **`040` — post composer + Spotify catalog search (Sebastian).** (`011`, `012` done.)
 
