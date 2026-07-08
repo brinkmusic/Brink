@@ -112,6 +112,38 @@ These are expectations, not automated guarantees — they set how we work.
   `Superseded by [ADR-NNNN](NNNN-...md)`. This is *why* the log doesn't go stale: history is
   preserved, the current decision is always the latest non-superseded ADR.
 
+## Developer skills (Claude Code)
+
+Three committed skills (in `.claude/skills/`) bookend a unit of work. Invoke one by typing
+`/<name>` in Claude Code, or just describe the situation. They're **guided checklists, not
+auto-runners** — they do the steps and flag problems, but stop for your judgement and never bypass
+review or push to `develop`/`main`.
+
+The work cycle:
+
+> **`get-me-started`** (begin session) → work a ticket → **`close-out`** (finish the *ticket*) →
+> repeat → **`close-session`** (finish the *session*).
+
+- **`get-me-started` — start of a session.** Pulls in what changed, lists open PRs, audits whether
+  each kept its docs in sync with its code, and briefs you on where things stand + what's next. It
+  **flags, doesn't fix.** Use it whenever you sit down or feel out of the loop ("catch me up",
+  "what's ready to review", "where am I").
+- **`close-out` — finishing a *ticket* (pre-merge).** The per-ticket bookkeeping: move the ticket
+  `backlog → completed`, flip its `status` + the `requirements.md` rows it satisfied, sync the
+  Status line below, and refresh the tickets README. Since **T93 this runs *before* merge** — the
+  edits are committed onto your feature branch so they ride the **same PR** as the code (no separate
+  follow-up PR). Run it as the **last step before you open/finalize a feature PR**, once the code is
+  done and tests are green. Deferring to a follow-up PR is still allowed but only as a **stated**
+  exception (e.g. a very large PR). Say "close out T<NN>".
+- **`close-session` — end of a *session* (final validation).** The "am I safe to stop?" gate and
+  bookend to `get-me-started`: runs the full backend suite + frontend build/lint, confirms the tree
+  is clean and pushed and open PRs are green, prunes already-merged branches, and writes the
+  handoff. Use it when wrapping up ("sign off", "I'm done", "final validation").
+
+**Key distinction:** `close-out` is per **ticket** (its docs, folded into the feature PR);
+`close-session` is per **work session** (validate + clean up + handoff). You may run `close-out`
+several times in a session, `close-session` once at the end.
+
 ## Database migrations
 
 Schema changes use **SQLModel + Alembic**: edit `backend/app/models.py`, then
