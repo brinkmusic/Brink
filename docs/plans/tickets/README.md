@@ -37,6 +37,7 @@ Each file has YAML frontmatter + sections:
 | `05x` | Artist portal |
 | `06x` | Cleanup + QA |
 | `07x` | Review remediation (from the [2026-07-02 code review](../reviews/2026-07-02-code-review-t00-t08.md)) |
+| `09x` | Developer tooling / automation |
 
 ## Dependency waves
 
