@@ -162,12 +162,16 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   **Vercel** (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`,
   `/api/health` → `db: true`), Spotify login works end-to-end. Repo: **`brinkmusic/Brink`**
   (public). Remaining remediation: T75, T76 (see
-  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **T90–T92 (developer tooling) done** —
-  the committed `get-me-started` session-warmup skill and `close-out` ticket-close-out skill
-  (`.claude/skills/`), plus the **`docs-sync` CI gate** (`.github/workflows/docs-sync.yml`) that
-  fails any PR changing source without touching docs (`no-docs` label = escape hatch). `develop`
-  and `main` are now branch-protected: PR required, up to date, checks `api/web/secrets/docs-sync`
-  green, admins included. **Next feature work: T13 (follow + feed).**
+  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **T90–T93 (developer tooling) done** —
+  the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
+  (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
+  pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
+  implements the ticket, so no separate follow-up PR (`close-session` owns the end-of-session
+  validate + branch-cleanup + handoff). Plus the **`docs-sync` CI gate**
+  (`.github/workflows/docs-sync.yml`) that fails any PR changing source without touching docs
+  (`no-docs` label = escape hatch). `develop` and `main` are now branch-protected: PR required, up
+  to date, checks `api/web/secrets/docs-sync` green, admins included. **Next feature work: T13
+  (follow + feed).**
 
 ## Deployment topology (ADR-0010, T07)
 
