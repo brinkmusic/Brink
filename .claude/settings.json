@@ -1,0 +1,15 @@
+{
+  "$comment": "Committed, team-shared Claude Code settings for Brink. Applies to everyone who uses Claude Code in this repo (personal overrides live in the git-ignored settings.local.json). The SessionStart hook below surfaces the doc-sync norm at the start of every session so it stays visible; the hard enforcement is the docs-sync CI gate (.github/workflows/docs-sync.yml), not this reminder.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"Brink norm: keep docs in sync in the SAME PR (see CLAUDE.md). If you change architecture/behavior, commands, or scope, update the matching ADR (docs/decisions/adr/), ticket (docs/plans/), or CLAUDE.md before opening the PR. The docs-sync CI check enforces this. Tip: run the get-me-started skill to warm up the session.\""
+          }
+        ]
+      }
+    ]
+  }
+}
