@@ -112,6 +112,38 @@ These are expectations, not automated guarantees — they set how we work.
   `Superseded by [ADR-NNNN](NNNN-...md)`. This is *why* the log doesn't go stale: history is
   preserved, the current decision is always the latest non-superseded ADR.
 
+## Developer skills (Claude Code)
+
+Three committed skills (in `.claude/skills/`) bookend a unit of work. Invoke one by typing
+`/<name>` in Claude Code, or just describe the situation. They're **guided checklists, not
+auto-runners** — they do the steps and flag problems, but stop for your judgement and never bypass
+review or push to `develop`/`main`.
+
+The work cycle:
+
+> **`get-me-started`** (begin session) → work a ticket → **`close-out`** (finish the *ticket*) →
+> repeat → **`close-session`** (finish the *session*).
+
+- **`get-me-started` — start of a session.** Pulls in what changed, lists open PRs, audits whether
+  each kept its docs in sync with its code, and briefs you on where things stand + what's next. It
+  **flags, doesn't fix.** Use it whenever you sit down or feel out of the loop ("catch me up",
+  "what's ready to review", "where am I").
+- **`close-out` — finishing a *ticket* (pre-merge).** The per-ticket bookkeeping: move the ticket
+  `backlog → completed`, flip its `status` + the `requirements.md` rows it satisfied, sync the
+  Status line below, and refresh the tickets README. Since **T93 this runs *before* merge** — the
+  edits are committed onto your feature branch so they ride the **same PR** as the code (no separate
+  follow-up PR). Run it as the **last step before you open/finalize a feature PR**, once the code is
+  done and tests are green. Deferring to a follow-up PR is still allowed but only as a **stated**
+  exception (e.g. a very large PR). Say "close out T<NN>".
+- **`close-session` — end of a *session* (final validation).** The "am I safe to stop?" gate and
+  bookend to `get-me-started`: runs the full backend suite + frontend build/lint, confirms the tree
+  is clean and pushed and open PRs are green, prunes already-merged branches, and writes the
+  handoff. Use it when wrapping up ("sign off", "I'm done", "final validation").
+
+**Key distinction:** `close-out` is per **ticket** (its docs, folded into the feature PR);
+`close-session` is per **work session** (validate + clean up + handoff). You may run `close-out`
+several times in a session, `close-session` once at the end.
+
 ## Database migrations
 
 Schema changes use **SQLModel + Alembic**: edit `backend/app/models.py`, then
@@ -153,11 +185,38 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   backend removed, error envelope hardened, auth race fixed, CI hygiene done, review-remediation
   test/polish landed. **T10 (posts API) done** — `POST /api/posts` + `GET /api/posts?userId=`,
   track upsert, and the reusable Postgres-backed rate-limit helper (ADR-0011) + camelCase response
-  DTOs (ADR-0012) are the first social-API precedents. The React SPA is on
+  DTOs (ADR-0012) are the first social-API precedents. **T11 (reactions) done** —
+  `POST`/`DELETE /api/posts/{id}/reactions` (idempotent add / own-only remove) returning fresh
+  per-type counts (`ReactionCountsOut`), reusing the T10 rate-limit + DTO patterns (satisfies
+  BE-5). **T12 (comments) done** — `POST`/`GET /api/posts/{id}/comments` (both login-gated;
+  create is rate-limited + trims/length-validates `body`, list returns newest-first with nested
+  author DTO), satisfies BE-6. The React SPA is on
   **Vercel** (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`,
   `/api/health` → `db: true`), Spotify login works end-to-end. Repo: **`brinkmusic/Brink`**
   (public). Remaining remediation: T75, T76 (see
-  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **Next feature work: T11 (reactions).**
+  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **T90–T93 (developer tooling) done** —
+  the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
+  (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
+  pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
+  implements the ticket, so no separate follow-up PR (`close-session` owns the end-of-session
+  validate + branch-cleanup + handoff). Plus the **`docs-sync` CI gate**
+  (`.github/workflows/docs-sync.yml`) that fails any PR changing source without touching docs
+  (`no-docs` label = escape hatch). `develop` and `main` are now branch-protected: PR required, up
+  to date, checks `api/web/secrets/docs-sync` green, admins included. **T13 (follow + feed) done**
+  — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
+  `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
+  counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
+  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **T22 (Spotify token refresh) done** —
+  `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
+  (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
+  unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against
+  T02). This was a missing prerequisite discovered while starting T20 — both **T20 (now-playing)**
+  and **T21 (snapshot)** build on it and are now genuinely unblocked. **T20 (now-playing) done** —
+  `GET /api/me/now-playing` (login-gated) + `spotify.get_currently_playing`, returning the
+  normalized currently-playing track or `{ data: null }` for the empty/degraded cases (nothing
+  playing, no linked Spotify, Spotify error) — the backend half of SP-1/UI-10 (the surface is T44).
+  **Next backend feature: T21 (snapshot); T14 (profile) is still gated on the analytics spine
+  (T35).**
 
 ## Deployment topology (ADR-0010, T07)
 

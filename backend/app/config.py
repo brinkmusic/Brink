@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     supabase_service_role_key: Optional[str] = None
     token_enc_key: Optional[str] = None
 
+    # Spotify app credentials, used to refresh a user's access token server-side (T22). Optional on
+    # the model (so tests/migrations import without them); a refresh simply can't happen without them.
+    spotify_client_id: Optional[str] = None
+    spotify_client_secret: Optional[str] = None
+
 
 # Returns the settings. @lru_cache means "build this once, then reuse it" — we don't
 # re-read the .env file every time something needs a setting.

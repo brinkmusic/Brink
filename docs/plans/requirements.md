@@ -11,7 +11,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | AUTH-2 | Capture + encrypt the Spotify refresh token server-side in `SpotifyToken`. | T02 | ✅ |
 | AUTH-3 † | Passwordless email magic-link/OTP signup (Supabase sends mail). | T03 | ◻ |
 | AUTH-4 | Every `/api/*` mutation verifies the Supabase JWT. | T02 + every API ticket (ADR-0007) | ✅ base |
-| AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T02 | ✅ |
+| AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T22 | ✅ |
 | AUTH-6 | Handle accounts work fully except Spotify-derived stats ("link Spotify"). | T03, T44 | ◻ |
 
 ## Layer 2 — Backend API + Data Model (BE)
@@ -20,10 +20,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, 404s since T08) + dead front-end stubs. | T60 | ◻ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
-| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ◻ |
-| BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ◻ |
-| BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ◻ |
-| BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ◻ |
+| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ✅ |
+| BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
+| BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
+| BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ✅ |
 | BE-8 | `GET /api/users/:id/profile` — stats + cluster + compatibility. | T14 | ◻ |
 | BE-9 | `POST /api/artist/posts` — create BTS post + optional track. | T50 | ◻ |
 | BE-10 | All mutations: session-gated, validated, consistent error JSON. | every API ticket (ADR-0007) | ◻ |

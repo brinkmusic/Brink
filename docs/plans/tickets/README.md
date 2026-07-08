@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T10**, T70–T74, T77, T78). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.**
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T10–T13**, **T20**, **T22**, T70–T74, T77, T78, **T90–T93**). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
 
 ## How these relate to the rest of the docs
 
@@ -37,6 +37,7 @@ Each file has YAML frontmatter + sections:
 | `05x` | Artist portal |
 | `06x` | Cleanup + QA |
 | `07x` | Review remediation (from the [2026-07-02 code review](../reviews/2026-07-02-code-review-t00-t08.md)) |
+| `09x` | Developer tooling / automation |
 
 ## Dependency waves
 
@@ -44,8 +45,8 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 
 | Wave | Tickets |
 |---|---|
-| **0 (ready)** | `003` `020` `030` `039` `050` |
-| 1 | `011` `012` `013` `021` `031` `040` `051` |
+| **0 (ready)** | `003` `030` `039` `050` |
+| 1 | `021` `031` `040` `051` |
 | 2 | `032` `034` `036` `041` `042` `043` `052` |
 | 3 | `033` `038` `045` |
 | 4 | `035` |
@@ -54,9 +55,11 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 | 7 | `060` |
 | 8 | `061` |
 
-**Ready to start now** (all `blocked_by` merged, as of T10):
-- `003` (Sebastian) · `020` `039` `050` (Andrea) · `030` (Jonah) — these never had blockers.
-- **Newly unblocked by T10:** `011` `012` `013` `021` (Andrea) · **`040` — post composer + Spotify catalog search (Sebastian).**
+**Ready to start now** (all `blocked_by` merged, as of T13):
+- `003` (Sebastian) · `039` `050` (Andrea) · `030` (Jonah) — these never had blockers.
+- **Newly unblocked by T10:** `021` (Andrea) · **`040` — post composer + Spotify catalog search (Sebastian).** (`011`, `012` done.)
+- **Newly unblocked by T13 (follow + feed):** the follow/feed UIs — `041` `043` (Sebastian) — once their own remaining blockers are merged.
+- **Gated:** `009` — server-side Spotify login for the Jinja frontend (Andrea, auth/crypto) — queued behind the ADR-0013 Jinja shell (PR #60); startable once that merges.
 
 The wave numbers below are *dependency depth*, not live status — a ticket is startable as soon as its `blocked_by` are merged, which is what the "Ready to start now" list above reflects. Update that list whenever a wave of blockers merges.
 
