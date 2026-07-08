@@ -25,7 +25,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from app.db import get_session
 from app.deps import require_user
 from app.main import app
-from app.models import Comment, Post, RateLimitHit, Reaction, Track, User
+from app.models import Comment, Follow, Post, RateLimitHit, Reaction, Track, User
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def db_session():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    tables = [m.__table__ for m in (User, Track, Post, Reaction, Comment, RateLimitHit)]
+    tables = [m.__table__ for m in (User, Track, Post, Reaction, Comment, Follow, RateLimitHit)]
     SQLModel.metadata.create_all(engine, tables=tables)
     with Session(engine) as session:
         yield session

@@ -107,3 +107,29 @@ class CommentOut(CamelModel):
     body: str
     created_at: datetime
     author: AuthorOut
+
+
+# What POST/DELETE /api/follow/{userId} return: the target's id and whether the caller now follows
+# them (true after a follow, false after an unfollow). A tiny, explicit shape — never a raw row.
+class FollowStateOut(CamelModel):
+    following_id: str
+    following: bool
+
+
+# A single post as the feed returns it: the post's own fields + its track, plus the engagement
+# numbers the feed shows. `reaction_counts` and `viewer_reactions` ALWAYS carry an entry for every
+# reaction type (like ReactionCountsOut) so the frontend renders a stable set of badges:
+#   reaction_counts  -> how many of each type the post has, e.g. {"HEART": 3, "FIRE": 0, ...}
+#   viewer_reactions -> whether the CURRENT viewer left each type, e.g. {"HEART": true, ...}
+#   comment_count    -> how many comments the post has.
+class FeedPostOut(CamelModel):
+    id: str
+    user_id: str
+    author: AuthorOut
+    caption: Optional[str]
+    source: PostSource
+    created_at: datetime
+    track: TrackOut
+    reaction_counts: dict[str, int]
+    comment_count: int
+    viewer_reactions: dict[str, bool]
