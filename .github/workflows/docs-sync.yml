@@ -1,0 +1,87 @@
+# WHAT THIS FILE IS
+# A CI guardrail for Brink's project norm "keep docs in sync in the same PR — stale docs
+# are a bug" (see CLAUDE.md). It fails a pull request that changes substantive SOURCE CODE
+# but touches NO documentation, so an architecture/behavior/command change can't silently
+# merge while the docs still describe the old world.
+#
+# This is a *heuristic, prompt-independent* gate: it does not read minds or judge whether the
+# docs are good — it only checks that *some* doc moved alongside the code. That deliberately
+# catches the common failure (code changed, zero docs changed) without pretending to verify
+# doc quality (which review + the PR template handle). Because it runs in CI, it applies to
+# every PR regardless of who — or which AI agent — wrote it.
+#
+# Escape hatch: a change that genuinely needs no docs (a pure refactor, a test-only change)
+# gets the `no-docs` label on the PR, which skips this job.
+
+name: Docs sync
+
+# Runs only on pull requests (it needs a base branch to diff against). We also listen for
+# label add/remove so that applying the `no-docs` escape-hatch label re-evaluates the check
+# immediately, instead of the PR staying red until the next push.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  docs-sync:
+    runs-on: ubuntu-latest
+    # Skip the whole job when the author has declared this change needs no docs.
+    # `labels.*.name` is the list of label names on the PR; `contains(...)` is true if
+    # `no-docs` is among them.
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-docs') }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so we can compute the merge-base diff against the base branch.
+          fetch-depth: 0
+
+      - name: Check that docs moved with the code
+        env:
+          # The branch this PR targets (usually `develop`).
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # `set -euo pipefail`: stop on the first error, treat unset vars as errors, and
+          # fail a pipeline if any stage fails — so a bug in this script can't pass silently.
+          set -euo pipefail
+
+          # Make sure we have the base branch locally, then list every file this PR changes
+          # relative to where it branched off (the `...` merge-base form).
+          git fetch --no-tags origin "$BASE"
+          changed="$(git diff --name-only "origin/$BASE...HEAD")"
+          echo "Files changed in this PR:"
+          echo "$changed"
+          echo
+
+          # SUBSTANTIVE CODE = application source that can carry architectural or behavioral
+          # meaning. We start from the app source trees, then subtract things that legitimately
+          # change without a doc update: tests, dependency lockfiles/manifests, and binary or
+          # style assets. `|| true` keeps grep's "no match" exit code from aborting the script.
+          code="$(echo "$changed" \
+            | grep -E '^(backend/app/|apps/web/src/|analytics/)' \
+            | grep -vE '(/tests?/|(^|/)test_|_test\.|\.test\.)' \
+            | grep -vE '(uv\.lock|package(-lock)?\.json|pyproject\.toml|\.python-version)$' \
+            | grep -vE '\.(png|jpe?g|gif|svg|ico|css)$' \
+            || true)"
+
+          # DOCS = anything that records intent or decisions: the spec/tickets, the ADR log,
+          # CLAUDE.md, or any README.
+          docs="$(echo "$changed" \
+            | grep -E '(^docs/|^CLAUDE\.md$|README\.md$)' \
+            || true)"
+
+          # The rule: if this PR touches substantive code but no docs at all, block it.
+          if [ -n "$code" ] && [ -z "$docs" ]; then
+            echo "::error::This PR changes source code but updates no documentation."
+            echo
+            echo "Brink norm (CLAUDE.md): keep docs in sync in the SAME PR — stale docs are a bug."
+            echo "Update the doc that matches your change and push it here:"
+            echo "  - a decision/architecture change  -> add/supersede an ADR in docs/decisions/adr/"
+            echo "  - a feature/scope change          -> the ticket in docs/plans/ + requirements.md"
+            echo "  - commands/env/conventions/status -> CLAUDE.md"
+            echo
+            echo "If this change genuinely needs no docs (pure refactor, test-only, etc.),"
+            echo "add the 'no-docs' label to this PR and the check will pass."
+            exit 1
+          fi
+
+          echo "Docs-sync check passed: docs changed alongside code (or no substantive code changed)."
