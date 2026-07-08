@@ -75,6 +75,14 @@ class TrackOut(CamelModel):
     popularity: Optional[int] = None
 
 
+# What GET /api/me/now-playing returns: the currently-playing track plus whether it's actively
+# playing (vs paused). Reuses TrackOut so a "now playing" card renders the same track fields as a
+# post. The endpoint returns this OR null (nothing playing / no linked Spotify).
+class NowPlayingOut(CamelModel):
+    is_playing: bool
+    track: TrackOut
+
+
 # A post as the API returns it: the post's own fields plus its linked track. Note this is an
 # explicit allow-list — only these fields ever go out, regardless of what the table stores.
 class PostOut(CamelModel):
