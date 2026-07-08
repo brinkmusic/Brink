@@ -40,7 +40,7 @@ The original T21 added a `crons` entry to `vercel.json`. **ADR-0006 supersedes t
 - **Integrity:** the unique constraint on `(userId, playedAt)` in `backend/app/models.py` makes duplicate plays structurally impossible even if the job double-runs.
 
 ## Current State (on `develop`)
-- Present after the auth port (T06): `backend/app/spotify.py` (server-side token refresh, `get_valid_access_token`), `backend/app/deps.py`, encrypted `SpotifyToken` storage.
+- Present after **T22**: `backend/app/spotify.py` (server-side token refresh, `get_valid_access_token`); plus `backend/app/deps.py` and encrypted `SpotifyToken` storage (T06). (The refresh helper was built in T22, not T06 — earlier notes here misattributed it.)
 - `Play` and `Track` already modeled in `backend/app/models.py`.
 - No snapshot router (`backend/app/routers/snapshot.py`) and no `.github/workflows/snapshot.yml` yet.
 - `upsert_track` is introduced by T10 (hence `blocked_by: [010]`).

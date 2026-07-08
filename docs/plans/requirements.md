@@ -11,7 +11,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | AUTH-2 | Capture + encrypt the Spotify refresh token server-side in `SpotifyToken`. | T02 | ✅ |
 | AUTH-3 † | Passwordless email magic-link/OTP signup (Supabase sends mail). | T03 | ◻ |
 | AUTH-4 | Every `/api/*` mutation verifies the Supabase JWT. | T02 + every API ticket (ADR-0007) | ✅ base |
-| AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T02 | ✅ |
+| AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T22 | ✅ |
 | AUTH-6 | Handle accounts work fully except Spotify-derived stats ("link Spotify"). | T03, T44 | ◻ |
 
 ## Layer 2 — Backend API + Data Model (BE)
