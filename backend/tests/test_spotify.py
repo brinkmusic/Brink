@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from cryptography.exceptions import InvalidTag
 
 from app import spotify
 from app.models import SpotifyToken, User
@@ -88,6 +89,30 @@ def test_rotated_refresh_token_is_stored(db_session, monkeypatch):
 def test_refresh_failure_returns_none(db_session, monkeypatch):
     _seed_token(db_session, expires_in_seconds=-10)
     monkeypatch.setattr(spotify, "_request_refreshed_token", lambda rt: None)
+    assert spotify.get_valid_access_token(db_session, "u1") is None
+
+
+# A stored token that can't be decrypted (wrong TOKEN_ENC_KEY -> InvalidTag) must degrade to None,
+# not raise — one unreadable token must never 500 the whole snapshot (T23). This is the fresh-token
+# branch: the token looks valid (not expired) but its ciphertext is unreadable.
+def test_unreadable_fresh_token_returns_none(db_session, monkeypatch):
+    _seed_token(db_session, access="AT", expires_in_seconds=3600)
+    def raise_invalid_tag(blob):
+        raise InvalidTag()
+    monkeypatch.setattr(spotify, "decrypt", raise_invalid_tag)
+    assert spotify.get_valid_access_token(db_session, "u1") is None
+
+
+# The expired-token branch: if the stored REFRESH token can't be decrypted, we can't refresh —
+# degrade to None and don't even attempt the network refresh (T23).
+def test_unreadable_refresh_token_returns_none(db_session, monkeypatch):
+    _seed_token(db_session, refresh="RT", expires_in_seconds=-10)
+    def raise_malformed(blob):
+        raise ValueError("malformed ciphertext")
+    monkeypatch.setattr(spotify, "decrypt", raise_malformed)
+    def boom(*a, **k):
+        raise AssertionError("must not attempt a refresh when the refresh token is unreadable")
+    monkeypatch.setattr(spotify, "_request_refreshed_token", boom)
     assert spotify.get_valid_access_token(db_session, "u1") is None
 
 
