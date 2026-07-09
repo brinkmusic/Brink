@@ -14,12 +14,13 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from app.db import get_session
+from app.deps import AuthError, require_user
 from app.models import Post, Track
 
 logger = logging.getLogger(__name__)
@@ -109,9 +110,24 @@ def _recent_posts(session: Session, limit: int = 20) -> list[dict]:
 # required (matching the T10 GET /api/posts endpoint, which is also public).
 @router.get("/feed", response_class=HTMLResponse)
 def feed(request: Request, session: Session = Depends(get_session)):
+    # Gate the feed on login (T09): a visitor who isn't signed in is sent to Spotify login.
+    # We authenticate against a scratch Response so that if require_user REFRESHES the
+    # session (Supabase rotates refresh tokens on refresh), we can carry its refreshed
+    # session cookie onto the page response below — otherwise the browser would keep an
+    # old, now-rotated token and eventually be logged out.
+    refreshed = Response()
+    try:
+        require_user(request, session=session, response=refreshed)
+    except AuthError:
+        return RedirectResponse("/auth/login", status_code=303)
+
     posts = _recent_posts(session)
-    return templates.TemplateResponse(
+    page = templates.TemplateResponse(
         request,
         "feed.html",
         {"page_title": "Feed · Brink", "posts": posts},
     )
+    for key, value in refreshed.raw_headers:
+        if key == b"set-cookie":
+            page.raw_headers.append((key, value))
+    return page
