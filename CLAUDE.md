@@ -164,10 +164,11 @@ is a no-op on the existing DB. `alembic check` reports any drift between the mod
 
 **Medallion schemas (T39, ADR-0009).** Tables live in Postgres schemas: `silver` (`Track`, `Play`),
 `gold` (`Cluster`, `ModelMetrics`, `ModelArtifact`), `bronze` (raw `*_raw` landing tables); the
-social/auth tables stay in the default `public` schema. Two consequences: (1) **autogenerate must
-be run with schema reflection on** — `env.py` needs `include_schemas=True` before the next
-`--autogenerate`, or Alembic won't see the schema-qualified tables and will propose dropping them
-(follow-up; T39 is hand-written and unaffected). (2) SQLite tests map the schemas to none via a
+social/auth tables stay in the default `public` schema. Two consequences: (1) **autogenerate runs
+with schema reflection on** — `env.py` sets `include_schemas=True` (+ an `include_name` allow-list
+so only our schemas are reflected, not Supabase's `auth`/`storage`, and a schema-qualified
+`include_object` check), so `--autogenerate` sees the medallion tables correctly (done in **T37**;
+verified with `alembic check`). (2) SQLite tests map the schemas to none via a
 `schema_translate_map` in `tests/conftest.py`. A migration that **moves** a table between schemas
 must use `ALTER TABLE ... SET SCHEMA` (preserves rows) — never autogenerate's drop+recreate.
 
@@ -259,8 +260,12 @@ PR that it went in without a second review).
   Supabase Auth Redirect URLs *and* the Spotify app redirect allow-list, then do one real login to
   confirm the server exchange returns the Spotify refresh token (the only path not covered by tests).
   **Policy change (owner):** a second review on auth/crypto changes is now *encouraged, not
-  required* — the owner may self-merge. **Next backend feature: T50 (artist storage) is ready; the
-  analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still gated on T35.**
+  required* — the owner may self-merge. **T37 (Alembic schema reflection) done** — `env.py` now sets
+  `include_schemas=True` + an `include_name` schema allow-list + a schema-qualified `include_object`
+  check, so `--autogenerate` sees the T39 medallion schemas and ignores Supabase's own schemas
+  (verified with `alembic check`: no drift); this clears the follow-up T39 flagged. **Next backend
+  feature: T50 (artist storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked;
+  T14 (profile) still gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 

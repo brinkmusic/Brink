@@ -93,6 +93,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 
 ## Tickets without a legacy requirement ID
 - **T39** — analytics schema migration (`ModelArtifact` + medallion bronze/silver/gold). Decision-driven (ADR-0003 / ADR-0009), no original spec req.
+- **T37** — Alembic schema reflection (`include_schemas` + guards) so autogenerate sees the medallion schemas. Tooling follow-up to T39 (ADR-0009), no spec req.
 - **T61** — test sweep + k6 + cross-browser E2E. Maps to proposal §6/§11 below.
 
 ## Success-metric traceability (proposal §11)
