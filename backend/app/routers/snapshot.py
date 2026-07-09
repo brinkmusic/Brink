@@ -88,6 +88,15 @@ def _ingest_user(session: Session, user_id: str, payload: dict) -> int:
         if played_at in existing or played_at in seen:
             continue
         upsert_track(session, _track_meta(track))         # silver: ensure the song exists
+        # Write the Track to the database NOW, before we add the Play that points at it. WHY:
+        # Play.trackId is a foreign key to Track.spotifyId — Postgres rejects a Play whose Track
+        # doesn't yet physically exist. Without this flush, both the new Track and its Play sit
+        # unwritten until a later query triggers an automatic flush, and that flush is not
+        # guaranteed to insert the Track before the Play across this batched loop → a
+        # ForeignKeyViolation (the T23 snapshot-500). flush() sends the pending Track (and the
+        # bronze row) to the DB inside the same transaction; the per-user commit still happens
+        # once, below, so nothing is half-committed if a later user errors.
+        session.flush()
         session.add(Play(user_id=user_id, track_id=track["id"], played_at=played_at))
         seen.add(played_at)
         inserted += 1

@@ -267,12 +267,18 @@ PR that it went in without a second review).
   `develop → main` release (#79) shipped** — Render (which builds `main`) was 64 commits stale, so
   T09 login, the Jinja pages, and the snapshot endpoint were 404 in production and the snapshot cron
   couldn't fire (GitHub runs `schedule` only from the default branch). Post-release, `/` (200),
-  `/auth/login` (307), and gated `/feed` (303) are live. **T23 (token-decrypt guard) done** — the
-  release surfaced the snapshot cron 500-ing: `get_valid_access_token` decrypted stored tokens
-  unguarded, so a `TOKEN_ENC_KEY` mismatch (`InvalidTag`) crashed the whole run; it now degrades an
-  unreadable token to `None` (skip that user) via `_safe_decrypt`, per its documented contract.
-  **Next backend feature: T50 (artist storage) is ready; the analytics spine (031/033/034, Jonah) is
-  unblocked; T14 (profile) still gated on T35.**
+  `/auth/login` (307), and gated `/feed` (303) are live. **T23 (snapshot-500 remediation) done** —
+  the release surfaced the snapshot cron 500-ing; two fixes: (1) the real cause — `_ingest_user`
+  inserted each `Play` before the `Track` it FK-references, so on Postgres a batch of new tracks hit
+  a `ForeignKeyViolation`; now it `session.flush()`es each upserted Track first (the SQLite suite
+  missed this because SQLite doesn't enforce FKs — a new `fk_session` test fixture turns them on).
+  (2) hardening — `get_valid_access_token` decrypted stored tokens unguarded, so a `TOKEN_ENC_KEY`
+  mismatch (`InvalidTag`) would crash the whole run; it now degrades an unreadable token to `None`
+  (skip that user) via `_safe_decrypt`. Verified end-to-end against `brink-dev` (50 plays ingested).
+  **Follow-up:** the same insert-ordering gap likely affects the T10 posts endpoint for a brand-new
+  track (upsert_track + Post in one commit) — worth a check. **Next backend feature: T50 (artist
+  storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still
+  gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 
