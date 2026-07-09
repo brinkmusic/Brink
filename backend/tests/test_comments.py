@@ -20,9 +20,14 @@ def _user(id="user-1", handle="h", display_name="d", avatar_url=None):
                 created_at=datetime.now(timezone.utc))
 
 
-# Put a real Post (and its Track) in the database so the endpoint's post-exists check passes.
+# Put a real Post (and its author + Track) in the database so the endpoint's post-exists check
+# passes. The author (handle derived from its id so it never clashes with the caller's handle) and
+# the Track are committed FIRST — the Post foreign-key-references both and the test DB enforces
+# foreign keys, so the parents must exist before the Post.
 def _seed_post(session, post_id="post-1", author="author-1"):
+    session.add(_user(id=author, handle=author))
     session.add(Track(spotify_id="spot-1", title="A", artist_name="X"))
+    session.commit()
     session.add(Post(id=post_id, user_id=author, track_id="spot-1", source=PostSource.MANUAL))
     session.commit()
     return post_id
@@ -122,8 +127,14 @@ def test_list_comments_unauthenticated_returns_401(client):
 # Returns a post's comments newest-first, each with its author's fields.
 def test_list_comments_newest_first_with_author(client, as_user, db_session):
     _seed_post(db_session)
+    # The comment authors (u1, u2) and a second post ("other", to prove cross-post filtering) are
+    # parents the Comments foreign-key-reference, so seed and commit them BEFORE the Comments (the
+    # test DB enforces foreign keys). "other" reuses the already-seeded author + track.
     db_session.add(_user("u1", handle="ann", display_name="Ann"))
     db_session.add(_user("u2", handle="bo", display_name="Bo", avatar_url="http://a/b.png"))
+    db_session.commit()
+    db_session.add(Post(id="other", user_id="author-1", track_id="spot-1", source=PostSource.MANUAL))
+    db_session.commit()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     db_session.add(Comment(post_id="post-1", user_id="u1", body="older", created_at=now - timedelta(minutes=5)))
     db_session.add(Comment(post_id="post-1", user_id="u2", body="newer", created_at=now))
