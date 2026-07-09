@@ -191,3 +191,15 @@ def test_callback_missing_handshake_cookie_is_rejected(client, monkeypatch):
     resp = client.get("/auth/callback?state=S&code=X", follow_redirects=False)
 
     assert resp.status_code == 400  # no handshake cookie → can't be a real login round-trip
+
+
+def test_logout_clears_session_cookie_and_redirects_home(client):
+    client.cookies.set(login_session.SESSION_COOKIE, "something")
+    resp = client.get("/auth/logout", follow_redirects=False)
+
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/"
+    # A cleared cookie comes back as a Set-Cookie that expires it immediately.
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert login_session.SESSION_COOKIE in set_cookie
+    assert 'Max-Age=0' in set_cookie or "expires=" in set_cookie.lower()
