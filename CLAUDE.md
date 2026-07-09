@@ -247,9 +247,20 @@ PR that it went in without a second review).
   conforms to silver (`upsert_track` + `Play` deduped on `userId+playedAt`); one bounded 429
   backoff; `.github/workflows/snapshot.yml` triggers it ~every 2h (satisfies SP-2/SP-4/SP-5/
   INFRA-3). **Deploy step for Andrea:** set `CRON_SECRET` on Render + add `SNAPSHOT_URL`/
-  `CRON_SECRET` GitHub repo secrets, or the cron 401s. **Next backend feature: T50 (artist
-  storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still
-  gated on T35.**
+  `CRON_SECRET` GitHub repo secrets, or the cron 401s. **T09 (server-side Spotify login) done** —
+  server-side OAuth for the Jinja frontend: `GET /auth/login` → `/auth/callback` → `/auth/logout`
+  (PKCE via Supabase; encrypted `brink_oauth` handshake cookie carrying the verifier + CSRF state;
+  encrypted `brink_session` cookie holding the Supabase session). `require_user` now also reads the
+  session cookie with **refresh-on-expiry** (Bearer path unchanged); the Spotify tokens are captured
+  server-side in the callback. New `app/security/session.py` owns the session cookie (reuse it for
+  any future gated page). Login buttons wired and `/feed` gated (anon → login), reversing PR #60's
+  temporary public feed. Re-implements the **AUTH-1/2/4** login surface server-side (identity/crypto
+  from T02/T06 reused). **Deploy step for Andrea:** add the deployed `/auth/callback` URL to the
+  Supabase Auth Redirect URLs *and* the Spotify app redirect allow-list, then do one real login to
+  confirm the server exchange returns the Spotify refresh token (the only path not covered by tests).
+  **Policy change (owner):** a second review on auth/crypto changes is now *encouraged, not
+  required* — the owner may self-merge. **Next backend feature: T50 (artist storage) is ready; the
+  analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 

@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: High
 category: Feature
@@ -109,15 +109,57 @@ removed with the SPA. `require_user` learns to read the session cookie in additi
 | `backend/tests/test_auth_login.py` | CREATE | start/callback/logout + cookie + `state` CSRF tests |
 
 ## Testing Checklist
-- [ ] `GET /auth/login` redirects to Spotify with the right redirect URL, scopes, and a `state`
-- [ ] callback with a valid code sets an httpOnly+Secure session cookie and provisions the `User`
-- [ ] callback stores an **encrypted** `SpotifyToken` (row is upserted, not duplicated on re-login)
-- [ ] callback with a mismatched/missing `state` is rejected (CSRF guard)
-- [ ] Spotify-returned `error` renders the friendly login-failed page, not a 500
-- [ ] a request with a valid session cookie passes `require_user`; existing Bearer-header auth
+- [x] `GET /auth/login` redirects to Spotify with the right redirect URL, scopes, and a `state`
+- [x] callback with a valid code sets an httpOnly+Secure session cookie and provisions the `User`
+- [x] callback stores an **encrypted** `SpotifyToken` (row is upserted, not duplicated on re-login)
+- [x] callback with a mismatched/missing `state` is rejected (CSRF guard)
+- [x] Spotify-returned `error` renders the friendly login-failed page, not a 500
+- [x] a request with a valid session cookie passes `require_user`; existing Bearer-header auth
       still works (no regression to the JSON API)
-- [ ] `GET /feed` while logged out redirects to login; while logged in renders the feed
-- [ ] `GET /auth/logout` clears the cookie and de-gates the feed
+- [x] `GET /feed` while logged out redirects to login; while logged in renders the feed
+- [x] `GET /auth/logout` clears the cookie and de-gates the feed
+
+## Outcome (as built)
+Server-side Spotify login shipped as five slices (branch `feat/T09-server-side-spotify-login`):
+- **`GET /auth/login`** (`routers/auth.py`) — starts Supabase PKCE OAuth; stores the PKCE verifier
+  + a CSRF `state` in a short-lived **encrypted, httpOnly handshake cookie** (`brink_oauth`). State
+  is carried in the `redirect_to` query param (verified Supabase preserves it) and matched on the
+  callback.
+- **`GET /auth/callback`** — verifies `state`, exchanges the code for a Supabase session
+  (`supabase.exchange_code`), provisions the user (`deps.get_or_create_user`), encrypts + upserts
+  the Spotify provider tokens (`auth._store_spotify_token`), sets the encrypted **`brink_session`**
+  cookie, redirects to `/feed`. Every failure (cancel, bad code, state mismatch, missing cookie) →
+  friendly `_login_failed` page, never a 500.
+- **`GET /auth/logout`** — clears the session cookie.
+- **`require_user`** (`deps.py`) now accepts the session cookie in addition to the Bearer header
+  (Bearer takes precedence, JSON API unchanged), with **refresh-on-expiry**: an expired Supabase
+  access token is refreshed via the stored refresh token and the cookie re-set.
+- **New `app/security/session.py`** — single source of truth for the `brink_session` cookie
+  (name / encode / decode / hardening), shared by callback, logout, and require_user (avoids a
+  deps↔routers.auth circular import). New `supabase.oauth_authorize` / `exchange_code` /
+  `refresh_session` wrappers.
+- **Login buttons wired** (`home.html`, `base.html`) and **`/feed` gated** (`routers/pages.py`):
+  anonymous → `/auth/login`. This intentionally reverses PR #60's temporary public feed
+  (confirmed with owner).
+
+Satisfies the **AUTH-1/AUTH-2/AUTH-4** login surface for the server-rendered frontend (the identity
+/ crypto model from T02/T06 is reused, not rebuilt); those rows were already ✅ via T02/T22 — the
+traceability now also points at T09 for the server-side path.
+
+**Reused precedent for later work:** `app/security/session.py` is the cookie-session pattern any
+future server-rendered gated page should reuse.
+
+**Design decision (encrypted-cookie session vs server-side store) and the PKCE spike are recorded
+in the Notes below; the second-review requirement was made optional mid-ticket (owner call).**
+
+Tests: 15 in `tests/test_auth_login.py` + cookie-auth cases in `tests/test_auth.py` + gated-feed
+cases in `tests/test_pages.py`. Full backend suite green (127 passed).
+
+**Deploy prerequisite (Andrea, not code):** the deployed `/auth/callback` URL must be added to the
+**Supabase Auth** Redirect URLs *and* the **Spotify app** redirect allow-list, or live login 401s.
+**Still to validate live:** tests fake the Supabase code exchange; one real Spotify login should
+confirm the server exchange returns `provider_refresh_token` end-to-end (the spike made this
+low-risk, but it's the one path automated tests can't exercise).
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
