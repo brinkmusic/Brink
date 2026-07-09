@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
+from cryptography.exceptions import InvalidTag
 from sqlmodel import Session
 
 from app.config import get_settings
@@ -51,6 +52,21 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _safe_decrypt(blob: str) -> Optional[str]:
+    # Decrypt a stored token, but NEVER raise. A token we can't read — because the DB value was
+    # encrypted with a different TOKEN_ENC_KEY (raises InvalidTag) or is malformed (raises
+    # ValueError) — must degrade to None, exactly like a missing/expired token. WHY: the snapshot
+    # job (T21) loops over every linked user; without this, one unreadable token would bubble an
+    # exception all the way up and 500 the whole run for everyone. This keeps
+    # get_valid_access_token's documented contract: "None (never an exception)".
+    try:
+        return decrypt(blob)
+    except (ValueError, InvalidTag):
+        logger.warning("could not decrypt a stored Spotify token (wrong key or corrupt value)",
+                       exc_info=True)
+        return None
+
+
 def get_valid_access_token(session: Session, user_id: str) -> Optional[str]:
     # Return a usable Spotify access token for this user, or None if we can't get one.
     # None (never an exception) is deliberate: callers show a graceful empty state instead of a 500.
@@ -60,11 +76,18 @@ def get_valid_access_token(session: Session, user_id: str) -> Optional[str]:
         return None
 
     # Still fresh (expiry is comfortably in the future)? Use the stored token as-is, no network call.
+    # _safe_decrypt yields None (not a raise) if the stored value can't be read — degrade gracefully.
     if row.expires_at > _utcnow() + timedelta(seconds=EXPIRY_BUFFER_SECONDS):
-        return decrypt(row.access_token)
+        return _safe_decrypt(row.access_token)
 
-    # Expired (or about to): exchange the stored refresh token for a new access token.
-    refreshed = _request_refreshed_token(decrypt(row.refresh_token))
+    # Expired (or about to): exchange the stored refresh token for a new access token. If the stored
+    # refresh token itself can't be decrypted (wrong TOKEN_ENC_KEY / corrupt value), we can't refresh
+    # — degrade to None rather than raising, so one unreadable token doesn't 500 the whole snapshot.
+    refresh_token = _safe_decrypt(row.refresh_token)
+    if refresh_token is None:
+        logger.warning("spotify refresh token unreadable for user %s", user_id)
+        return None
+    refreshed = _request_refreshed_token(refresh_token)
     if refreshed is None:
         # Spotify said no (revoked token / outage) or we have no client credentials — degrade to None.
         logger.warning("spotify token refresh failed for user %s", user_id)
