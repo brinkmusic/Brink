@@ -10,16 +10,29 @@
 # shape instead of FastAPI's default { "detail": ... } format (ADR-0010, ADR-0007 §1).
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import verify_required_settings
 from app.deps import AuthError
 from app.rate_limit import RateLimitError
 from app.responses import fail
-from app.routers import auth, comments, feed, follow, health, now_playing, posts, reactions, snapshot
+from app.routers import (
+    auth,
+    comments,
+    feed,
+    follow,
+    health,
+    now_playing,
+    pages,
+    posts,
+    reactions,
+    snapshot,
+)
 
 
 # Runs once when the server boots (and shuts down). We use it to fail fast on missing
@@ -34,6 +47,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Brink API", lifespan=lifespan)
 
+# Serve static assets (the stylesheet, and later HTMX/images) from app/static/ at
+# the /static/* URL. ADR-0013: the Python-rendered pages load their CSS from here.
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
 app.include_router(health.router)  # GET /api/health
 app.include_router(auth.router)    # POST /api/auth/capture-spotify
 app.include_router(posts.router)   # POST /api/posts, GET /api/posts?userId=
@@ -43,6 +61,7 @@ app.include_router(follow.router)     # POST/DELETE /api/follow/{userId}
 app.include_router(feed.router)       # GET /api/feed
 app.include_router(now_playing.router)  # GET /api/me/now-playing
 app.include_router(snapshot.router)     # POST /api/snapshot (cron-triggered)
+app.include_router(pages.router)   # GET /, GET /feed — the browser-facing web pages (ADR-0013)
 
 
 # Auth failures (e.g. missing or invalid session token) → 401 { "error": ... }.

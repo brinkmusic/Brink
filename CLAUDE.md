@@ -15,6 +15,13 @@ Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
 > [ADR-0010](docs/decisions/adr/0010-fastapi-render-backend.md) for how the backend moved here from
 > an earlier TypeScript/Vercel/Prisma stack (removed in T08). All backend work is in `backend/`.
 
+> **⚠ Frontend transitioning ([ADR-0013](docs/decisions/adr/0013-python-frontend.md)).** The
+> frontend is moving from the React/Vite SPA to **HTML pages served by the FastAPI backend**
+> (Jinja2 templates + HTMX, in `backend/app/templates/` and `backend/app/routers/pages.py`), so the
+> whole app is one Python codebase we can all read and defend. The React/Vite `apps/web/` SPA stays
+> as a fallback until the Python pages reach parity, then it is retired. Server-side Spotify login
+> for the new frontend is tracked in **T09**.
+
 **Source of truth — read these before planning any work:**
 - `docs/plans/requirements.md` — requirement catalog (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`) + requirement→ticket traceability. Data model: `backend/app/models.py` (SQLModel). Decisions: `docs/decisions/`.
 - `docs/plans/tickets/` — one file per ticket (`backlog/`, `completed/`), derived from the ADRs in `docs/decisions/`. Start at `docs/plans/tickets/README.md` for the dependency waves and reading guide.
@@ -23,21 +30,25 @@ Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
 
 - `backend/` — **the API: FastAPI app (Python, `uv`-managed)**. App code in `backend/app/`, tests
   in `backend/tests/`, DB migrations in `backend/alembic/`.
-- `apps/web/` — React/Vite SPA frontend (TypeScript).
+- `backend/app/templates/` + `backend/app/static/` — the **Python frontend**: HTML pages
+  (Jinja2 templates; HTMX to come) served by FastAPI, with routes in `backend/app/routers/pages.py` (ADR-0013).
+- `apps/web/` — React/Vite SPA frontend (TypeScript). **Legacy**: being replaced by the Jinja/HTMX
+  pages above per [ADR-0013](docs/decisions/adr/0013-python-frontend.md); kept as a fallback until parity.
 - `analytics/` — Python pipeline (`uv`-managed). Created in T30.
 - `docs/plans/` — spec + tickets (source of truth above).
 
 ## Commands
 
-Local dev needs **two terminals**. Local reads the root `.env` (the `brink-dev` Supabase project),
-so it never touches production.
+Local dev reads the root `.env` (the `brink-dev` Supabase project), so it never touches production.
 
 ```
-# Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
-cd apps/web && npm run dev
-
-# Terminal 2 — API on :3001 (Vite proxies /api -> :3001)
+# API + Python frontend — the FastAPI app serves BOTH the JSON API and the HTML pages
+# (ADR-0013). Visit http://127.0.0.1:3001/ for the pages, /api/* for the API.
 cd backend && uv run uvicorn app.main:app --reload --port 3001
+
+# Legacy React/Vite SPA — only until it's retired per ADR-0013. Separate terminal,
+# Vite on 127.0.0.1:5173, proxies /api -> :3001.
+cd apps/web && npm run dev
 ```
 
 - **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest` (after T30 — `analytics/` does not exist yet).
@@ -239,6 +250,12 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
+
+> **⚠ In transition (ADR-0013).** The topology below describes the React/Vite SPA on Vercel, which
+> is still the live frontend. As the Jinja/HTMX pages served by FastAPI reach parity, the frontend
+> is served by **Render** (the same app as the API) and the separate Vercel SPA is retired. Until
+> then both exist and this section still applies. When the new frontend goes live on Render, its URL
+> (not just the Vercel URL) must be in the Supabase/Spotify redirect allow-lists (tracked in T09).
 
 - **Frontend:** Vercel serves the React SPA at `brink-theta.vercel.app` (project root `apps/web`),
   deploying from `main`. Supabase Auth **URL config** must list the Vercel URL in Site URL +

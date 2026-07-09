@@ -1,0 +1,234 @@
+/*
+  WHAT THIS FILE IS
+  Brink's visual style for the Python-served pages: the colour palette and the basic
+  styling for the nav bar, cards, and text. WHY plain CSS (not Tailwind): a core
+  reason for ADR-0013 is to drop the JavaScript build toolchain — plain CSS needs no
+  build step, so anyone on the team can read and edit it directly.
+
+  The colours below are Brink's locked palette, copied exactly from the old React
+  app's tailwind config so the Python pages look identical.
+*/
+
+:root {
+  --ink: #0b0b12;    /* page background */
+  --panel: #15151f;  /* card background */
+  --line: #26263a;   /* borders */
+  --mute: #8a8aa3;   /* secondary text */
+  --text: #ededf5;   /* primary text */
+  --accent: #9d8df1; /* primary action (lavender) */
+  --hot: #f472b6;    /* reactions / streaks (pink) */
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Top navigation bar ---- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 11, 18, 0.8);
+  backdrop-filter: blur(8px);
+}
+.nav-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+.brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  text-decoration: none;
+}
+.nav-links { display: flex; align-items: center; gap: 0.25rem; }
+.nav-links a {
+  padding: 0.5rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mute);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-links a:hover { color: var(--text); background: var(--panel); }
+.avatar {
+  height: 2rem;
+  width: 2rem;
+  border-radius: 9999px;
+  background: linear-gradient(to bottom right, var(--accent), var(--hot));
+  display: inline-block;
+}
+
+/* ---- Page layout ---- */
+.container { max-width: 48rem; margin: 0 auto; padding: 1.5rem 1rem; }
+.stack > * + * { margin-top: 1rem; }
+
+/* ---- Hero banner ----
+   A wide image with the headline laid over its left side. The photo already
+   fades to purple on the left; the ::before dark gradient on top of it makes
+   doubly sure light text stays readable there. `cover` + right-center keeps the
+   hands (the focal point) in view while the text sits over the calm left zone. */
+.hero {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  overflow: hidden;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  /* fallback colour shows while the image loads, matched to the photo's purple */
+  background: #2a0d5e url("/static/hero-mixer.png") right center / cover no-repeat;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(11, 11, 18, 0.92) 0%,
+    rgba(11, 11, 18, 0.55) 38%,
+    rgba(11, 11, 18, 0) 68%
+  );
+}
+.hero-content { position: relative; padding: 2rem; max-width: 30rem; }
+.hero-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 9999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.btn:active { transform: translateY(1px); }
+/* Primary action, in Brink's lavender with dark text for strong contrast. */
+.btn-spotify { background: var(--accent); color: #0b0b12; }
+.btn-spotify:hover { background: #b1a4f5; }
+/* Secondary action, outlined and quiet so it sits behind the primary one. */
+.btn-ghost { border-color: var(--line); color: var(--text); }
+.btn-ghost:hover { border-color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- Feature cards ---- */
+.features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.feature {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 1rem;
+  padding: 1.25rem;
+}
+.feature h3 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+.feature p { margin: 0; color: var(--mute); font-size: 0.92rem; line-height: 1.55; }
+@media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+
+/* ---- How it works ---- */
+.section-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.25rem; }
+.step-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }
+.step-list li { display: flex; gap: 0.9rem; align-items: flex-start; }
+.step-num {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: rgba(157, 141, 241, 0.15);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.step-list h3 { margin: 0 0 0.15rem; font-size: 1rem; }
+.step-list p { margin: 0; color: var(--mute); font-size: 0.92rem; line-height: 1.5; }
+.steps > * + * { margin-top: 1rem; }
+
+/* ---- Feed: post cards ---- */
+.post {
+  display: flex;
+  gap: 0.9rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 1rem;
+  padding: 0.9rem;
+}
+.post-art {
+  flex-shrink: 0;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  background: linear-gradient(to bottom right, var(--accent), var(--hot));
+}
+.post-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.post-body { min-width: 0; }
+.post-track { margin: 0; font-weight: 600; font-size: 0.95rem; }
+.post-artist { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
+.post-caption { margin: 0.4rem 0 0; font-size: 0.9rem; color: var(--text); font-style: italic; }
+.post-meta { margin: 0.4rem 0 0; color: var(--mute); font-size: 0.75rem; }
+.empty { color: var(--mute); font-size: 0.95rem; }
+.empty p { margin: 0; }
+
+/* ---- Footer ---- */
+.footer { border-top: 1px solid var(--line); margin-top: 2rem; }
+.footer-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.footer-tag { color: var(--mute); font-size: 0.85rem; }
+
+/* ---- Text + components ---- */
+.pill {
+  display: inline-block;
+  border-radius: 9999px;
+  background: rgba(157, 141, 241, 0.15);
+  color: var(--accent);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.hero-title { font-size: 1.75rem; font-weight: 700; margin: 0; }
+.hero-sub { color: var(--mute); font-size: 0.95rem; line-height: 1.5; margin: 0; max-width: 36rem; }
+
+.card {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+}
+.card-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mute);
+  margin: 0 0 0.5rem;
+}
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li { padding: 0.25rem 0; font-size: 0.95rem; }
