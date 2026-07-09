@@ -15,8 +15,9 @@ from app.main import app
 from app.models import Post, PostSource, Track, User
 
 
+# handle is derived from id so distinct seeded users get distinct handles (User.handle is unique).
 def _user(id="user-1"):
-    return User(id=id, handle="h", display_name="d", created_at=datetime.now(timezone.utc))
+    return User(id=id, handle=id, display_name="d", created_at=datetime.now(timezone.utc))
 
 
 def _valid_body(**overrides):
@@ -122,8 +123,12 @@ def test_list_missing_userid_returns_400(client):
 
 # Returns a user's posts newest-first, each with its linked track.
 def test_list_returns_user_posts_newest_first_with_track(client, db_session):
-    track = Track(spotify_id="spot-1", title="A", artist_name="X")
-    db_session.add(track)
+    # Seed the authors (u1, u2) and the Track FIRST, then commit — the Posts foreign-key-reference
+    # both, and the test DB enforces foreign keys, so the parents must exist before the Posts.
+    db_session.add(_user("u1"))
+    db_session.add(_user("u2"))
+    db_session.add(Track(spotify_id="spot-1", title="A", artist_name="X"))
+    db_session.commit()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     older = Post(user_id="u1", track_id="spot-1", caption="older",
                  source=PostSource.MANUAL, created_at=now - timedelta(minutes=10))

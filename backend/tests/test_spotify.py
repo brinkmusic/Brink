@@ -23,8 +23,11 @@ def _naive_now():
 
 
 def _seed_token(session, user_id="u1", access="AT", refresh="RT", expires_in_seconds=3600):
+    # Commit the User before the SpotifyToken: SpotifyToken.userId is a foreign key to User.id, and
+    # the test DB enforces foreign keys, so the user must exist first.
     session.add(User(id=user_id, handle=user_id, display_name=user_id,
                      created_at=datetime.now(timezone.utc)))
+    session.commit()
     session.add(SpotifyToken(
         user_id=user_id, access_token=access, refresh_token=refresh,
         expires_at=_naive_now() + timedelta(seconds=expires_in_seconds), scopes="s",
