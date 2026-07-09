@@ -1,6 +1,6 @@
 ---
 name: get-me-started
-description: Session warm-up for the Brink repo — pull in what changed, survey open PRs and new branches, audit each incoming change for documentation sync (code changed but CLAUDE.md / ADRs / tickets didn't), and brief the developer on where things stand and what's next. Use at the start of a working session or whenever someone says "get me started", "catch me up", "what's new", "where am I", "warm me up", "pull in changes", "what's ready to review", or asks whether incoming PRs kept their docs in sync.
+description: Session warm-up for the Brink repo — pull in what changed, survey open PRs and new branches, audit each incoming change for documentation sync (code changed but AGENTS.md / ADRs / tickets didn't), and brief the developer on where things stand and what's next. Use at the start of a working session or whenever someone says "get me started", "catch me up", "what's new", "where am I", "warm me up", "pull in changes", "what's ready to review", or asks whether incoming PRs kept their docs in sync.
 ---
 
 # Get Me Started (Brink session warm-up)
@@ -39,14 +39,14 @@ For each open PR (and any unmerged branch that matters):
 
 ### Pass 3 — Did the docs keep up? (the core of this skill)
 
-This is the whole point. Brink's contract (`CLAUDE.md` → "Keep docs in sync in the same PR")
+This is the whole point. Brink's contract (`AGENTS.md` → "Keep docs in sync in the same PR")
 maps *kinds of change* to *docs that must move with them*. For each PR, check the change type and
 confirm the matching doc was touched **in the same PR's file list**:
 
 | If the PR changes… | The same PR must also… |
 |---|---|
 | Architecture / a past decision | Add a new ADR in `docs/decisions/adr/`, **and** set the superseded/amended ADR's `Status:` line to point forward to it (ADRs are append-only — never rewrite them). |
-| Commands, env vars, conventions, dev workflow, or project status | Update `CLAUDE.md` (the Commands / Environment / Deployment-topology / Status sections). |
+| Commands, env vars, conventions, dev workflow, or project status | Update `AGENTS.md` (the Commands / Environment / Deployment-topology / Status sections). |
 | Feature scope, or a ticket's shape | Update `docs/plans/` — the ticket file in `docs/plans/tickets/` and the requirement→ticket traceability in `docs/plans/requirements.md`. |
 | Behavior the requirements catalog tracks | Flip the relevant `AUTH-* / BE-* / SP-* / …` status in `docs/plans/requirements.md`. |
 
@@ -63,7 +63,7 @@ confirm the matching doc was touched **in the same PR's file list**:
 
 **Expect close-out folded into the feature PR (T93).** Brink now closes a ticket *in the same PR
 that implements it*: the feature PR should also move the ticket `backlog/ → completed/`, flip its
-traceability rows, and update the `CLAUDE.md` status line (the `close-out` skill does this
+traceability rows, and update the `AGENTS.md` status line (the `close-out` skill does this
 pre-merge). So for a PR that finishes a ticket, a code diff with **no** matching ticket/requirements
 move is now a **flag** (a missing close-out), not on-pattern — the reverse of the old post-merge
 model. Two exceptions are still legitimate and should NOT be flagged: (1) a PR body that *explicitly*
@@ -80,7 +80,7 @@ purpose, just track it).
 
 - Current branch and working-tree state (`git status`).
 - **Next ticket:** read `docs/plans/tickets/README.md` for the dependency waves and the current
-  status line in `CLAUDE.md`; name the next unblocked ticket and any that are gated.
+  status line in `AGENTS.md`; name the next unblocked ticket and any that are gated.
 - **CI / review state:** for open PRs, `gh pr checks <n>` — call out anything red or anything
   waiting on the developer's review (auth/crypto PRs are the highest-risk area, so a second review
   is encouraged where a reviewer is available — but it's not required and the owner may self-merge).

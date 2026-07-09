@@ -130,7 +130,8 @@ removed with the SPA. `require_user` learns to read the session cookie in additi
 ## Notes
 Branch off `develop` as `feat/T09-server-side-spotify-login`; one PR back into `develop`. **This is
 an auth/crypto change** — `backend/app/deps.py` and `routers/auth.py` touch tokens and
-`require_user`, so per CLAUDE.md it needs a deliberate second review and **must not be self-merged**.
+`require_user`, so per CLAUDE.md a second review is encouraged where a reviewer is available, but it
+is not required and the owner may self-merge (noting in the PR that it went in without one).
 Run the full backend suite (`cd backend && uv run pytest`) — `deps.py` is shared code.
 
 **Design decisions — CONFIRMED 2026-07-09** (a spike validated the server-side PKCE flow against the

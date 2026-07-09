@@ -193,7 +193,9 @@ must use `ALTER TABLE ... SET SCHEMA` (preserves rows) — never autogenerate's 
 The owner of an area is the default reviewer for PRs touching it (every ticket also has an
 `owner` in its frontmatter). **Auth and crypto changes** — `backend/app/deps.py`,
 `backend/app/security/crypto.py`, `backend/app/security/supabase.py`, anything touching tokens or
-`TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge them.
+`TOKEN_ENC_KEY` — are the highest-risk area, so a second review is **encouraged** where a reviewer
+is available. It is **not required**, though: the area owner may self-merge them (call out in the
+PR that it went in without a second review).
 
 ## Watch-outs
 
