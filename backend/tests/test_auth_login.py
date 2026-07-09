@@ -11,7 +11,14 @@
 
 import base64
 import json
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+from sqlmodel import select
+
+from app.db import get_session
+from app.main import app
+from app.models import SpotifyToken, User
 from app.routers import auth as auth_router
 from app.security import supabase
 
@@ -67,6 +74,118 @@ def test_login_requests_spotify_scopes_and_callback_redirect(client, monkeypatch
 
     client.get("/auth/login", follow_redirects=False)
 
-    # The callback URL is derived from the request origin, so it adapts to local vs prod.
-    assert captured["redirect_to"].endswith("/auth/callback")
+    # The callback URL is derived from the request origin (adapts to local vs prod) and
+    # carries the CSRF state as a query param — Supabase preserves it and echoes it back
+    # to the callback so we can verify it there.
+    assert "/auth/callback?state=" in captured["redirect_to"]
     assert captured["scopes"] == EXPECTED_SCOPES
+
+
+# --- /auth/callback (slice 2) ----------------------------------------------------
+
+
+def _su(**overrides):
+    base = dict(
+        id="abcdef12-3456-7890-abcd-ef1234567890",
+        email="jane@example.com",
+        user_metadata={"full_name": "Jane Doe", "provider_id": "spot1"},
+        app_metadata={"provider": "spotify"},
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def _fake_session(**overrides):
+    # Stand-in for the supabase_auth Session returned by exchange_code: it carries the
+    # Supabase session tokens AND the Spotify provider tokens.
+    base = dict(
+        user=_su(),
+        access_token="sb-at",
+        refresh_token="sb-rt",
+        expires_at=9999999999,
+        provider_token="sp-at",
+        provider_refresh_token="sp-rt",
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def _handshake(state="S", verifier="V"):
+    return _enc(json.dumps({"state": state, "verifier": verifier}))
+
+
+def test_callback_happy_path_provisions_user_stores_token_sets_session(
+    client, db_session, monkeypatch
+):
+    monkeypatch.setattr(auth_router, "encrypt", _enc)
+    monkeypatch.setattr(auth_router, "decrypt", _dec)
+    captured = {}
+
+    def fake_exchange(auth_code, code_verifier):
+        captured["code"], captured["verifier"] = auth_code, code_verifier
+        return _fake_session()
+
+    monkeypatch.setattr(supabase, "exchange_code", fake_exchange)
+    app.dependency_overrides[get_session] = lambda: db_session
+
+    client.cookies.set("brink_oauth", _handshake(state="S", verifier="V"))
+    resp = client.get("/auth/callback?state=S&code=THECODE", follow_redirects=False)
+
+    # Redirected into the app, having consumed the exact code + verifier.
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/feed"
+    assert captured == {"code": "THECODE", "verifier": "V"}
+
+    # Session cookie set, encrypted, holding the Supabase session tokens.
+    sess = resp.cookies.get("brink_session")
+    assert sess and "sb-rt" not in sess
+    payload = json.loads(_dec(sess))
+    assert payload["access_token"] == "sb-at"
+    assert payload["refresh_token"] == "sb-rt"
+
+    # User provisioned from the Supabase identity (reusing the T02 handle policy).
+    user = db_session.exec(select(User)).first()
+    assert user and user.spotify_id == "spot1"
+
+    # Spotify provider tokens stored ENCRYPTED (never in the clear).
+    tok = db_session.get(SpotifyToken, user.id)
+    assert tok is not None
+    assert "sp-at" not in tok.access_token and "sp-rt" not in tok.refresh_token
+    assert _dec(tok.access_token) == "sp-at" and _dec(tok.refresh_token) == "sp-rt"
+
+
+def test_callback_rejects_state_mismatch(client, monkeypatch):
+    monkeypatch.setattr(auth_router, "decrypt", _dec)
+    called = {"exchange": False}
+    monkeypatch.setattr(
+        supabase, "exchange_code", lambda *a: called.__setitem__("exchange", True)
+    )
+    app.dependency_overrides[get_session] = lambda: MagicMock()
+
+    client.cookies.set("brink_oauth", _handshake(state="GOOD", verifier="V"))
+    resp = client.get("/auth/callback?state=BAD&code=X", follow_redirects=False)
+
+    assert resp.status_code == 400  # CSRF guard: query state != cookie state
+    assert called["exchange"] is False  # never attempted the code exchange
+
+
+def test_callback_spotify_error_renders_friendly_page_not_500(client, monkeypatch):
+    monkeypatch.setattr(
+        supabase, "exchange_code", lambda *a: (_ for _ in ()).throw(AssertionError("no exchange"))
+    )
+    app.dependency_overrides[get_session] = lambda: MagicMock()
+
+    resp = client.get(
+        "/auth/callback?error=access_denied&error_description=denied", follow_redirects=False
+    )
+
+    assert resp.status_code == 400
+    assert "text/html" in resp.headers["content-type"]
+
+
+def test_callback_missing_handshake_cookie_is_rejected(client, monkeypatch):
+    app.dependency_overrides[get_session] = lambda: MagicMock()
+
+    resp = client.get("/auth/callback?state=S&code=X", follow_redirects=False)
+
+    assert resp.status_code == 400  # no handshake cookie → can't be a real login round-trip

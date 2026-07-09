@@ -55,24 +55,12 @@ def _slugify(s: str) -> str:
     return s[:20]
 
 
-def require_user(request: Request, session: Session = Depends(get_session)) -> User:
-    token = _bearer_token(request)
-
-    # Ask Supabase to validate the token and tell us who it belongs to.
-    # - ValueError means a configuration problem (e.g. SUPABASE_URL not set) — let it
-    #   propagate so the server 500s and the missing config is visible in Render logs.
-    # - Any other exception (network error, bad/expired token) means "not a valid
-    #   session" → 401. We log the original error at DEBUG so it's diagnosable without
-    #   leaking details to the caller.
-    try:
-        su = supabase.get_user_from_token(token)
-    except ValueError:
-        raise  # misconfiguration — must surface as 500, not a silent 401
-    except Exception:
-        logger.debug("token verification failed", exc_info=True)
-        raise AuthError("invalid session")
-    if su is None:
-        raise AuthError("invalid session")
+def get_or_create_user(session: Session, su) -> User:
+    # Given a validated Supabase user (`su`), return their Brink `User` row, creating it
+    # on first sign-in. Extracted from require_user so the server-side login callback
+    # (T09) can provision a user from the SAME identity data without re-implementing the
+    # handle policy. `su` is any object exposing id/email/user_metadata/app_metadata —
+    # the real supabase_auth User, or a session's `.user`.
 
     # Already have this person? Return their existing record.
     existing = session.exec(select(User).where(User.supabase_user_id == su.id)).first()
@@ -117,3 +105,25 @@ def require_user(request: Request, session: Session = Depends(get_session)) -> U
         if existing:
             return existing
         raise  # genuinely unexpected — re-raise for a 500
+
+
+def require_user(request: Request, session: Session = Depends(get_session)) -> User:
+    token = _bearer_token(request)
+
+    # Ask Supabase to validate the token and tell us who it belongs to.
+    # - ValueError means a configuration problem (e.g. SUPABASE_URL not set) — let it
+    #   propagate so the server 500s and the missing config is visible in Render logs.
+    # - Any other exception (network error, bad/expired token) means "not a valid
+    #   session" → 401. We log the original error at DEBUG so it's diagnosable without
+    #   leaking details to the caller.
+    try:
+        su = supabase.get_user_from_token(token)
+    except ValueError:
+        raise  # misconfiguration — must surface as 500, not a silent 401
+    except Exception:
+        logger.debug("token verification failed", exc_info=True)
+        raise AuthError("invalid session")
+    if su is None:
+        raise AuthError("invalid session")
+
+    return get_or_create_user(session, su)
