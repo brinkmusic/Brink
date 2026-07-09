@@ -33,8 +33,30 @@ def include_object(obj, name, type_, reflected, compare_to):
     # Tell Alembic to ignore tables it doesn't manage. Specifically, the old Prisma
     # tool left a bookkeeping table ("_prisma_migrations") in the same database.
     # Without this, Alembic would think we want to delete it. Return False = "skip".
-    if type_ == "table" and reflected and name not in target_metadata.tables:
-        return False
+    #
+    # With include_schemas turned on (see run_migrations_online), some of our tables live
+    # in a schema (silver/gold/bronze). SQLModel.metadata keys those as "schema.table",
+    # but the `name` Alembic passes here is the UNQUALIFIED table name. So we rebuild the
+    # qualified key from obj.schema before checking — otherwise our own schema tables would
+    # look "unmanaged" and Alembic would propose dropping them.
+    if type_ == "table" and reflected:
+        schema = getattr(obj, "schema", None)
+        key = f"{schema}.{name}" if schema else name
+        if key not in target_metadata.tables:
+            return False
+    return True
+
+
+def include_name(name, type_, parent_names):
+    # Runs only because include_schemas=True (below) makes Alembic reflect EVERY schema in
+    # the database — including Supabase-managed ones (auth, storage, ...) we don't own.
+    # Restrict reflection to the schemas our own models declare, so autogenerate never sees
+    # (and never proposes dropping) Supabase's tables. We derive the allowed set from the
+    # models themselves (each table's .schema; None = the default "public" schema), so adding
+    # a model in a new schema is covered automatically — there's no hand-kept list to update.
+    if type_ == "schema":
+        managed_schemas = {table.schema for table in target_metadata.tables.values()}
+        return name in managed_schemas
     return True
 
 
@@ -75,6 +97,11 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_object=include_object,  # apply the "ignore Prisma's table" rule above
+            # include_schemas=True: also look at non-default schemas (silver/gold/bronze from
+            # T39/ADR-0009), or autogenerate wouldn't see those tables and would mis-generate.
+            # include_name then narrows reflection back to just the schemas we own.
+            include_schemas=True,
+            include_name=include_name,
         )
         with context.begin_transaction():
             context.run_migrations()

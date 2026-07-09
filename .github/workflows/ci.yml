@@ -5,24 +5,14 @@ on:
   push:
     branches: [main, develop]
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      # Prisma client is needed for type resolution; generate does not connect to the DB,
-      # but the datasource block requires the env vars to be defined.
-      - run: npx prisma generate
-        env:
-          DATABASE_URL: postgresql://user:pass@localhost:5432/db
-          DIRECT_URL: postgresql://user:pass@localhost:5432/db
-      - run: npm test
+# Pinned here so bumping the version is a one-line change, not a hunt through the curl
+# command below. Dependabot (github-actions ecosystem) can't track the curl URL, so
+# this is the manual equivalent of "version in one place."
+env:
+  GITLEAKS_VERSION: "8.21.2"
 
+jobs:
+  # Backend (FastAPI) tests.
   api:
     runs-on: ubuntu-latest
     defaults:
@@ -33,7 +23,9 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-      - run: uv sync
+      # --locked fails the build if uv.lock is out of sync with pyproject.toml, instead
+      # of silently re-locking (which would hide dependency drift until production).
+      - run: uv sync --locked
       - run: uv run pytest -q
 
   web:
@@ -60,6 +52,7 @@ jobs:
       # is free (MIT), so we run it directly. Scans the working tree using the allowlist
       # in .gitleaks.toml.
       - name: Install gitleaks
-        run: curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz | sudo tar -xz -C /usr/local/bin gitleaks
+        # Version is set in the workflow-level env.GITLEAKS_VERSION block above.
+        run: curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sudo tar -xz -C /usr/local/bin gitleaks
       - name: Scan for secrets
         run: gitleaks detect --source . --no-git --redact --no-banner --exit-code 1

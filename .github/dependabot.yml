@@ -5,27 +5,8 @@
 # by this file — a known vulnerability still gets flagged and patched.
 version: 2
 updates:
-  # Root npm = the legacy TS api/ + tooling (mostly removed in T08).
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: monthly
-    target-branch: develop
-    open-pull-requests-limit: 5
-    groups:
-      root-npm:
-        patterns: ["*"]
-    ignore:
-      # Skip breaking major-version bumps — they're the ones that break the build.
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-      # Legacy deps removed in T08 — no point updating at all.
-      - dependency-name: prisma
-      - dependency-name: "@prisma/client"
-      - dependency-name: "@vercel/node"
-      - dependency-name: supertest
-      - dependency-name: "@types/supertest"
-  # Frontend npm (apps/web) = the live app.
+  # Frontend npm (apps/web) = the live app. (The root had npm deps only for the legacy
+  # TS backend, removed in T08 — so there's no root npm group anymore.)
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
@@ -46,6 +27,22 @@ updates:
     target-branch: develop
     groups:
       actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  # Backend Python deps (FastAPI, cryptography, supabase, etc.).
+  # Dependabot does not yet support "uv" as an ecosystem — "pip" is the closest
+  # supported value and covers packages declared in pyproject.toml. When Dependabot
+  # adds native uv support, change ecosystem to "uv" here.
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: monthly
+    target-branch: develop
+    open-pull-requests-limit: 5
+    groups:
+      backend-python:
         patterns: ["*"]
     ignore:
       - dependency-name: "*"

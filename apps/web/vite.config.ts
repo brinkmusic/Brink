@@ -8,7 +8,7 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "src") },
   },
   // Spotify rejects http://localhost as a redirect URI; loopback must be 127.0.0.1.
-  // /api/* is proxied to the local serverless-function runner (npm run dev:api).
+  // /api/* is proxied to the local FastAPI backend (uvicorn on :3001).
   server: {
     host: "127.0.0.1",
     port: 5173,

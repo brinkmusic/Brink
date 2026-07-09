@@ -1,42 +1,42 @@
 # Brink — Requirements & Traceability
 
-The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement → ticket** map. This replaces the old `brink-spec-design.md`: decisions now live in [`docs/decisions/`](../decisions/), the data model in [`prisma/schema.prisma`](../../prisma/schema.prisma), and the implementation plan in [`tickets/`](tickets/). This file is the glue that proves the proposal's scope is covered.
+The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement → ticket** map. This replaces the old `brink-spec-design.md`: decisions now live in [`docs/decisions/`](../decisions/), the data model in [`backend/app/models.py`](../../backend/app/models.py) (SQLModel), and the implementation plan in [`tickets/`](tickets/). This file is the glue that proves the proposal's scope is covered.
 
 **Status:** ✅ done · ◻ backlog · **†** = original spec text superseded by a later decision (see [Superseded](#superseded-spec-text)).
 
 ## Layer 1 — Identity & Auth (AUTH)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| AUTH-1 | Spotify login via Supabase provider; first login creates/links a `public.User`. | T02 | ✅ |
-| AUTH-2 | Capture + encrypt the Spotify refresh token server-side in `SpotifyToken`. | T02 | ✅ |
+| AUTH-1 | Spotify login via Supabase provider; first login creates/links a `public.User`. | T02 (browser), T09 (server-side) | ✅ |
+| AUTH-2 | Capture + encrypt the Spotify refresh token server-side in `SpotifyToken`. | T02 (browser), T09 (server-side callback) | ✅ |
 | AUTH-3 † | Passwordless email magic-link/OTP signup (Supabase sends mail). | T03 | ◻ |
-| AUTH-4 | Every `/api/*` mutation verifies the Supabase JWT. | T02 + every API ticket (ADR-0007) | ✅ base |
-| AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T02 | ✅ |
+| AUTH-4 | Every `/api/*` mutation verifies the Supabase JWT. | T02 + every API ticket (ADR-0007); T09 (session cookie) | ✅ base |
+| AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T22 | ✅ |
 | AUTH-6 | Handle accounts work fully except Spotify-derived stats ("link Spotify"). | T03, T44 | ◻ |
 
 ## Layer 2 — Backend API + Data Model (BE)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| BE-1 | Supabase Postgres + Prisma schema migrated; pooled URLs in env. | T01 | ✅ |
-| BE-2 | Replace `api/state.js` (jsonblob) + delete dead `lib/api.ts`. | T00, T60 | ◻ |
-| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ◻ |
-| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ◻ |
-| BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ◻ |
-| BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ◻ |
-| BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ◻ |
+| BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
+| BE-2 | Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, 404s since T08) + dead front-end stubs. | T60 | ◻ |
+| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
+| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ✅ |
+| BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
+| BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
+| BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ✅ |
 | BE-8 | `GET /api/users/:id/profile` — stats + cluster + compatibility. | T14 | ◻ |
 | BE-9 | `POST /api/artist/posts` — create BTS post + optional track. | T50 | ◻ |
 | BE-10 | All mutations: session-gated, validated, consistent error JSON. | every API ticket (ADR-0007) | ◻ |
-| BE-11 | Serverless connection pooling configured. | T01 | ✅ |
+| BE-11 | Connection pooling (Supabase pooler) configured. | T01, T05 | ✅ |
 
 ## Layer 3 — Spotify Integration (SP)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | SP-1 | Currently-playing endpoint + "now playing" surface. | T20 | ◻ |
-| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ◻ |
-| SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ◻ |
-| SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ◻ |
-| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ◻ |
+| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ✅ |
+| SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ✅ |
+| SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ✅ |
+| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ✅ |
 
 ## Layer 4 — Analytics & Data Science (AN)
 | ID | Acceptance | Ticket(s) | Status |
@@ -77,9 +77,9 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 7 — Infrastructure & Scheduling (INFRA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| INFRA-1 | Vercel project: SPA + `/api/*`; env vars set, no secrets in repo. | T01 | ✅ |
+| INFRA-1 † | Vercel project: SPA + `/api/*` rewrite to Render; env vars set, no secrets in repo. | T01, T07 | ✅ |
 | INFRA-2 | Supabase provisioned; pooled URLs; migrations in CI; Data API disabled. | T01 | ✅ |
-| INFRA-3 † | Snapshot trigger on a fixed cadence. *(GitHub Actions, not Vercel Cron)* | T21 | ◻ |
+| INFRA-3 † | Snapshot trigger on a fixed cadence. *(GitHub Actions, not Vercel Cron)* | T21 | ✅ |
 | INFRA-4 | GitHub Actions runs the Python pipeline against Supabase. | T30, T38 | ◻ |
 | INFRA-5 | Secret hygiene: `.gitignore` enforced; secrets in env only. | T00 | ✅ |
 
@@ -93,6 +93,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 
 ## Tickets without a legacy requirement ID
 - **T39** — analytics schema migration (`ModelArtifact` + medallion bronze/silver/gold). Decision-driven (ADR-0003 / ADR-0009), no original spec req.
+- **T37** — Alembic schema reflection (`include_schemas` + guards) so autogenerate sees the medallion schemas. Tooling follow-up to T39 (ADR-0009), no spec req.
 - **T61** — test sweep + k6 + cross-browser E2E. Maps to proposal §6/§11 below.
 
 ## Success-metric traceability (proposal §11)
@@ -106,6 +107,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 
 ## Superseded spec text
 The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagged † above) evolved after it was written — defer to the ADRs:
+- **INFRA-1** — original spec assumed Vercel serverless (`api/`) as the backend. ADR-0010 moved the API to FastAPI on Render; Vercel now serves only the SPA and rewrites `/api/*` to the Render URL ([ADR-0010](../decisions/adr/0010-fastapi-render-backend.md)).
 - **AN-2/4/5/7/9** — per-user analytics are computed **on read in TS**, not materialized; `UserStats`/`TasteVector`/`Compatibility` tables and `User.clusterId` are dropped, `ModelArtifact` added ([ADR-0003](../decisions/adr/0003-analytics-runtime.md), [ADR-0009](../decisions/adr/0009-medallion-layering.md)).
 - **SP-2 / INFRA-3** — snapshot is triggered by **GitHub Actions**, not Vercel Cron ([ADR-0006](../decisions/adr/0006-scheduling.md)).
 - **AUTH-3** — handle is **auto-derived**; no signup form / custom-handle flow.

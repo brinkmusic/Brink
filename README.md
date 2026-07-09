@@ -34,7 +34,7 @@ The detailed, authoritative docs live under `docs/` — read these before planni
 > **Stack:** a **FastAPI / Python** API (SQLModel + Alembic) on **Render**, a **React / Vite** SPA
 > on **Vercel** that calls it same-origin via an `/api/*` rewrite, and **Supabase** for Postgres,
 > Auth, and Storage. Analytics is a Python/scikit-learn batch job. (An earlier TypeScript/Vercel
-> backend is being retired — see [ADR-0010](./docs/decisions/adr/0010-fastapi-render-backend.md).)
+> backend was removed in T08 — see [ADR-0010](./docs/decisions/adr/0010-fastapi-render-backend.md).)
 > Current build status lives in [`CLAUDE.md`](./CLAUDE.md).
 
 ```
@@ -50,9 +50,7 @@ Analytics: Python / scikit-learn batch job (analytics/, GitHub Actions cron) ─
 ```
 
 - **`apps/web/`** — React + TypeScript + Vite SPA (frontend), deployed on Vercel.
-- **`backend/`** — FastAPI app (Python, `uv`-managed); the API's new home (ADR-0010).
-- **`api/`** — *legacy* Vercel serverless functions (TypeScript); being retired (ADR-0010).
-- **`prisma/`** — *legacy* `schema.prisma`; superseded by `backend/app/models.py` (SQLModel).
+- **`backend/`** — the API: FastAPI app (Python, `uv`-managed), on Render.
 - **`analytics/`** — Python pipeline, `uv`-managed (added in T30).
 - **`docs/`** — requirements, tickets, and decision records.
 
@@ -72,14 +70,11 @@ Andrea for the values.
 # Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
 cd apps/web && npm install && npm run dev
 
-# Terminal 2 — API on :3001
-#   FastAPI (new backend, use for backend work):
+# Terminal 2 — API on :3001 (FastAPI)
 cd backend && uv run uvicorn app.main:app --reload --port 3001
-#   legacy TS handlers (still serving until the cutover): npm install && npm run dev:api
 ```
 
-- **Test:** `cd backend && uv run pytest` (FastAPI); `npm test` (Jest — legacy TS).
-  Analytics: `cd analytics && uv run pytest`.
+- **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest`.
 - **Build frontend:** `cd apps/web && npm run build`
 
 See CLAUDE.md for the env-var list and migration details (SQLModel + Alembic).
@@ -89,8 +84,8 @@ See CLAUDE.md for the env-var list and migration details (SQLModel + Alembic).
 ## 4. Branching & deploying
 
 - **`develop`** is the integration branch — every change goes through a PR into `develop`.
-- **`main`** is production — Vercel deploys the frontend (and, after the ADR-0010 cutover, the
-  FastAPI backend runs on Render). `develop` reaches `main` only via a release PR (and only once
+- **`main`** is production — Vercel deploys the frontend; the ADR-0010 cutover is complete and the
+  FastAPI backend runs on Render. `develop` reaches `main` only via a release PR (and only once
   env vars are set). **Never push to `main` or `develop` directly.**
 - Branch naming: `<type>/<ticket-id>-<slug>` (e.g. `feat/T10-posts-api`). One ticket = one PR.
 

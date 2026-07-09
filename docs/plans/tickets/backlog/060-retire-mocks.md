@@ -16,7 +16,7 @@ owner: Sebastian
 Once feed, profile, and analytics are live (T41/T44/T45), the mock data sources and the jsonblob backend are dead weight and a correctness risk. Remove them from production code.
 
 ## Summary
-Delete `mocks/feed.ts`, `mocks/stats.ts`, the jsonblob `api/state.js`, the heuristic `lib/analytics.ts`, and the `lib/data.ts` mock path — anything no longer referenced after the live wiring.
+Delete `mocks/feed.ts`, `mocks/stats.ts`, the heuristic `lib/analytics.ts`, and the `lib/data.ts` mock path — anything no longer referenced after the live wiring. Also remove `apps/web/src/lib/backend.ts` (the stub that calls the now-404 `/api/state` path; `api/state.js` was removed in T08).
 
 ## Source
 - Spec reqs: **DATA-4**, **BE-2** (final), **UI-9**
@@ -26,7 +26,8 @@ Delete `mocks/feed.ts`, `mocks/stats.ts`, the jsonblob `api/state.js`, the heuri
 ### In Scope
 - Remove `apps/web/src/mocks/feed.ts`, `apps/web/src/mocks/stats.ts`.
 - Remove `apps/web/src/lib/data.ts` (mock feed) and `apps/web/src/lib/analytics.ts` (heuristic) once unreferenced.
-- Delete `api/state.js` (jsonblob).
+- Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, which 404s since T08; replaced by real API calls in T10–T14).
+- Prune the now-orphaned exports `getTopTracks`, `getTopArtists`, `getRecentlyPlayed` from `apps/web/src/lib/spotify-api.ts` — their only callers live in `lib/data.ts`, which this ticket deletes. Keep `getMe`: it survives because `context/AuthContext.tsx` still uses it.
 - Grep-verify no remaining imports.
 
 ### Out of Scope
@@ -36,7 +37,7 @@ Delete `mocks/feed.ts`, `mocks/stats.ts`, the jsonblob `api/state.js`, the heuri
 - Pure removal; the guarantee is that nothing in production still imports the removed modules.
 
 ## Current State (on `develop`)
-- Present: `mocks/feed.ts`, `mocks/stats.ts`, `lib/data.ts`, `lib/analytics.ts`, `api/state.js`. (`FeedPage` still imports `lib/data` until T41.)
+- Present: `mocks/feed.ts`, `mocks/stats.ts`, `lib/data.ts`, `lib/analytics.ts`, `lib/backend.ts`. (`FeedPage` still imports `lib/data` until T41. `api/state.js` was removed in T08.)
 
 ## Files to Create/Modify
 | File | Action | Purpose |
@@ -45,10 +46,10 @@ Delete `mocks/feed.ts`, `mocks/stats.ts`, the jsonblob `api/state.js`, the heuri
 | `apps/web/src/mocks/stats.ts` | DELETE | mock stats |
 | `apps/web/src/lib/data.ts` | DELETE | mock data path |
 | `apps/web/src/lib/analytics.ts` | DELETE | heuristic analytics |
-| `api/state.js` | DELETE | jsonblob backend |
+| `apps/web/src/lib/backend.ts` | DELETE | stub that calls `/api/state` (returns 404 since T08) |
 
 ## Testing Checklist
-- [ ] `grep -r "lib/data\|mocks/\|lib/analytics\|state.js" apps/web/src api` returns nothing
+- [ ] `grep -r "lib/data\|mocks/\|lib/analytics\|lib/backend" apps/web/src` returns nothing
 - [ ] `npm run build` + `npm test` green
 - [ ] app still works end-to-end (feed/profile/analytics) with no mock fallback
 
@@ -62,4 +63,4 @@ Delete `mocks/feed.ts`, `mocks/stats.ts`, the jsonblob `api/state.js`, the heuri
 ## Notes
 Branch off `develop` as `feat/T60-retire-mocks`; one PR back into `develop` (never `main`).
 
-**Cutover sequencing (ADR-0010):** the jsonblob `/api/state` (`api/state.js`) is served by the legacy TS backend and called by the frontend mock path. The FastAPI backend does **not** reimplement `/api/state`. So this retirement must land **before** the Render cutover (T07) routes `/api/*` away from Vercel, or `/api/state` will 404. Coordinate T60 with T07/T08; the remaining TS `api/` is removed wholesale in T08.
+Note: `api/state.js` (the jsonblob backend) was already removed in T08. The remaining frontend stub is `apps/web/src/lib/backend.ts`, which calls `/api/state` and currently receives a 404. T60 cleans that up once the live social paths (T10–T14) replace it.

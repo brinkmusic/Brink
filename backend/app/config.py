@@ -4,6 +4,7 @@
 # be written into the code. We keep them in a .env file (which git ignores) and
 # read them here, in one place, so the rest of the app just asks for "settings".
 
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -31,9 +32,47 @@ class Settings(BaseSettings):
     supabase_service_role_key: Optional[str] = None
     token_enc_key: Optional[str] = None
 
+    # Spotify app credentials, used to refresh a user's access token server-side (T22). Optional on
+    # the model (so tests/migrations import without them); a refresh simply can't happen without them.
+    spotify_client_id: Optional[str] = None
+    spotify_client_secret: Optional[str] = None
+
+    # Shared secret that authenticates the scheduled snapshot trigger (T21). The GitHub Actions
+    # workflow sends it in the `X-Cron-Secret` header; the endpoint refuses any request without it.
+    cron_secret: Optional[str] = None
+
 
 # Returns the settings. @lru_cache means "build this once, then reuse it" — we don't
 # re-read the .env file every time something needs a setting.
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+# The secrets a real deployment cannot run without. database_url is already enforced by
+# pydantic (it has no default); these three are Optional on the model (so tests and
+# migrations can import the app without them) but MUST be present when actually serving.
+_REQUIRED_IN_PRODUCTION = ("supabase_url", "supabase_service_role_key", "token_enc_key")
+
+
+def _is_test_environment() -> bool:
+    # The escape hatch: during automated tests the app is imported with no real .env
+    # (CI has no secrets) and each test fakes the settings it needs. So we skip the
+    # production fail-fast whenever pytest is the process running us.
+    return "pytest" in sys.modules
+
+
+def verify_required_settings() -> None:
+    # Fail fast at startup when a required secret is missing, so a misdeployed server
+    # crashes loudly on boot instead of booting "healthy" and then returning 500s on
+    # every request (the /api/health check only tests the database, so it would not
+    # catch a missing SUPABASE_* / TOKEN_ENC_KEY). Called from main.py's startup.
+    if _is_test_environment():
+        return
+    settings = get_settings()
+    missing = [name for name in _REQUIRED_IN_PRODUCTION if not getattr(settings, name)]
+    if missing:
+        raise RuntimeError(
+            "Missing required environment settings: "
+            + ", ".join(name.upper() for name in missing)
+        )

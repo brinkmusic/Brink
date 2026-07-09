@@ -1,7 +1,0 @@
-{
-  "name": "brink-api",
-  "version": "0.0.1",
-  "private": true,
-  "description": "Vercel serverless functions for Brink shared state.",
-  "type": "commonjs"
-}
