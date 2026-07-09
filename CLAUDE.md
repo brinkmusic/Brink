@@ -31,7 +31,7 @@ Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
 - `backend/` — **the API: FastAPI app (Python, `uv`-managed)**. App code in `backend/app/`, tests
   in `backend/tests/`, DB migrations in `backend/alembic/`.
 - `backend/app/templates/` + `backend/app/static/` — the **Python frontend**: HTML pages
-  (Jinja2 + HTMX) served by FastAPI, with routes in `backend/app/routers/pages.py` (ADR-0013).
+  (Jinja2 templates; HTMX to come) served by FastAPI, with routes in `backend/app/routers/pages.py` (ADR-0013).
 - `apps/web/` — React/Vite SPA frontend (TypeScript). **Legacy**: being replaced by the Jinja/HTMX
   pages above per [ADR-0013](docs/decisions/adr/0013-python-frontend.md); kept as a fallback until parity.
 - `analytics/` — Python pipeline (`uv`-managed). Created in T30.
