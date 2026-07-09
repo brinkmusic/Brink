@@ -6,10 +6,13 @@
 # them to fetch the user's listening history. Ported from the old
 # api/auth/capture-spotify.ts (removed in T08; see ADR-0010).
 
+import json
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlmodel import Session
 
@@ -17,9 +20,48 @@ from app.db import get_session
 from app.deps import require_user
 from app.models import SpotifyToken, User
 from app.responses import fail, ok
+from app.security import supabase
 from app.security.crypto import encrypt
 
 router = APIRouter()
+
+# The Spotify permissions the login asks for. Kept identical to what the old React SPA
+# requested (apps/web/src/context/AuthContext.tsx) so the server-side login grants the
+# same access the snapshot (T21) and now-playing (T20) features already depend on.
+SPOTIFY_SCOPES = (
+    "user-read-email user-read-recently-played user-top-read user-read-currently-playing"
+)
+
+# Short-lived cookie that carries the login handshake (the PKCE verifier + a CSRF state)
+# from /auth/login to /auth/callback. Encrypted, httpOnly, and expires in minutes.
+OAUTH_COOKIE = "brink_oauth"
+OAUTH_COOKIE_MAX_AGE = 600  # seconds — the login round-trip should take well under this
+
+
+@router.get("/auth/login")
+def auth_login(request: Request):
+    # Step 1 of server-side Spotify login: send the browser to Spotify's consent screen.
+    # The callback URL is derived from the current origin, so this works unchanged on
+    # localhost and on Render (the derived URL must be in Supabase's redirect allow-list).
+    redirect_to = str(request.base_url).rstrip("/") + "/auth/callback"
+    authorize_url, verifier = supabase.oauth_authorize(redirect_to, SPOTIFY_SCOPES)
+
+    # A random CSRF state we generate and stash alongside the PKCE verifier; the callback
+    # checks it to reject login attempts that didn't originate from this browser.
+    state = secrets.token_urlsafe(32)
+    handshake = encrypt(json.dumps({"state": state, "verifier": verifier}))
+
+    # 307 keeps the method a GET as the browser follows the redirect to Spotify.
+    response = RedirectResponse(authorize_url, status_code=307)
+    response.set_cookie(
+        OAUTH_COOKIE,
+        handshake,
+        max_age=OAUTH_COOKIE_MAX_AGE,
+        httponly=True,  # JavaScript can't read it — mitigates XSS token theft
+        secure=request.url.scheme == "https",  # HTTPS-only in prod; off for local http dev
+        samesite="lax",
+    )
+    return response
 
 
 # The expected request body. All fields Optional so we can return our own clear 400
