@@ -162,6 +162,15 @@ Schema changes use **SQLModel + Alembic**: edit `backend/app/models.py`, then
 Alembic was baselined against the live schema in T05 (stamped, not recreated), so `upgrade head`
 is a no-op on the existing DB. `alembic check` reports any drift between the models and the DB.
 
+**Medallion schemas (T39, ADR-0009).** Tables live in Postgres schemas: `silver` (`Track`, `Play`),
+`gold` (`Cluster`, `ModelMetrics`, `ModelArtifact`), `bronze` (raw `*_raw` landing tables); the
+social/auth tables stay in the default `public` schema. Two consequences: (1) **autogenerate must
+be run with schema reflection on** — `env.py` needs `include_schemas=True` before the next
+`--autogenerate`, or Alembic won't see the schema-qualified tables and will propose dropping them
+(follow-up; T39 is hand-written and unaffected). (2) SQLite tests map the schemas to none via a
+`schema_translate_map` in `tests/conftest.py`. A migration that **moves** a table between schemas
+must use `ALTER TABLE ... SET SCHEMA` (preserves rows) — never autogenerate's drop+recreate.
+
 ## Environment
 
 - Supabase project `brink-dev` (ref `ljzwskfhiviunmqxerwu`). Data API disabled — tables are
@@ -226,8 +235,19 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   `GET /api/me/now-playing` (login-gated) + `spotify.get_currently_playing`, returning the
   normalized currently-playing track or `{ data: null }` for the empty/degraded cases (nothing
   playing, no linked Spotify, Spotify error) — the backend half of SP-1/UI-10 (the surface is T44).
-  **Next backend feature: T21 (snapshot); T14 (profile) is still gated on the analytics spine
-  (T35).**
+  **T39 (analytics contract + medallion schemas) done** — added `ModelArtifact` + bronze `*_raw`
+  landing tables, moved `Track`/`Play` → `silver` and `Cluster`/`ModelMetrics` → `gold`, dropped
+  the unused `UserStats`/`TasteVector`/`Compatibility` + `User.clusterId` (ADR-0003/0009). The
+  migration is **hand-written and applied manually by Andrea on `brink-dev`** (SET SCHEMA preserves
+  rows). This unblocks **T21** (bronze/silver now exist) and the analytics spine (033/034/036).
+  **T21 (Spotify play snapshot) done** — `POST /api/snapshot` (cron-authed by `X-Cron-Secret`)
+  lands each Spotify-linked user's recently-played into `bronze.spotify_recently_played_raw`, then
+  conforms to silver (`upsert_track` + `Play` deduped on `userId+playedAt`); one bounded 429
+  backoff; `.github/workflows/snapshot.yml` triggers it ~every 2h (satisfies SP-2/SP-4/SP-5/
+  INFRA-3). **Deploy step for Andrea:** set `CRON_SECRET` on Render + add `SNAPSHOT_URL`/
+  `CRON_SECRET` GitHub repo secrets, or the cron 401s. **Next backend feature: T50 (artist
+  storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still
+  gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 

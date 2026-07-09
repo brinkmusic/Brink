@@ -31,6 +31,7 @@ from app.routers import (
     pages,
     posts,
     reactions,
+    snapshot,
 )
 
 
@@ -59,6 +60,7 @@ app.include_router(comments.router)   # POST/GET /api/posts/{id}/comments
 app.include_router(follow.router)     # POST/DELETE /api/follow/{userId}
 app.include_router(feed.router)       # GET /api/feed
 app.include_router(now_playing.router)  # GET /api/me/now-playing
+app.include_router(snapshot.router)     # POST /api/snapshot (cron-triggered)
 app.include_router(pages.router)   # GET /, GET /feed — the browser-facing web pages (ADR-0013)
 
 

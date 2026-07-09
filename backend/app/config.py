@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     spotify_client_id: Optional[str] = None
     spotify_client_secret: Optional[str] = None
 
+    # Shared secret that authenticates the scheduled snapshot trigger (T21). The GitHub Actions
+    # workflow sends it in the `X-Cron-Secret` header; the endpoint refuses any request without it.
+    cron_secret: Optional[str] = None
+
 
 # Returns the settings. @lru_cache means "build this once, then reuse it" — we don't
 # re-read the .env file every time something needs a setting.

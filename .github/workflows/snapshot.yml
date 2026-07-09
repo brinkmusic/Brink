@@ -1,0 +1,32 @@
+# WHAT THIS FILE IS
+# The scheduled trigger for the Spotify play-snapshot (T21). GitHub Actions runs on a cron and
+# simply calls our snapshot endpoint on Render with the shared secret — the actual work (pull
+# recently-played, land bronze, conform silver) happens server-side in app/routers/snapshot.py.
+# WHY GitHub Actions and not a managed cron: ADR-0006 (managed-cron cadence was too coarse for ~2h).
+#
+# Required GitHub repo secrets (Settings -> Secrets and variables -> Actions):
+#   SNAPSHOT_URL  — the full endpoint URL, e.g. https://brink-xg7p.onrender.com/api/snapshot
+#   CRON_SECRET   — must match the CRON_SECRET env var set on the Render backend service
+
+name: Spotify snapshot
+
+on:
+  # Run roughly every 2 hours. Cron is UTC; "0 */2 * * *" = at minute 0 of every 2nd hour.
+  schedule:
+    - cron: "0 */2 * * *"
+  # Also allow a manual run from the Actions tab (handy for testing).
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the snapshot endpoint
+        env:
+          SNAPSHOT_URL: ${{ secrets.SNAPSHOT_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        # -f makes curl exit non-zero on an HTTP error (so a failed snapshot shows red here);
+        # -s hides the progress meter; -S still prints errors. The secret goes in the header,
+        # never in the URL (URLs can be logged).
+        run: |
+          curl -fsS -X POST "$SNAPSHOT_URL" -H "X-Cron-Secret: $CRON_SECRET"
