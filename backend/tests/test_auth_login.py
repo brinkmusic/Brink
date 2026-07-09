@@ -20,6 +20,7 @@ from app.db import get_session
 from app.main import app
 from app.models import SpotifyToken, User
 from app.routers import auth as auth_router
+from app.security import session as login_session
 from app.security import supabase
 
 
@@ -117,8 +118,9 @@ def _handshake(state="S", verifier="V"):
 def test_callback_happy_path_provisions_user_stores_token_sets_session(
     client, db_session, monkeypatch
 ):
-    monkeypatch.setattr(auth_router, "encrypt", _enc)
-    monkeypatch.setattr(auth_router, "decrypt", _dec)
+    monkeypatch.setattr(auth_router, "encrypt", _enc)  # Spotify-token store (in auth.py)
+    monkeypatch.setattr(auth_router, "decrypt", _dec)  # handshake cookie read (in auth.py)
+    monkeypatch.setattr(login_session, "encrypt", _enc)  # brink_session cookie write
     captured = {}
 
     def fake_exchange(auth_code, code_verifier):

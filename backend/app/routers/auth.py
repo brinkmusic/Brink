@@ -22,6 +22,7 @@ from app.db import get_session
 from app.deps import get_or_create_user, require_user
 from app.models import SpotifyToken, User
 from app.responses import fail, ok
+from app.security import session as login_session
 from app.security import supabase
 from app.security.crypto import decrypt, encrypt
 
@@ -38,11 +39,6 @@ SPOTIFY_SCOPES = (
 # from /auth/login to /auth/callback. Encrypted, httpOnly, and expires in minutes.
 OAUTH_COOKIE = "brink_oauth"
 OAUTH_COOKIE_MAX_AGE = 600  # seconds — the login round-trip should take well under this
-
-# The long-lived login cookie set after a successful sign-in. Holds the encrypted Supabase
-# session (access + refresh tokens); require_user reads it to identify the logged-in user.
-SESSION_COOKIE = "brink_session"
-SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 
 
 def _set_cookie(response, name: str, value: str, max_age: int, secure: bool) -> None:
@@ -150,17 +146,14 @@ def auth_callback(request: Request, session: Session = Depends(get_session)):
     # Set the login cookie: the encrypted Supabase session tokens (require_user reads these
     # and re-verifies with Supabase on each request). 303 → the browser does a plain GET to
     # /feed after the POST-like OAuth exchange.
-    session_payload = encrypt(
-        json.dumps(
-            {
-                "access_token": sb_session.access_token,
-                "refresh_token": sb_session.refresh_token,
-                "expires_at": getattr(sb_session, "expires_at", None),
-            }
-        )
-    )
     response = RedirectResponse("/feed", status_code=303)
-    _set_cookie(response, SESSION_COOKIE, session_payload, SESSION_COOKIE_MAX_AGE, secure)
+    login_session.set_cookie(
+        response,
+        sb_session.access_token,
+        sb_session.refresh_token,
+        getattr(sb_session, "expires_at", None),
+        secure,
+    )
     response.delete_cookie(OAUTH_COOKIE)  # handshake is single-use; clear it
     return response
 
@@ -169,7 +162,7 @@ def auth_callback(request: Request, session: Session = Depends(get_session)):
 def auth_logout():
     # Clear the login cookie and return to the landing page. 303 → plain GET of "/".
     response = RedirectResponse("/", status_code=303)
-    response.delete_cookie(SESSION_COOKIE)
+    login_session.clear_cookie(response)
     return response
 
 

@@ -66,6 +66,16 @@ def exchange_code(auth_code: str, code_verifier: str) -> Optional[Session]:
     return response.session if response else None
 
 
+def refresh_session(refresh_token: str) -> Optional[Session]:
+    # Trade a Supabase refresh token for a fresh session (new access + refresh tokens).
+    # Used by require_user when a logged-in page request arrives with an expired access
+    # token, so the user stays signed in without logging in again. Returns None if no
+    # session comes back; raises if Supabase rejects the refresh token (caller treats
+    # that as "session invalid → re-login").
+    response = admin().auth.refresh_session(refresh_token)
+    return response.session if response else None
+
+
 def get_user_from_token(token: str) -> Optional[User]:
     # Ask Supabase "who does this login token belong to?" It checks the token against
     # Supabase's auth server and returns that user.
