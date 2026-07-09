@@ -8,7 +8,8 @@ from functools import lru_cache
 from typing import Optional
 
 from supabase import Client, create_client
-from supabase_auth.types import User
+from supabase.client import ClientOptions
+from supabase_auth.types import Session, User
 
 from app.config import get_settings
 
@@ -20,6 +21,59 @@ def admin() -> Client:
     if not settings.supabase_url or not settings.supabase_service_role_key:
         raise ValueError("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set")
     return create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+
+def _pkce_client() -> Client:
+    # A FRESH client configured for the PKCE OAuth flow (used by the server-side Spotify
+    # login, T09). WHY fresh (not @lru_cache like admin()): sign_in_with_oauth stashes a
+    # one-time "code_verifier" in the client's in-memory storage, so two concurrent logins
+    # sharing one cached client could clobber each other's verifier before we read it.
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise ValueError("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set")
+    return create_client(
+        settings.supabase_url,
+        settings.supabase_service_role_key,
+        options=ClientOptions(flow_type="pkce"),
+    )
+
+
+def oauth_authorize(redirect_to: str, scopes: str) -> tuple[str, str]:
+    # Start a server-side Spotify login (PKCE). Returns (authorize_url, code_verifier):
+    #   - authorize_url — where we redirect the browser to sign in with Spotify.
+    #   - code_verifier — a one-time secret PKCE generates; it must be replayed to
+    #     exchange_code() on the callback. PKCE cryptographically binds the login code to
+    #     this browser, so a stolen code is useless without the matching verifier.
+    # The caller stores the verifier in a short-lived encrypted cookie until the callback.
+    client = _pkce_client()
+    resp = client.auth.sign_in_with_oauth(
+        {"provider": "spotify", "options": {"redirect_to": redirect_to, "scopes": scopes}}
+    )
+    verifier = client.auth._storage.get_item(f"{client.auth._storage_key}-code-verifier")
+    return resp.url, verifier
+
+
+def exchange_code(auth_code: str, code_verifier: str) -> Optional[Session]:
+    # Finish the server-side login: swap the one-time `auth_code` Spotify sent to our
+    # callback for a Supabase session, using the PKCE `code_verifier` we stored at login.
+    # The returned Session carries the user AND the Spotify provider tokens
+    # (provider_token / provider_refresh_token) we encrypt and store. Returns None if the
+    # exchange yields no session.
+    client = _pkce_client()
+    response = client.auth.exchange_code_for_session(
+        {"auth_code": auth_code, "code_verifier": code_verifier}
+    )
+    return response.session if response else None
+
+
+def refresh_session(refresh_token: str) -> Optional[Session]:
+    # Trade a Supabase refresh token for a fresh session (new access + refresh tokens).
+    # Used by require_user when a logged-in page request arrives with an expired access
+    # token, so the user stays signed in without logging in again. Returns None if no
+    # session comes back; raises if Supabase rejects the refresh token (caller treats
+    # that as "session invalid → re-login").
+    response = admin().auth.refresh_session(refresh_token)
+    return response.session if response else None
 
 
 def get_user_from_token(token: str) -> Optional[User]:

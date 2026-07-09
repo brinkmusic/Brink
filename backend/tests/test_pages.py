@@ -36,15 +36,43 @@ def test_stylesheet_is_served(client):
 
 # ---- Feed page (reads the posts the T10 API creates) ----
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 from app.db import get_session
 from app.main import app
 from app.models import Post, PostSource, Track
+from app.security import session as login_session
+from app.security import supabase
 
 
-# With real posts in the database, the feed renders them — proving the page is wired
-# to the actual Post/Track data (not showing hardcoded content). We seed a throwaway
-# in-memory database (the `db_session` fixture) and point the app at it.
-def test_feed_shows_real_posts(client, db_session):
+def _login(client, monkeypatch):
+    # Sign a fake user in for feed tests: the feed is login-gated (T09), so we plant a
+    # valid session cookie and fake the Supabase token check the same way the auth unit
+    # tests do — no real Spotify/Supabase.
+    su = SimpleNamespace(
+        id="abcdef12-3456-7890-abcd-ef1234567890",
+        email=None,
+        user_metadata={},
+        app_metadata={},
+    )
+    monkeypatch.setattr(login_session, "decode", lambda raw: {"access_token": "AT", "refresh_token": "RT"})
+    monkeypatch.setattr(supabase, "get_user_from_token", lambda t: su if t == "AT" else None)
+    client.cookies.set(login_session.SESSION_COOKIE, "x")
+
+
+# An anonymous visitor is redirected to Spotify login instead of seeing the feed (T09).
+def test_feed_redirects_anonymous_to_login(client):
+    app.dependency_overrides[get_session] = lambda: MagicMock()
+    res = client.get("/feed", follow_redirects=False)
+    assert res.status_code == 303
+    assert res.headers["location"] == "/auth/login"
+
+
+# With real posts in the database, a LOGGED-IN user's feed renders them — proving the
+# page is wired to the actual Post/Track data (not showing hardcoded content). We seed a
+# throwaway in-memory database (the `db_session` fixture) and point the app at it.
+def test_feed_shows_real_posts(client, db_session, monkeypatch):
     track = Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino")
     post = Post(
         user_id="u_demo",
@@ -56,8 +84,9 @@ def test_feed_shows_real_posts(client, db_session):
     db_session.add(post)
     db_session.commit()
 
-    # Make the feed page use our seeded in-memory database for this test.
+    # Make the feed page use our seeded in-memory database for this test, and sign in.
     app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
 
     res = client.get("/feed")
     assert res.status_code == 200
@@ -67,10 +96,11 @@ def test_feed_shows_real_posts(client, db_session):
     assert "a whole vibe" in body       # the caption
 
 
-# With no posts, the feed still returns a page (never crashes) and shows the empty
-# state — important because that is exactly what a brand-new or offline app looks like.
-def test_feed_empty_state(client, db_session):
+# With no posts, a logged-in user's feed still returns a page (never crashes) and shows
+# the empty state — exactly what a brand-new or offline app looks like.
+def test_feed_empty_state(client, db_session, monkeypatch):
     app.dependency_overrides[get_session] = lambda: db_session  # empty database
+    _login(client, monkeypatch)
     res = client.get("/feed")
     assert res.status_code == 200
     assert "No songs shared yet" in res.text
