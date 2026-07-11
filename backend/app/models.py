@@ -314,6 +314,8 @@ class ArtistPost(SQLModel, table=True):
 
     id: str = _pk_cuid()
     artist_user_id: str = Field(sa_column=_fk("artistUserId", "User.id", ondelete="CASCADE"))
+    # The object URL of the uploaded promo image. Storage is Supabase Storage (the private
+    # "artist-images" bucket) — chosen in ADR-0002, retained under ADR-0010 — NOT Cloudinary.
     image_url: str = Field(sa_column=Column("imageUrl", Text, nullable=False))
     caption: str = Field(sa_column=Column("caption", Text, nullable=False))
     linked_track_id: Optional[str] = Field(

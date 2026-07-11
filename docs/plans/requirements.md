@@ -25,7 +25,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
 | BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ✅ |
 | BE-8 | `GET /api/users/:id/profile` — stats + cluster + compatibility. | T14 | ◻ |
-| BE-9 | `POST /api/artist/posts` — create BTS post + optional track. | T50 | ◻ |
+| BE-9 | `POST /api/artist/posts` — create BTS post + optional track. | T50 | ✅ |
 | BE-10 | All mutations: session-gated, validated, consistent error JSON. | every API ticket (ADR-0007) | ◻ |
 | BE-11 | Connection pooling (Supabase pooler) configured. | T01, T05 | ✅ |
 
@@ -68,9 +68,9 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ◻ |
+| MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ✅ |
 | MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. | T51 | ◻ |
-| MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ◻ |
+| MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ✅ |
 | MEDIA-4 | Per-post engagement analytics shown to the artist. | T52 | ◻ |
 | MEDIA-5 | ≥98% upload success across 5 file types up to 10 MB. | T51 | ◻ |
 
