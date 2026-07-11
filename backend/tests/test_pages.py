@@ -37,11 +37,12 @@ def test_stylesheet_is_served(client):
 # ---- Feed page (reads the posts the T10 API creates) ----
 
 from types import SimpleNamespace
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from app.db import get_session
 from app.main import app
-from app.models import Post, PostSource, Track
+from app.models import Post, PostSource, Track, User
 from app.security import session as login_session
 from app.security import supabase
 
@@ -73,15 +74,18 @@ def test_feed_redirects_anonymous_to_login(client):
 # page is wired to the actual Post/Track data (not showing hardcoded content). We seed a
 # throwaway in-memory database (the `db_session` fixture) and point the app at it.
 def test_feed_shows_real_posts(client, db_session, monkeypatch):
-    track = Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino")
-    post = Post(
+    # Seed the author and the Track FIRST, then commit — the Post foreign-key-references both, and
+    # the test DB enforces foreign keys, so the parents must exist before the Post.
+    db_session.add(User(id="u_demo", handle="u_demo", display_name="Demo",
+                        created_at=datetime.now(timezone.utc)))
+    db_session.add(Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino"))
+    db_session.commit()
+    db_session.add(Post(
         user_id="u_demo",
         track_id="t_redbone",
         caption="a whole vibe",
         source=PostSource.MANUAL,
-    )
-    db_session.add(track)
-    db_session.add(post)
+    ))
     db_session.commit()
 
     # Make the feed page use our seeded in-memory database for this test, and sign in.

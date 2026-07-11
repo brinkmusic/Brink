@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
-from sqlmodel import select
+from sqlalchemy import event
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from app import spotify
 from app.db import get_session
@@ -20,6 +22,33 @@ from app.routers import snapshot
 CRON = "topsecret"
 
 
+@pytest.fixture
+def fk_session():
+    # Like the shared `db_session` fixture, but with SQLite FOREIGN KEY enforcement turned ON.
+    # WHY a separate fixture: SQLite ignores foreign keys unless you ask (`PRAGMA foreign_keys=ON`),
+    # so the default fixture can't catch a foreign-key *ordering* bug — which is exactly how the
+    # T23 snapshot-500 slipped through (a `Play` inserted before the `Track` it references). Turning
+    # the pragma on makes SQLite behave like Postgres here, so the regression test below actually
+    # reproduces the production failure. (Broader gap — enabling this in the shared fixture — is
+    # noted as a follow-up in the T23 ticket.)
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+
+    @event.listens_for(engine, "connect")
+    def _enable_fk(dbapi_conn, _record):
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
+    engine = engine.execution_options(
+        schema_translate_map={"bronze": None, "silver": None, "gold": None}
+    )
+    SQLModel.metadata.create_all(engine, tables=[
+        m.__table__ for m in (User, Track, Play, SpotifyToken, SpotifyRecentlyPlayedRaw)
+    ])
+    with Session(engine) as session:
+        yield session
+
+
 # The snapshot endpoint reads the expected secret from settings; stub it for every test here.
 @pytest.fixture(autouse=True)
 def _cron_secret(monkeypatch):
@@ -27,7 +56,13 @@ def _cron_secret(monkeypatch):
 
 
 def _linked_user(session, uid="u1"):
+    # Commit the User first, THEN the token. WHY the two commits: SpotifyToken.userId is a foreign
+    # key to User.id, so under foreign-key enforcement (the fk_session fixture) the User row must
+    # already exist before the token can reference it. (The default db_session fixture doesn't
+    # enforce FKs, so this also works there.) In production these are always separate transactions
+    # anyway — the user signs up, then their Spotify token is captured on a later request.
     session.add(User(id=uid, handle=uid, display_name=uid, created_at=datetime.now(timezone.utc)))
+    session.commit()
     session.add(SpotifyToken(
         user_id=uid, access_token="a", refresh_token="r",
         expires_at=datetime.now(timezone.utc).replace(tzinfo=None), scopes="s",
@@ -76,6 +111,27 @@ def test_snapshot_lands_bronze_and_conforms_silver_with_dedup(client, db_session
     assert res2.status_code == 200
     assert len(db_session.exec(select(Play)).all()) == 1                    # dedup: still one play
     assert len(db_session.exec(select(SpotifyRecentlyPlayedRaw)).all()) == 2  # bronze appends
+
+
+# Regression (T23): a batch with MULTIPLE new tracks must not hit a foreign-key violation. Each
+# Play FK-references a Track, so the ingest has to persist each Track before the Play that points at
+# it. With SQLite's foreign keys enforced (matching Postgres), the pre-fix code inserted a Play
+# before its Track during a batched autoflush -> ForeignKeyViolation -> the snapshot returned 500.
+def test_snapshot_multiple_new_tracks_no_fk_violation(client, fk_session, monkeypatch):
+    _linked_user(fk_session, "u1")
+    payload = {"items": [
+        {"track": {"id": f"trk{i}", "name": f"S{i}", "artists": [{"name": "A"}],
+                   "album": {"images": []}},
+         "played_at": f"2026-07-08T2{i}:00:00.000Z"}
+        for i in range(3)
+    ]}
+    monkeypatch.setattr(snapshot, "get_recently_played", lambda session, user_id: payload)
+    app.dependency_overrides[get_session] = lambda: fk_session
+
+    res = client.post("/api/snapshot", headers={"X-Cron-Secret": CRON})
+    assert res.status_code == 200
+    assert len(fk_session.exec(select(Play)).all()) == 3                      # all three plays landed
+    assert all(fk_session.get(Track, f"trk{i}") is not None for i in range(3))  # tracks persisted first
 
 
 # Only Spotify-linked users are processed; a user without a token is never fetched.

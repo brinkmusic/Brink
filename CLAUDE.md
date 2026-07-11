@@ -263,9 +263,27 @@ PR that it went in without a second review).
   required* — the owner may self-merge. **T37 (Alembic schema reflection) done** — `env.py` now sets
   `include_schemas=True` + an `include_name` schema allow-list + a schema-qualified `include_object`
   check, so `--autogenerate` sees the T39 medallion schemas and ignores Supabase's own schemas
-  (verified with `alembic check`: no drift); this clears the follow-up T39 flagged. **Next backend
-  feature: T50 (artist storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked;
-  T14 (profile) still gated on T35.**
+  (verified with `alembic check`: no drift); this clears the follow-up T39 flagged. **First
+  `develop → main` release (#79) shipped** — Render (which builds `main`) was 64 commits stale, so
+  T09 login, the Jinja pages, and the snapshot endpoint were 404 in production and the snapshot cron
+  couldn't fire (GitHub runs `schedule` only from the default branch). Post-release, `/` (200),
+  `/auth/login` (307), and gated `/feed` (303) are live. **T23 (snapshot-500 remediation) done** —
+  the release surfaced the snapshot cron 500-ing; two fixes: (1) the real cause — `_ingest_user`
+  inserted each `Play` before the `Track` it FK-references, so on Postgres a batch of new tracks hit
+  a `ForeignKeyViolation`; now it `session.flush()`es each upserted Track first (the SQLite suite
+  missed this because SQLite doesn't enforce FKs — a new `fk_session` test fixture turns them on).
+  (2) hardening — `get_valid_access_token` decrypted stored tokens unguarded, so a `TOKEN_ENC_KEY`
+  mismatch (`InvalidTag`) would crash the whole run; it now degrades an unreadable token to `None`
+  (skip that user) via `_safe_decrypt`. Verified end-to-end against `brink-dev` (50 plays ingested).
+  **T62 (FK-ordering hardening) done** — confirmed that follow-up: `db_session` now enforces FKs
+  (`PRAGMA foreign_keys=ON`) suite-wide, which surfaced 30 failures = 1 real bug (the T10 posts
+  endpoint had the same parent-before-child insert — now `flush()`es the Track before the Post) + 29
+  test-seed conveniences SQLite's lax default had hidden (fixed to commit parents before children;
+  `as_user` now persists the caller). Root cause: the models use FK columns without ORM
+  `relationship()`, so SQLAlchemy doesn't insert in FK order — parents must be flushed/committed
+  first. Also corrected the CLAUDE.md line that wrongly said Render deploys from `develop` (it's
+  `main`). **Next backend feature: T50 (artist storage) is ready; the analytics spine (031/033/034,
+  Jonah) is unblocked; T14 (profile) still gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 
@@ -283,8 +301,10 @@ PR that it went in without a second review).
   `SPOTIFY_*`, `TOKEN_ENC_KEY`) live only in Render, never committed.
 - **Wiring:** the Vercel project's **root directory is `apps/web`** (it builds only the SPA).
   `apps/web/vercel.json` rewrites `/api/:path*` → the Render URL, so the browser still calls
-  same-origin `/api/*` (no CORS). Vercel deploys the frontend from `main`; Render deploys the
-  backend from `develop`.
+  same-origin `/api/*` (no CORS). **Both Vercel (frontend) and Render (backend) deploy from `main`**
+  — so backend changes reach production only via a `develop → main` release PR, and each release
+  must be followed by a back-merge of `main` into `develop` (or the next release PR is blocked as
+  BEHIND, since `main` protection is `strict`).
 - **Note:** the frontend still calls a legacy POC `/api/state` path (`apps/web/src/lib/backend.ts`)
   that FastAPI does not implement, so it 404s; those mock social features are replaced by the real
   API in T10–T14, and the `/api/state` calls are removed in T60.

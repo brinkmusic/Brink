@@ -15,13 +15,19 @@ from app.main import app
 from app.models import Post, PostSource, Reaction, Track, User
 
 
+# handle is derived from id so every seeded user has a UNIQUE handle (User.handle is a unique
+# index) — tests here seed several distinct users (author, and one or more reactors).
 def _user(id="user-1"):
-    return User(id=id, handle="h", display_name="d", created_at=datetime.now(timezone.utc))
+    return User(id=id, handle=id, display_name="d", created_at=datetime.now(timezone.utc))
 
 
-# Put a real Post (and its Track) in the database so the endpoint's post-exists check passes.
+# Put a real Post (and its author + Track) in the database so the endpoint's post-exists check
+# passes. The author User and the Track are committed FIRST: the Post foreign-key-references both,
+# and the test DB enforces foreign keys, so the parents must physically exist before the Post.
 def _seed_post(session, post_id="post-1", author="author-1"):
+    session.add(_user(id=author))
     session.add(Track(spotify_id="spot-1", title="A", artist_name="X"))
+    session.commit()
     session.add(Post(id=post_id, user_id=author, track_id="spot-1", source=PostSource.MANUAL))
     session.commit()
     return post_id
