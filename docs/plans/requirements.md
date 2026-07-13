@@ -71,7 +71,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ✅ |
 | MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. | T51 | ◻ |
 | MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ✅ |
-| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52 | ◻ |
+| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52 | ✅ (reaction + comment counts, owner-only; view count deferred — no artist-post read path yet, T51) |
 | MEDIA-5 | ≥98% upload success across 5 file types up to 10 MB. | T51 | ◻ |
 
 ## Layer 7 — Infrastructure & Scheduling (INFRA)

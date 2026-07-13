@@ -289,11 +289,23 @@ PR that it went in without a second review).
   be `User.isArtist == true`, else 403) with the artist always taken from the login (unspoofable, like
   T10's `Post`); JPEG/PNG ≤ 10 MB is enforced at the request-contract level (ADR-0007/0008, technical
   validation only — no moderation), satisfying BE-9/MEDIA-1/MEDIA-3. New `app/routers/artist.py` +
-  `create_signed_upload_url` in `security/supabase.py`. **Deploy step for Andrea:** create the private
-  Supabase Storage bucket `artist-images` in `brink-dev`, or `sign-upload` errors in production (tests
-  stub storage, so CI can't catch a missing bucket). Its merge unblocks **T51** (artist upload UI) and
-  **T52** (per-post engagement). **Next backend feature: the analytics spine (031/033/034, Jonah) is
-  unblocked; T14 (profile) still gated on T35.**
+  `create_signed_upload_url` in `security/supabase.py`. The private `artist-images` bucket has been
+  created in `brink-dev` (done). Its merge unblocks **T51** (artist upload UI) and **T52**
+  (per-post engagement). **T52 (artist engagement) done** — engagement on artist posts, under
+  `/api/artist`: `POST`/`DELETE /posts/{id}/reactions` and `POST`/`GET /posts/{id}/comments` are
+  login-gated but open to **any** user (the audience), while `GET /posts/{id}/engagement` is
+  **owner-only** (403 for a non-owner) and returns the owning artist's reaction + comment counts
+  (satisfies MEDIA-4). Because a foreign key targets one table and `ArtistPost` is not `Post`, this
+  added **new `ArtistReaction` + `ArtistComment` tables** (mirrors of `Reaction`/`Comment`, reusing
+  the `ReactionType` enum + rate-limit helper) rather than making the existing social tables
+  polymorphic — keeping the blast radius off the T10–T13 path. **Scope note:** the ticket assumed
+  T11/T12's reactions/comments already attached to artist posts (they don't), so with owner sign-off
+  it was widened to also build that write path; a **view count is deferred** (no artist-post read
+  path to count from yet — T51). **Deploy step for Andrea:** apply the migration to `brink-dev` —
+  `cd backend && uv run alembic upgrade head` (creates the two tables; reuses the existing
+  `ReactionType` enum, so no `CREATE TYPE`), same manual-apply pattern as T39. Its merge readies the
+  engagement API for **T51** to render. **Next backend feature: the analytics spine (031/033/034,
+  Jonah) is unblocked; T14 (profile) still gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 

@@ -182,3 +182,14 @@ class ArtistPostOut(CamelModel):
     caption: str
     linked_track_id: Optional[str] = None
     created_at: datetime
+
+
+# What GET /api/artist/posts/{id}/engagement returns to the OWNING artist (T52, MEDIA-4): how their
+# post is performing. `reaction_counts` always carries an entry for every reaction type (zeros
+# included), like ReactionCountsOut, so the artist page renders a stable set of badges; `comment_count`
+# is how many comments the post has. (A view count is a deferred follow-up — there is no public
+# artist-post read path to count views from yet; that surface is the artist UI, T51.)
+class ArtistEngagementOut(CamelModel):
+    post_id: str
+    reaction_counts: dict[str, int]
+    comment_count: int
