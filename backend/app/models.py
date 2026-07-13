@@ -324,6 +324,45 @@ class ArtistPost(SQLModel, table=True):
     created_at: datetime = _created_at()
 
 
+# A reaction (heart / fire / sparkle) a user left on an ARTIST post (T52). This is a separate
+# table from Reaction (which links to Post) because ArtistPost is a different table: a foreign
+# key points at exactly one table, so engagement on artist posts needs its own reaction/comment
+# tables. The columns otherwise mirror Reaction so the same counting logic and response shapes
+# work for both.
+class ArtistReaction(SQLModel, table=True):
+    __tablename__ = "ArtistReaction"
+    __table_args__ = (
+        # Same "no duplicate reaction of one type" rule as Reaction, but keyed on the artist post.
+        Index(
+            "ArtistReaction_artistPostId_userId_type_key",
+            "artistPostId", "userId", "type", unique=True,
+        ),
+    )
+
+    id: str = _pk_cuid()
+    artist_post_id: str = Field(sa_column=_fk("artistPostId", "ArtistPost.id", ondelete="CASCADE"))
+    user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE"))
+    type: ReactionType = Field(
+        sa_column=Column("type", SAEnum(ReactionType, name="ReactionType"), nullable=False)
+    )
+
+
+# A text comment a user left on an ARTIST post (T52). Separate from Comment for the same reason
+# ArtistReaction is separate from Reaction (see above): the foreign key targets ArtistPost.
+class ArtistComment(SQLModel, table=True):
+    __tablename__ = "ArtistComment"
+    __table_args__ = (
+        # Speed up "comments on this artist post".
+        Index("ArtistComment_artistPostId_idx", "artistPostId"),
+    )
+
+    id: str = _pk_cuid()
+    artist_post_id: str = Field(sa_column=_fk("artistPostId", "ArtistPost.id", ondelete="CASCADE"))
+    user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE"))
+    body: str = Field(sa_column=Column("body", Text, nullable=False))
+    created_at: datetime = _created_at()
+
+
 # One row per "limited action" performed, used to stop spam/abuse (ADR-0011). Before a
 # write endpoint (e.g. creating a post) runs, we count recent rows here for this
 # (subject, action) pair; too many in the time window -> the request is refused. WHY a
