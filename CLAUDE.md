@@ -282,8 +282,18 @@ PR that it went in without a second review).
   `as_user` now persists the caller). Root cause: the models use FK columns without ORM
   `relationship()`, so SQLAlchemy doesn't insert in FK order — parents must be flushed/committed
   first. Also corrected the CLAUDE.md line that wrongly said Render deploys from `develop` (it's
-  `main`). **Next backend feature: T50 (artist storage) is ready; the analytics spine (031/033/034,
-  Jonah) is unblocked; T14 (profile) still gated on T35.**
+  `main`). **T50 (artist storage backend) done** — the artist BTS portal's server half:
+  `POST /api/artist/sign-upload` mints a Supabase Storage signed upload URL (service role) for the
+  private `artist-images` bucket at a caller-namespaced path, and `POST /api/artist/posts` creates an
+  `ArtistPost` (image URL + caption + optional `linkedTrackId`). Both are **artist-only** (caller must
+  be `User.isArtist == true`, else 403) with the artist always taken from the login (unspoofable, like
+  T10's `Post`); JPEG/PNG ≤ 10 MB is enforced at the request-contract level (ADR-0007/0008, technical
+  validation only — no moderation), satisfying BE-9/MEDIA-1/MEDIA-3. New `app/routers/artist.py` +
+  `create_signed_upload_url` in `security/supabase.py`. **Deploy step for Andrea:** create the private
+  Supabase Storage bucket `artist-images` in `brink-dev`, or `sign-upload` errors in production (tests
+  stub storage, so CI can't catch a missing bucket). Its merge unblocks **T51** (artist upload UI) and
+  **T52** (per-post engagement). **Next backend feature: the analytics spine (031/033/034, Jonah) is
+  unblocked; T14 (profile) still gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 

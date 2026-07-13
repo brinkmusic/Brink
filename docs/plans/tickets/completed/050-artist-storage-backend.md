@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Medium
 category: Feature
@@ -56,10 +56,36 @@ The artist BTS portal needs a way to store uploaded images and create artist pos
 | `backend/tests/test_artist.py` | CREATE | tests |
 
 ## Testing Checklist
-- [ ] sign-upload returns a valid signed URL for the owning artist
-- [ ] non-owner cannot mint an upload for another artist → 403
-- [ ] create persists an `ArtistPost` with object URL (+ optional track)
-- [ ] oversized / non-JPEG-PNG intent rejected at the contract level
+- [x] sign-upload returns a valid signed URL for the owning artist
+- [x] non-owner cannot mint an upload for another artist → 403 (a non-artist account, `isArtist=false`)
+- [x] create persists an `ArtistPost` with object URL (+ optional track)
+- [x] oversized / non-JPEG-PNG intent rejected at the contract level
+
+## Outcome (as built)
+Shipped per **Option A — artist-account gate** (chosen with the owner). Both routes are login-gated
+**and artist-only**: the caller must be an artist account (`User.isArtist == true`), and the artist
+is **always** the authenticated caller (never read from the body), so it can't be spoofed — the same
+unspoofable-author precedent as `Post` (T10). A non-artist caller gets **403**.
+
+- `POST /api/artist/sign-upload` — mints a Supabase Storage signed upload URL (service role) for the
+  private `artist-images` bucket, at a path namespaced under the caller: `<artistUserId>/<uuid>.<ext>`.
+  JPEG/PNG ≤ 10 MB is enforced at the **contract level** (`SignUploadBody`: `contentType` is a
+  `Literal`, `sizeBytes` bounded) → a bad request is a 400 before any logic runs (ADR-0007/0008,
+  technical validation only; **no** moderation).
+- `POST /api/artist/posts` — creates an `ArtistPost` (image URL + caption + optional `linkedTrackId`),
+  returning the camelCase `ArtistPostOut` (ADR-0012).
+- **Files:** `backend/app/routers/artist.py` (new) · `backend/app/schemas.py` (`SignUploadBody`,
+  `SignUploadOut`, `CreateArtistPostBody`, `ArtistPostOut`) · `backend/app/security/supabase.py`
+  (`create_signed_upload_url` helper) · `backend/app/main.py` (router registered) ·
+  `backend/app/models.py` (`ArtistPost.imageUrl` now documents Supabase Storage, not Cloudinary) ·
+  `backend/tests/test_artist.py` (11 tests) · `backend/tests/conftest.py` (ArtistPost in the test DB).
+- **Tests:** 11 new; full backend suite **141 passed**. No DB migration (comment-only model change).
+- **Deploy step for Andrea:** create the **private** Supabase Storage bucket `artist-images` in
+  `brink-dev`, or `sign-upload` errors in production (tests stub storage, so CI can't catch a missing
+  bucket).
+- **Deliberate scope calls:** no rate-limit on these writes (not in ticket scope; closed
+  team-controlled demo per ADR-0008), and no `is_artist`-provisioning path (setting the flag is out
+  of scope here).
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable

@@ -27,6 +27,7 @@ from app.db import get_session
 from app.deps import require_user
 from app.main import app
 from app.models import (
+    ArtistPost,
     Comment,
     Follow,
     Play,
@@ -74,7 +75,7 @@ def db_session():
     )
     tables = [m.__table__ for m in (
         User, Track, Play, Post, Reaction, Comment, Follow, SpotifyToken,
-        SpotifyRecentlyPlayedRaw, RateLimitHit,
+        SpotifyRecentlyPlayedRaw, RateLimitHit, ArtistPost,
     )]
     SQLModel.metadata.create_all(engine, tables=tables)
     with Session(engine) as session:

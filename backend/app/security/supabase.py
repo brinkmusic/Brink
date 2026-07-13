@@ -76,6 +76,15 @@ def refresh_session(refresh_token: str) -> Optional[Session]:
     return response.session if response else None
 
 
+def create_signed_upload_url(bucket: str, path: str) -> dict:
+    # Mint a Supabase Storage "signed upload URL" (T50): a short-lived, single-use URL that lets
+    # the browser upload ONE file straight to `path` in a PRIVATE bucket, WITHOUT ever seeing the
+    # service-role key. WHY this shape: the browser can't be trusted with admin credentials, so the
+    # server (which holds the key) signs a narrow permission for exactly one object path and hands
+    # back just that. Returns Supabase's dict: {"signed_url", "token", "path"}.
+    return admin().storage.from_(bucket).create_signed_upload_url(path)
+
+
 def get_user_from_token(token: str) -> Optional[User]:
     # Ask Supabase "who does this login token belong to?" It checks the token against
     # Supabase's auth server and returns that user.
