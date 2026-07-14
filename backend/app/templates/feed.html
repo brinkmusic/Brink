@@ -53,6 +53,28 @@
             </button>
             {% endfor %}
           </div>
+
+          {# Comments (T42). The button shows the count and opens a panel that lazily loads
+             this post's comments and offers a box to add one (see static/comments.js). #}
+          <div class="comments" data-post-id="{{ p.id }}">
+            <button type="button" class="comment-toggle" onclick="toggleComments(this)">
+              💬 <span class="comment-count">{{ p.comment_count }}</span>
+            </button>
+            <div class="comment-panel" hidden>
+              <ul class="comment-list"></ul>
+              <form class="comment-form" onsubmit="submitComment(event, this)">
+                <input
+                  type="text"
+                  name="body"
+                  placeholder="Add a comment…"
+                  maxlength="2000"
+                  autocomplete="off"
+                  required
+                />
+                <button type="submit" class="btn btn-spotify">Post</button>
+              </form>
+            </div>
+          </div>
         </div>
       </article>
       {% endfor %}
@@ -64,6 +86,7 @@
   {% endif %}
 </section>
 
-{# The tiny script that makes the reaction buttons live (calls the T11 API). #}
+{# The small scripts that make reactions (T11) and comments (T12) live. #}
 <script src="/static/reactions.js"></script>
+<script src="/static/comments.js"></script>
 {% endblock %}
