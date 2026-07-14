@@ -20,6 +20,34 @@
     <p class="hero-sub">What people are playing right now 🎶</p>
   </div>
 
+  {# Composer (T40): search a song, add a caption, share it. See static/composer.js. #}
+  <section class="composer card">
+    <input
+      type="text"
+      class="composer-search"
+      placeholder="Search a song to share…"
+      autocomplete="off"
+      oninput="composerSearch(this)"
+    />
+    <ul class="composer-results" hidden></ul>
+    <div class="composer-selected" hidden>
+      <p class="composer-track">
+        <span class="composer-track-title"></span>
+        <span class="composer-track-artist"></span>
+      </p>
+      <input
+        type="text"
+        class="composer-caption"
+        placeholder="Say something about it (optional)…"
+        maxlength="300"
+      />
+      <div class="composer-actions">
+        <button type="button" class="btn btn-ghost" onclick="composerReset(this)">Cancel</button>
+        <button type="button" class="btn btn-spotify" onclick="composerPublish(this)">Share 🎶</button>
+      </div>
+    </div>
+  </section>
+
   {% if posts %}
     <div class="stack">
       {% for p in posts %}
@@ -86,7 +114,8 @@
   {% endif %}
 </section>
 
-{# The small scripts that make reactions (T11) and comments (T12) live. #}
+{# The small scripts that make the composer (T40), reactions (T11) and comments (T12) live. #}
+<script src="/static/composer.js"></script>
 <script src="/static/reactions.js"></script>
 <script src="/static/comments.js"></script>
 {% endblock %}

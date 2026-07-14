@@ -204,3 +204,17 @@ def test_feed_shows_comment_section_and_count(client, db_session, monkeypatch):
     assert 'name="body"' in body
     # The comment count from build_feed renders (this post has one comment).
     assert 'class="comment-count">1<' in body
+
+
+# ---- T40: the composer (search + share a song) renders on the feed ----
+
+
+def test_feed_has_composer(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'class="composer' in body               # the composer block is present
+    assert "composerSearch(this)" in body          # the search box is wired
+    assert "/static/composer.js" in body           # the script is loaded
