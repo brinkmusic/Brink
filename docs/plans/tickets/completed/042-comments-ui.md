@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Low
 category: Feature
@@ -43,10 +43,10 @@ Add a real comment input and newest-first comment list to `PostCard`, wired to `
 | `apps/web/src/components/PostCard.tsx` | MODIFY | real comment input + list |
 
 ## Testing Checklist
-- [ ] submitting a comment persists and appears in the list
-- [ ] empty comment is blocked client-side (and server returns 400 if forced)
-- [ ] list shows newest-first with author
-- [ ] dead button removed
+- [x] submitting a comment persists and appears in the list
+- [x] empty comment is blocked client-side (and server returns 400 if forced)
+- [x] list shows newest-first with author
+- [x] dead button removed (n/a — the Python feed had no comment affordance; added fresh)
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -57,3 +57,13 @@ Add a real comment input and newest-first comment list to `PostCard`, wired to `
 
 ## Notes
 Branch off `develop` as `feat/T42-comments-ui`; one PR back into `develop` (never `main`). Owner: Sebastian.
+
+## Outcome (as built)
+Built as the **Python/Jinja frontend** (ADR-0013). Each feed post card gained a `💬 <count>`
+toggle (the count comes from `build_feed`'s `commentCount`) that opens a panel. On first open
+`static/comments.js` lazily fetches `GET /api/posts/{id}/comments` and renders each comment
+(author, text, "time ago") newest-first; the add-comment form POSTs to `POST /api/posts/{id}/comments`
+(T12), prepends the new comment, and bumps the count. Non-empty is enforced client-side; the server
+is the real gate. User text is inserted with `textContent` (never `innerHTML`) so it can't inject
+HTML. Files: `backend/app/templates/feed.html`, `backend/app/static/comments.js`,
+`backend/app/static/brink.css`, `backend/tests/test_pages.py`. Satisfies **UI-4**. Full suite green (157).

@@ -210,6 +210,45 @@ body {
 .react-btn.reacted { border-color: var(--accent); background: rgba(157, 141, 241, 0.15); color: var(--text); }
 .react-emoji { line-height: 1; }
 .react-count { font-variant-numeric: tabular-nums; }
+
+/* ---- Comments (feed, T42) ---- */
+.comments { margin-top: 0.5rem; }
+.comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 9999px;
+}
+.comment-toggle:hover { color: var(--text); }
+.comment-count { font-variant-numeric: tabular-nums; }
+.comment-panel { margin-top: 0.5rem; }
+.comment-list { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.4rem; }
+.comment { font-size: 0.85rem; line-height: 1.4; }
+.comment-author { font-weight: 600; margin-right: 0.4rem; }
+.comment-body { color: var(--text); }
+.comment-when { color: var(--mute); font-size: 0.72rem; margin-left: 0.4rem; }
+.comment-empty { color: var(--mute); font-size: 0.85rem; }
+.comment-form { display: flex; gap: 0.5rem; }
+.comment-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.comment-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.comment-form .btn { padding: 0.45rem 0.9rem; font-size: 0.8rem; }
 .empty { color: var(--mute); font-size: 0.95rem; }
 .empty p { margin: 0; }
 

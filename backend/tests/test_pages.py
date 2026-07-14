@@ -42,7 +42,7 @@ from unittest.mock import MagicMock
 
 from app.db import get_session
 from app.main import app
-from app.models import Post, PostSource, Reaction, ReactionType, Track, User
+from app.models import Comment, Post, PostSource, Reaction, ReactionType, Track, User
 from app.security import session as login_session
 from app.security import supabase
 
@@ -178,3 +178,29 @@ def test_feed_reactions_not_marked_for_other_viewer(client, db_session, monkeypa
     # The heart count shows (1), but the viewer hasn't tapped anything.
     assert 'aria-pressed="true"' not in body
     assert 'aria-pressed="false"' in body
+
+
+# ---- T42: feed post cards carry a comment section with the live comment count ----
+
+
+def test_feed_shows_comment_section_and_count(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_c", title="Commented Song", artist_name="Artist"))
+    db_session.commit()
+    post = Post(user_id=viewer.id, track_id="t_c", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    db_session.add(Comment(post_id=post.id, user_id=viewer.id, body="first!"))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    # The comment section is present and wired to this post, with an add-comment input.
+    assert f'class="comments" data-post-id="{post.id}"' in body
+    assert 'onclick="toggleComments(this)"' in body
+    assert 'name="body"' in body
+    # The comment count from build_feed renders (this post has one comment).
+    assert 'class="comment-count">1<' in body

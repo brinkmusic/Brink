@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T37**, **T39**, **T41**, **T50**, **T52**, **T62**, T70–T74, T77, T78, **T90–T93**). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T37**, **T39**, **T41**, **T42**, **T50**, **T52**, **T62**, T70–T74, T77, T78, **T90–T93**). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
 
 ## How these relate to the rest of the docs
 
@@ -47,7 +47,7 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 |---|---|
 | **0 (ready)** | `003` `030` ~~`050`~~ ✅ |
 | 1 | `021` `031` `040` `051` |
-| 2 | `032` `034` `036` ~~`041`~~ ✅ `042` `043` ~~`052`~~ ✅ |
+| 2 | `032` `034` `036` ~~`041`~~ ✅ ~~`042`~~ ✅ `043` ~~`052`~~ ✅ |
 | 3 | `033` `038` `045` |
 | 4 | `035` |
 | 5 | `014` |
@@ -61,8 +61,8 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
   (`052` — per-post engagement — is now **done**; its owner-only engagement API is ready for `051`
   to render.)
 - **Newly unblocked by T10:** **`040` — post composer + Spotify catalog search (Sebastian).** (`011`, `012` done.)
-- **Newly unblocked by T11/T12/T13:** the social UIs — `042` — comments UI, `043` — follow UI (Sebastian).
-- **Done:** `041` — feed + live reactions (Sebastian) — the feed page reuses the shared `build_feed()` and reacts via the T11 API from the browser.
+- **Newly unblocked by T13:** `043` — follow UI (Sebastian).
+- **Done:** `041` — feed + live reactions, `042` — comments UI (Sebastian) — the feed page reuses `build_feed()` and reacts/comments via the T11/T12 APIs from the browser.
 - **`009` (server-side Spotify login) done** — the ADR-0013 Jinja shell (PR #60) merged and this landed on top; the Python frontend can now sign users in and gate `/feed`.
 
 The wave numbers below are *dependency depth*, not live status — a ticket is startable as soon as its `blocked_by` are merged, which is what the "Ready to start now" list above reflects. Update that list whenever a wave of blockers merges.
