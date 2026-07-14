@@ -1,11 +1,17 @@
 {#
   WHAT THIS FILE IS
   The feed page: a running list of the songs people have shared. Each card shows the
-  track, who shared it, and when. The posts come from the database (the Post + Track
-  rows the T10 API creates). When there are none yet, we show a friendly empty state
-  instead of a blank page.
+  track, who shared it, when, and a row of reaction buttons (heart / fire / sparkle) with
+  live counts. Tapping a reaction calls the T11 reactions API from the browser (see
+  static/reactions.js) and updates the counts. The posts come from the database (the
+  Post + Track rows the T10 API creates). When there are none yet, we show a friendly
+  empty state instead of a blank page.
 #}
 {% extends "base.html" %}
+
+{# The three reaction types and the emoji we show for each. Order is fixed so every
+   card's buttons line up. Values must match the ReactionType enum (HEART/FIRE/SPARKLE). #}
+{% set reaction_kinds = [("HEART", "❤️"), ("FIRE", "🔥"), ("SPARKLE", "✨")] %}
 
 {% block content %}
 <section class="stack">
@@ -29,7 +35,24 @@
           {% if p.caption %}
             <p class="post-caption">"{{ p.caption }}"</p>
           {% endif %}
-          <p class="post-meta">shared {{ p.when }}</p>
+          <p class="post-meta">{{ p.author }} · shared {{ p.when }}</p>
+
+          {# Reaction bar. data-post-id tells the script which post to react to; each
+             button carries its type. "reacted" marks the ones this viewer already tapped. #}
+          <div class="reactions" data-post-id="{{ p.id }}">
+            {% for kind, emoji in reaction_kinds %}
+            <button
+              type="button"
+              class="react-btn{% if kind in p.mine %} reacted{% endif %}"
+              data-type="{{ kind }}"
+              aria-pressed="{{ 'true' if kind in p.mine else 'false' }}"
+              onclick="react(this)"
+            >
+              <span class="react-emoji">{{ emoji }}</span>
+              <span class="react-count">{{ p.counts[kind] }}</span>
+            </button>
+            {% endfor %}
+          </div>
         </div>
       </article>
       {% endfor %}
@@ -40,4 +63,7 @@
     </div>
   {% endif %}
 </section>
+
+{# The tiny script that makes the reaction buttons live (calls the T11 API). #}
+<script src="/static/reactions.js"></script>
 {% endblock %}

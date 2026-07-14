@@ -229,7 +229,11 @@ PR that it went in without a second review).
   — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
   `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
   counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
-  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **T22 (Spotify token refresh) done** —
+  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **Frontend (Python, ADR-0013): the
+  landing page + login-gated feed shipped (#60), and T41 (feed + live reactions) done** — the feed
+  page reuses the shared `build_feed()` (extracted in `backend/app/routers/feed.py`) so it matches
+  `GET /api/feed`, and `backend/app/static/reactions.js` calls the T11 reactions API from the
+  browser (optimistic, reconciled with server counts), satisfying UI-2/UI-3. **T22 (Spotify token refresh) done** —
   `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
   (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
   unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against

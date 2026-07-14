@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -45,10 +45,10 @@ The feed is the home screen and currently renders mock data via `lib/data.getFee
 | `apps/web/src/components/PostCard.tsx` | MODIFY | live optimistic reactions |
 
 ## Testing Checklist
-- [ ] feed renders real posts from `/api/feed` (no mock import on this path)
-- [ ] reacting updates optimistically, reconciles with server counts
-- [ ] un-reacting decrements correctly
-- [ ] loading / empty / error states render
+- [x] feed renders real posts from `/api/feed` (no mock import on this path)
+- [x] reacting updates optimistically, reconciles with server counts
+- [x] un-reacting decrements correctly
+- [x] loading / empty / error states render (empty + error covered; see Outcome re: loading)
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -59,3 +59,26 @@ The feed is the home screen and currently renders mock data via `lib/data.getFee
 
 ## Notes
 Branch off `develop` as `feat/T41-feed-live`; one PR back into `develop` (never `main`). Owner: Sebastian.
+
+## Outcome (as built)
+Built as the **Python/Jinja frontend** (ADR-0013), not React — the ticket's `FeedPage.tsx` /
+`PostCard.tsx` map to the server-rendered feed page instead.
+
+- **Feed reads the real feed (UI-2).** `feed.py` was refactored to expose a shared
+  `build_feed(session, user)` (extracted from the `GET /api/feed` handler, output unchanged) that
+  the feed **page** now reuses — so the page shows exactly the same posts as `/api/feed` (people
+  you follow + your own) with **zero duplicated query logic**. `pages.py` reshapes that output for
+  the template. Touches `backend/app/routers/feed.py` (Andrea's area) by agreement; her API tests
+  still pass.
+- **Live reactions (UI-3).** `static/reactions.js` calls the T11 `POST/DELETE
+  /api/posts/{id}/reactions` from the browser with optimistic UI, then reconciles every count from
+  the server response; un-react decrements; the viewer's own reactions render highlighted. Plain
+  JS (no build step) rather than HTMX for this optimistic-toggle interaction — matches the ticket's
+  "call BE-5, reconcile with server" spec; HTMX can be adopted later if preferred.
+- **States (UI-9).** Empty and error states covered (the feed degrades to the empty state if the
+  DB is unreachable, never 500s). Server-rendered pages have no separate client "loading" spinner
+  (the page arrives fully rendered). The final "no silent mock fallback" cleanup across the app is
+  **T60**, so UI-9 stays open there.
+- **Files:** `backend/app/routers/pages.py`, `backend/app/routers/feed.py` (shared builder),
+  `backend/app/templates/feed.html`, `backend/app/static/reactions.js`, `backend/app/static/brink.css`,
+  `backend/tests/test_pages.py`. Full suite green (156).

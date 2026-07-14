@@ -34,7 +34,7 @@ def test_stylesheet_is_served(client):
     assert "text/css" in res.headers["content-type"]
 
 
-# ---- Feed page (reads the posts the T10 API creates) ----
+# ---- Feed page (reuses build_feed: posts from people you follow + your own) ----
 
 from types import SimpleNamespace
 from datetime import datetime, timezone
@@ -42,24 +42,35 @@ from unittest.mock import MagicMock
 
 from app.db import get_session
 from app.main import app
-from app.models import Post, PostSource, Track, User
+from app.models import Post, PostSource, Reaction, ReactionType, Track, User
 from app.security import session as login_session
 from app.security import supabase
+
+# The Supabase user id _login signs in as. The feed only shows a viewer's own posts (plus the
+# people they follow), so tests author their posts under the viewer that require_user returns —
+# which is looked up by supabase_user_id, not the primary key.
+_VIEWER_ID = "abcdef12-3456-7890-abcd-ef1234567890"
 
 
 def _login(client, monkeypatch):
     # Sign a fake user in for feed tests: the feed is login-gated (T09), so we plant a
     # valid session cookie and fake the Supabase token check the same way the auth unit
     # tests do — no real Spotify/Supabase.
-    su = SimpleNamespace(
-        id="abcdef12-3456-7890-abcd-ef1234567890",
-        email=None,
-        user_metadata={},
-        app_metadata={},
-    )
+    su = SimpleNamespace(id=_VIEWER_ID, email=None, user_metadata={}, app_metadata={})
     monkeypatch.setattr(login_session, "decode", lambda raw: {"access_token": "AT", "refresh_token": "RT"})
     monkeypatch.setattr(supabase, "get_user_from_token", lambda t: su if t == "AT" else None)
     client.cookies.set(login_session.SESSION_COOKIE, "x")
+
+
+def _seed_viewer(db_session):
+    # Create the viewer's Brink user, keyed by supabase_user_id so require_user returns THIS
+    # row (its .id then matches the posts/reactions we attribute to the viewer). Returns it.
+    viewer = User(supabase_user_id=_VIEWER_ID, handle="viewer", display_name="Viewer",
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(viewer)
+    db_session.commit()
+    db_session.refresh(viewer)
+    return viewer
 
 
 # An anonymous visitor is redirected to Spotify login instead of seeing the feed (T09).
@@ -70,25 +81,19 @@ def test_feed_redirects_anonymous_to_login(client):
     assert res.headers["location"] == "/auth/login"
 
 
-# With real posts in the database, a LOGGED-IN user's feed renders them — proving the
-# page is wired to the actual Post/Track data (not showing hardcoded content). We seed a
-# throwaway in-memory database (the `db_session` fixture) and point the app at it.
+# With a real post by the viewer, their feed renders it — proving the page is wired to the
+# real feed data (not hardcoded). We seed a throwaway in-memory database and point the app
+# at it.
 def test_feed_shows_real_posts(client, db_session, monkeypatch):
-    # Seed the author and the Track FIRST, then commit — the Post foreign-key-references both, and
-    # the test DB enforces foreign keys, so the parents must exist before the Post.
-    db_session.add(User(id="u_demo", handle="u_demo", display_name="Demo",
-                        created_at=datetime.now(timezone.utc)))
+    # Parents before children — the test DB enforces foreign keys. The post is the viewer's
+    # own so it shows in their feed (which is follow + own).
+    viewer = _seed_viewer(db_session)
     db_session.add(Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino"))
     db_session.commit()
-    db_session.add(Post(
-        user_id="u_demo",
-        track_id="t_redbone",
-        caption="a whole vibe",
-        source=PostSource.MANUAL,
-    ))
+    db_session.add(Post(user_id=viewer.id, track_id="t_redbone", caption="a whole vibe",
+                        source=PostSource.MANUAL))
     db_session.commit()
 
-    # Make the feed page use our seeded in-memory database for this test, and sign in.
     app.dependency_overrides[get_session] = lambda: db_session
     _login(client, monkeypatch)
 
@@ -108,3 +113,68 @@ def test_feed_empty_state(client, db_session, monkeypatch):
     res = client.get("/feed")
     assert res.status_code == 200
     assert "No songs shared yet" in res.text
+
+
+# ---- T41: feed shows live reaction counts + highlights the viewer's own reactions ----
+
+
+def test_feed_shows_reaction_counts_and_marks_own(client, db_session, monkeypatch):
+    # The viewer's own post, plus another user who also reacts to it (parents before children —
+    # the test DB enforces foreign keys, and a Reaction references both a Post and a User).
+    viewer = _seed_viewer(db_session)
+    other = User(handle="other", display_name="Other", created_at=datetime.now(timezone.utc))
+    db_session.add(other)
+    db_session.add(Track(spotify_id="t_song", title="Song One", artist_name="Artist One"))
+    db_session.commit()
+    db_session.refresh(other)
+    post = Post(user_id=viewer.id, track_id="t_song", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+
+    # Two hearts (one is the VIEWER's own) and one fire. Sparkle stays at zero.
+    db_session.add(Reaction(post_id=post.id, user_id=viewer.id, type=ReactionType.HEART))
+    db_session.add(Reaction(post_id=post.id, user_id=other.id, type=ReactionType.HEART))
+    db_session.add(Reaction(post_id=post.id, user_id=other.id, type=ReactionType.FIRE))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+
+    # The reaction bar is wired to this post, with a button per type.
+    assert f'data-post-id="{post.id}"' in body
+    assert 'data-type="HEART"' in body
+    assert 'data-type="FIRE"' in body
+    assert 'data-type="SPARKLE"' in body
+    # Counts render: heart 2, fire 1, sparkle 0 (the count is the span's text).
+    assert ">2</span>" in body  # hearts
+    assert ">1</span>" in body  # fire
+    # The viewer's own heart is highlighted as already tapped.
+    assert "reacted" in body
+
+
+def test_feed_reactions_not_marked_for_other_viewer(client, db_session, monkeypatch):
+    # The viewer's own post with a reaction left by SOMEONE ELSE: the count shows, but nothing
+    # is marked as the viewer's.
+    viewer = _seed_viewer(db_session)
+    other = User(handle="other", display_name="Other", created_at=datetime.now(timezone.utc))
+    db_session.add(other)
+    db_session.add(Track(spotify_id="t_x", title="Track X", artist_name="Artist X"))
+    db_session.commit()
+    db_session.refresh(other)
+    post = Post(user_id=viewer.id, track_id="t_x", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    db_session.add(Reaction(post_id=post.id, user_id=other.id, type=ReactionType.HEART))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)  # signs in as _VIEWER_ID, who left no reactions
+
+    body = client.get("/feed").text
+    # The heart count shows (1), but the viewer hasn't tapped anything.
+    assert 'aria-pressed="true"' not in body
+    assert 'aria-pressed="false"' in body

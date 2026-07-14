@@ -55,8 +55,8 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | UI-1 | Post composer with Spotify catalog search → publish. | T40 | ◻ |
-| UI-2 | Feed reads `/api/feed`; manual + Spotify cards. | T41 | ◻ |
-| UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ◻ |
+| UI-2 | Feed reads `/api/feed`; manual + Spotify cards. | T41 | ✅ |
+| UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ◻ |
 | UI-5 | Follow/unfollow buttons + follower counts. | T43 | ◻ |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44 | ◻ |

@@ -39,6 +39,17 @@ def get_feed(
     user: User = Depends(require_user),   # ensures the caller is logged in; gives us their record
     session: Session = Depends(get_session),
 ):
+    # Thin wrapper: build the feed data and wrap it in the standard { data } envelope. The building
+    # logic lives in build_feed() below so the server-rendered feed PAGE (ADR-0013, in
+    # app/routers/pages.py) can reuse the exact same feed without duplicating any of it.
+    return ok(build_feed(session, user))
+
+
+# Build the feed as a list of plain dicts (camelCase, ready for JSON or an HTML template): posts
+# from everyone `user` follows plus their own, newest-first, each with its track, author, per-type
+# reaction counts, comment count, and which reactions `user` left. Shared by the JSON endpoint
+# above and the feed page — the single source of truth for "what's in the feed".
+def build_feed(session: Session, user: User) -> list[dict]:
     # Whose posts to show: everyone the caller follows, plus the caller themselves (so a brand-new
     # user with no follows still sees their own posts).
     followee_ids = session.exec(
@@ -56,7 +67,7 @@ def get_feed(
         .order_by(Post.created_at.desc())
     ).all()
     if not rows:
-        return ok([])
+        return []
 
     post_ids = [post.id for post, _, _ in rows]
 
@@ -114,4 +125,4 @@ def get_feed(
         )
         # by_alias=True -> emit camelCase field names (reactionCounts, commentCount, ...).
         data.append(out.model_dump(by_alias=True, mode="json"))
-    return ok(data)
+    return data
