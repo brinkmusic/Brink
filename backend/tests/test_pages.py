@@ -42,7 +42,17 @@ from unittest.mock import MagicMock
 
 from app.db import get_session
 from app.main import app
-from app.models import Comment, Follow, Post, PostSource, Reaction, ReactionType, Track, User
+from app.models import (
+    ArtistPost,
+    Comment,
+    Follow,
+    Post,
+    PostSource,
+    Reaction,
+    ReactionType,
+    Track,
+    User,
+)
 from app.security import session as login_session
 from app.security import supabase
 
@@ -276,3 +286,56 @@ def test_profile_missing_handle_is_404(client, db_session, monkeypatch):
     res = client.get("/u/nobody-here")
     assert res.status_code == 404
     assert "couldn't find that profile" in res.text
+
+
+# ---- T51: artist page + upload UI ----
+
+
+def _ensure_artist_table(db_session):
+    # The shared db_session fixture only builds a few tables; the artist page also reads ArtistPost.
+    ArtistPost.__table__.create(db_session.get_bind(), checkfirst=True)
+
+
+def _seed_artist(db_session):
+    # An artist account (is_artist=True) keyed to the login id, so require_user returns them.
+    artist = User(supabase_user_id=_VIEWER_ID, handle="the-artist", display_name="The Artist",
+                  is_artist=True, created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    return artist
+
+
+def test_artist_page_shows_upload_for_artist(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_artist(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/artist").text
+    assert 'class="artist-file"' in body            # the file picker is shown
+    assert "/static/artist-upload.js" in body       # the upload script is loaded
+
+
+def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)  # a normal listener (is_artist defaults to False)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/artist").text
+    assert 'class="artist-file"' not in body        # no upload box for non-artists
+    assert "Artist accounts only" in body
+
+
+def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    artist = _seed_artist(db_session)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url="the-artist/x.jpg",
+                              caption="new EP out now"))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/artist").text
+    assert "new EP out now" in body
