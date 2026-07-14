@@ -19,10 +19,12 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlmodel import Session
+from sqlalchemy import func
+from sqlmodel import Session, select
 
 from app.db import get_session
 from app.deps import AuthError, require_user
+from app.models import Follow, Post, Track, User
 from app.routers.feed import build_feed
 
 logger = logging.getLogger(__name__)
@@ -97,6 +99,7 @@ def _feed_items(session: Session, user) -> list[dict]:
             {
                 "id": it["id"],
                 "author": it["author"]["displayName"],
+                "author_handle": it["author"]["handle"],  # for linking to their profile (T43)
                 "title": it["track"]["title"],
                 "artist": it["track"]["artistName"],
                 "album_art": it["track"]["albumArtUrl"],
@@ -132,6 +135,82 @@ def feed(request: Request, session: Session = Depends(get_session)):
         "feed.html",
         {"page_title": "Feed · Brink", "posts": posts},
     )
+    for key, value in refreshed.raw_headers:
+        if key == b"set-cookie":
+            page.raw_headers.append((key, value))
+    return page
+
+
+# Gather everything a profile page needs: the person, their follower/following counts, whether the
+# viewer already follows them, and their own posts (newest-first). This is the minimal profile that
+# gives the Follow button (T43) a home; the full "Wrapped"-style stats/cluster/compatibility come
+# with T44 (which needs the profile API, T14). Returns None if there's no user with that handle.
+def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
+    person = session.exec(select(User).where(User.handle == handle)).first()
+    if person is None:
+        return None
+
+    # follower_count = people who follow THEM; following_count = people THEY follow.
+    follower_count = session.exec(
+        select(func.count()).select_from(Follow).where(Follow.following_id == person.id)
+    ).one()
+    following_count = session.exec(
+        select(func.count()).select_from(Follow).where(Follow.follower_id == person.id)
+    ).one()
+    # Does the viewer already follow this person? (Follow's PK is (follower_id, following_id).)
+    is_following = session.get(Follow, (viewer_id, person.id)) is not None
+
+    # Their posts, newest-first, joined to each track (simple read-only cards on the profile).
+    rows = session.exec(
+        select(Post, Track)
+        .join(Track, Track.spotify_id == Post.track_id)
+        .where(Post.user_id == person.id)
+        .order_by(Post.created_at.desc())
+    ).all()
+    posts = [
+        {
+            "title": track.title,
+            "artist": track.artist_name,
+            "album_art": track.album_art_url,
+            "caption": post.caption,
+            "when": _ago(post.created_at),
+        }
+        for post, track in rows
+    ]
+
+    return {
+        "id": person.id,
+        "display_name": person.display_name,
+        "handle": person.handle,
+        "avatar_url": person.avatar_url,
+        "follower_count": follower_count,
+        "following_count": following_count,
+        "is_following": is_following,
+        "is_self": person.id == viewer_id,  # hide the Follow button on your own profile
+        "posts": posts,
+    }
+
+
+# A user's profile page: their header, a Follow/Unfollow button + follower counts (T43), and their
+# posts. Login-gated like the rest of the app. `handle` comes from the URL, e.g. /u/andrea-ab12cd.
+@router.get("/u/{handle}", response_class=HTMLResponse)
+def profile(handle: str, request: Request, session: Session = Depends(get_session)):
+    refreshed = Response()
+    try:
+        viewer = require_user(request, session=session, response=refreshed)
+    except AuthError:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    data = _profile_data(session, handle, viewer_id=viewer.id)
+    if data is None:
+        # No such handle — render a friendly 404 page rather than a raw error.
+        page = templates.TemplateResponse(
+            request, "profile_missing.html", {"page_title": "Not found · Brink"}, status_code=404
+        )
+    else:
+        page = templates.TemplateResponse(
+            request, "profile.html", {"page_title": f"{data['display_name']} · Brink", "p": data}
+        )
     for key, value in refreshed.raw_headers:
         if key == b"set-cookie":
             page.raw_headers.append((key, value))

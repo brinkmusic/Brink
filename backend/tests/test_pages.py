@@ -42,7 +42,7 @@ from unittest.mock import MagicMock
 
 from app.db import get_session
 from app.main import app
-from app.models import Comment, Post, PostSource, Reaction, ReactionType, Track, User
+from app.models import Comment, Follow, Post, PostSource, Reaction, ReactionType, Track, User
 from app.security import session as login_session
 from app.security import supabase
 
@@ -218,3 +218,61 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert 'class="composer' in body               # the composer block is present
     assert "composerSearch(this)" in body          # the search box is wired
     assert "/static/composer.js" in body           # the script is loaded
+
+
+# ---- T43: profile page + follow button ----
+
+
+def test_profile_page_shows_follow_button(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    target = User(handle="artist-x", display_name="Artist X",
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.commit()
+    db_session.refresh(target)
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/artist-x").text
+    assert "Artist X" in body
+    assert "followers" in body
+    assert f'data-user-id="{target.id}"' in body   # follow button wired to this user
+    assert "toggleFollow(this)" in body
+
+
+def test_profile_shows_following_state_and_counts(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    target = User(handle="followed-one", display_name="Followed",
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.commit()
+    db_session.refresh(target)
+    # The viewer already follows the target -> button reads "Following"; target has 1 follower.
+    db_session.add(Follow(follower_id=viewer.id, following_id=target.id))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/followed-one").text
+    assert 'data-following="true"' in body
+    assert "Following" in body
+    assert 'class="follower-count">1<' in body
+
+
+def test_own_profile_has_no_follow_button(client, db_session, monkeypatch):
+    _seed_viewer(db_session)  # the viewer's handle is "viewer"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+    body = client.get("/u/viewer").text
+    assert "toggleFollow(this)" not in body  # you can't follow yourself
+
+
+def test_profile_missing_handle_is_404(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+    res = client.get("/u/nobody-here")
+    assert res.status_code == 404
+    assert "couldn't find that profile" in res.text
