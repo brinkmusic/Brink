@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Low
 category: Feature
@@ -36,7 +36,7 @@ A `GET /api/me/now-playing` endpoint that returns the authenticated user's curre
 - **Business rule:** handle a user with no linked Spotify (handle account) → graceful empty state, not 500.
 
 ## Current State (on `develop`)
-- `backend/app/spotify.py` holds the server-side token refresh (`get_valid_access_token`, built on T06's encrypted `SpotifyToken` storage). No `get_currently_playing` yet.
+- `backend/app/spotify.py` holds the server-side token refresh (`get_valid_access_token`, built in **T22** on T06's encrypted `SpotifyToken` storage). No `get_currently_playing` yet.
 - No now-playing router yet.
 - `require_user` + encrypted `SpotifyToken` storage present.
 
@@ -48,10 +48,23 @@ A `GET /api/me/now-playing` endpoint that returns the authenticated user's curre
 | `backend/tests/test_now_playing.py` | CREATE | tests |
 
 ## Testing Checklist
-- [ ] no session → 401
-- [ ] Spotify 200 (a track) → correct normalized shape
-- [ ] Spotify 204 (nothing playing) → `{ data: null }`, 200
-- [ ] handle user with no Spotify token → graceful empty state, not 500
+- [x] no session → 401
+- [x] Spotify 200 (a track) → correct normalized shape
+- [x] Spotify 204 (nothing playing) → `{ data: null }`, 200
+- [x] handle user with no Spotify token → graceful empty state, not 500
+
+## Implementation notes (as built)
+- `backend/app/spotify.py` — `get_currently_playing(session, user_id)` uses **T22**'s
+  `get_valid_access_token`, calls Spotify's currently-playing endpoint, and normalizes a playing
+  track to `{is_playing, track{spotify_id,title,artist_name,album_art_url,popularity}}`. Returns
+  `None` for 204 (nothing playing), a null `item` (ad/podcast), non-200, network error, or an
+  unlinked/refresh-failed user — so the caller never 500s.
+- `backend/app/routers/now_playing.py` — `GET /api/me/now-playing`, login-gated, returns the
+  normalized track via `NowPlayingOut` (reuses `TrackOut`) or `{ data: null }`.
+- Tests in `test_now_playing.py` (router + helper); full suite green.
+- **Requirement traceability:** T20 delivers the **backend half** of **SP-1** and **UI-10**, and
+  contributes to **SP-4** — but each also needs the T44 "now playing" surface (and SP-4 also T21),
+  so none is flipped to ✅ here. They flip when their UI/other tickets land.
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable

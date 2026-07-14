@@ -25,7 +25,18 @@ from sqlmodel import Session, SQLModel, create_engine
 from app.db import get_session
 from app.deps import require_user
 from app.main import app
-from app.models import Post, RateLimitHit, Track, User
+from app.models import (
+    Comment,
+    Follow,
+    Play,
+    Post,
+    RateLimitHit,
+    Reaction,
+    SpotifyRecentlyPlayedRaw,
+    SpotifyToken,
+    Track,
+    User,
+)
 
 
 @pytest.fixture
@@ -44,7 +55,18 @@ def db_session():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    tables = [m.__table__ for m in (User, Track, Post, RateLimitHit)]
+    # T39 (ADR-0009): some models now live in Postgres schemas (silver.Track, silver.Play, ...).
+    # SQLite has no schemas, so we tell SQLAlchemy to translate every medallion schema to "no
+    # schema" (None) for tests — the schema-qualified tables collapse into the one in-memory DB,
+    # and cross-schema foreign keys (e.g. Post -> silver.Track) resolve within it. Real Postgres
+    # ignores this map and uses the actual schemas.
+    engine = engine.execution_options(
+        schema_translate_map={"bronze": None, "silver": None, "gold": None}
+    )
+    tables = [m.__table__ for m in (
+        User, Track, Play, Post, Reaction, Comment, Follow, SpotifyToken,
+        SpotifyRecentlyPlayedRaw, RateLimitHit,
+    )]
     SQLModel.metadata.create_all(engine, tables=tables)
     with Session(engine) as session:
         yield session

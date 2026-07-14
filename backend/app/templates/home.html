@@ -1,0 +1,94 @@
+{#
+  WHAT THIS FILE IS
+  Brink's public landing page — what a visitor sees before signing in. Its job is
+  to explain, in a few seconds, what Brink is (a social app built on your real
+  listening) and get them to sign in with Spotify. Written for listeners, not
+  engineers: no mention of how it's built.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stack">
+
+  {# ---- Hero: the pitch, over the mixer photo ---- #}
+  <div class="hero">
+    <div class="hero-content stack">
+      <span class="pill">Music, but social 🎶</span>
+      <h1 class="hero-title">Your listening, made social.</h1>
+      <p class="hero-sub">
+        The tracks you keep coming back to, the ones on repeat at 2am, they say
+        something about you. Brink turns your real play history into a feed your
+        friends can feel, react to, and reply to.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-spotify" href="/auth/login">Continue with Spotify 🎧</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+    </div>
+  </div>
+
+  {# ---- What you get ---- #}
+  <div id="features" class="features">
+    <div class="feature">
+      <h3>A feed of what you actually play</h3>
+      <p>
+        No manual posting. Your real listening shows up live, and friends react
+        and reply to the songs you are truly into.
+      </p>
+    </div>
+    <div class="feature">
+      <h3>See who you vibe with</h3>
+      <p>
+        A compatibility score tells you and a friend how close your taste really
+        runs, from the artists you share to the ones only you love.
+      </p>
+    </div>
+    <div class="feature">
+      <h3>Find your people</h3>
+      <p>
+        Land in a taste community of listeners who feel music the way you do, and
+        meet the ones about to change your rotation.
+      </p>
+    </div>
+    <div class="feature">
+      <h3>Straight from the artists</h3>
+      <p>
+        The artists you stream get a place to speak to the fans who actually
+        listen. Closer than a follow, quieter than the noise.
+      </p>
+    </div>
+  </div>
+
+  {# ---- How it works (a real 3-step sequence, so the numbers mean something) ---- #}
+  <div id="how" class="steps">
+    <h2 class="section-title">How it works</h2>
+    <ol class="step-list">
+      <li>
+        <span class="step-num">1</span>
+        <div>
+          <h3>Connect Spotify</h3>
+          <p>Sign in once. Brink reads what you already play, so there is nothing to post by hand.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <div>
+          <h3>Your taste takes shape</h3>
+          <p>Top tracks, artists, genres and a listening streak, quietly updating as you listen.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <div>
+          <h3>Meet your people</h3>
+          <p>See your compatibility with friends and settle into a community that gets your taste.</p>
+        </div>
+      </li>
+    </ol>
+    <div class="hero-actions">
+      <a class="btn btn-spotify" href="/auth/login">Start with Spotify 🎧</a>
+    </div>
+  </div>
+
+</section>
+{% endblock %}

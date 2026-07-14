@@ -15,6 +15,13 @@ Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
 > [ADR-0010](docs/decisions/adr/0010-fastapi-render-backend.md) for how the backend moved here from
 > an earlier TypeScript/Vercel/Prisma stack (removed in T08). All backend work is in `backend/`.
 
+> **⚠ Frontend transitioning ([ADR-0013](docs/decisions/adr/0013-python-frontend.md)).** The
+> frontend is moving from the React/Vite SPA to **HTML pages served by the FastAPI backend**
+> (Jinja2 templates + HTMX, in `backend/app/templates/` and `backend/app/routers/pages.py`), so the
+> whole app is one Python codebase we can all read and defend. The React/Vite `apps/web/` SPA stays
+> as a fallback until the Python pages reach parity, then it is retired. Server-side Spotify login
+> for the new frontend is tracked in **T09**.
+
 **Source of truth — read these before planning any work:**
 - `docs/plans/requirements.md` — requirement catalog (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`) + requirement→ticket traceability. Data model: `backend/app/models.py` (SQLModel). Decisions: `docs/decisions/`.
 - `docs/plans/tickets/` — one file per ticket (`backlog/`, `completed/`), derived from the ADRs in `docs/decisions/`. Start at `docs/plans/tickets/README.md` for the dependency waves and reading guide.
@@ -23,21 +30,25 @@ Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
 
 - `backend/` — **the API: FastAPI app (Python, `uv`-managed)**. App code in `backend/app/`, tests
   in `backend/tests/`, DB migrations in `backend/alembic/`.
-- `apps/web/` — React/Vite SPA frontend (TypeScript).
+- `backend/app/templates/` + `backend/app/static/` — the **Python frontend**: HTML pages
+  (Jinja2 templates; HTMX to come) served by FastAPI, with routes in `backend/app/routers/pages.py` (ADR-0013).
+- `apps/web/` — React/Vite SPA frontend (TypeScript). **Legacy**: being replaced by the Jinja/HTMX
+  pages above per [ADR-0013](docs/decisions/adr/0013-python-frontend.md); kept as a fallback until parity.
 - `analytics/` — Python pipeline (`uv`-managed). Created in T30.
 - `docs/plans/` — spec + tickets (source of truth above).
 
 ## Commands
 
-Local dev needs **two terminals**. Local reads the root `.env` (the `brink-dev` Supabase project),
-so it never touches production.
+Local dev reads the root `.env` (the `brink-dev` Supabase project), so it never touches production.
 
 ```
-# Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
-cd apps/web && npm run dev
-
-# Terminal 2 — API on :3001 (Vite proxies /api -> :3001)
+# API + Python frontend — the FastAPI app serves BOTH the JSON API and the HTML pages
+# (ADR-0013). Visit http://127.0.0.1:3001/ for the pages, /api/* for the API.
 cd backend && uv run uvicorn app.main:app --reload --port 3001
+
+# Legacy React/Vite SPA — only until it's retired per ADR-0013. Separate terminal,
+# Vite on 127.0.0.1:5173, proxies /api -> :3001.
+cd apps/web && npm run dev
 ```
 
 - **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest` (after T30 — `analytics/` does not exist yet).
@@ -112,12 +123,54 @@ These are expectations, not automated guarantees — they set how we work.
   `Superseded by [ADR-NNNN](NNNN-...md)`. This is *why* the log doesn't go stale: history is
   preserved, the current decision is always the latest non-superseded ADR.
 
+## Developer skills (Claude Code)
+
+Three committed skills (in `.claude/skills/`) bookend a unit of work. Invoke one by typing
+`/<name>` in Claude Code, or just describe the situation. They're **guided checklists, not
+auto-runners** — they do the steps and flag problems, but stop for your judgement and never bypass
+review or push to `develop`/`main`.
+
+The work cycle:
+
+> **`get-me-started`** (begin session) → work a ticket → **`close-out`** (finish the *ticket*) →
+> repeat → **`close-session`** (finish the *session*).
+
+- **`get-me-started` — start of a session.** Pulls in what changed, lists open PRs, audits whether
+  each kept its docs in sync with its code, and briefs you on where things stand + what's next. It
+  **flags, doesn't fix.** Use it whenever you sit down or feel out of the loop ("catch me up",
+  "what's ready to review", "where am I").
+- **`close-out` — finishing a *ticket* (pre-merge).** The per-ticket bookkeeping: move the ticket
+  `backlog → completed`, flip its `status` + the `requirements.md` rows it satisfied, sync the
+  Status line below, and refresh the tickets README. Since **T93 this runs *before* merge** — the
+  edits are committed onto your feature branch so they ride the **same PR** as the code (no separate
+  follow-up PR). Run it as the **last step before you open/finalize a feature PR**, once the code is
+  done and tests are green. Deferring to a follow-up PR is still allowed but only as a **stated**
+  exception (e.g. a very large PR). Say "close out T<NN>".
+- **`close-session` — end of a *session* (final validation).** The "am I safe to stop?" gate and
+  bookend to `get-me-started`: runs the full backend suite + frontend build/lint, confirms the tree
+  is clean and pushed and open PRs are green, prunes already-merged branches, and writes the
+  handoff. Use it when wrapping up ("sign off", "I'm done", "final validation").
+
+**Key distinction:** `close-out` is per **ticket** (its docs, folded into the feature PR);
+`close-session` is per **work session** (validate + clean up + handoff). You may run `close-out`
+several times in a session, `close-session` once at the end.
+
 ## Database migrations
 
 Schema changes use **SQLModel + Alembic**: edit `backend/app/models.py`, then
 `cd backend && uv run alembic revision --autogenerate -m "..."` and `uv run alembic upgrade head`.
 Alembic was baselined against the live schema in T05 (stamped, not recreated), so `upgrade head`
 is a no-op on the existing DB. `alembic check` reports any drift between the models and the DB.
+
+**Medallion schemas (T39, ADR-0009).** Tables live in Postgres schemas: `silver` (`Track`, `Play`),
+`gold` (`Cluster`, `ModelMetrics`, `ModelArtifact`), `bronze` (raw `*_raw` landing tables); the
+social/auth tables stay in the default `public` schema. Two consequences: (1) **autogenerate runs
+with schema reflection on** — `env.py` sets `include_schemas=True` (+ an `include_name` allow-list
+so only our schemas are reflected, not Supabase's `auth`/`storage`, and a schema-qualified
+`include_object` check), so `--autogenerate` sees the medallion tables correctly (done in **T37**;
+verified with `alembic check`). (2) SQLite tests map the schemas to none via a
+`schema_translate_map` in `tests/conftest.py`. A migration that **moves** a table between schemas
+must use `ALTER TABLE ... SET SCHEMA` (preserves rows) — never autogenerate's drop+recreate.
 
 ## Environment
 
@@ -141,7 +194,9 @@ is a no-op on the existing DB. `alembic check` reports any drift between the mod
 The owner of an area is the default reviewer for PRs touching it (every ticket also has an
 `owner` in its frontmatter). **Auth and crypto changes** — `backend/app/deps.py`,
 `backend/app/security/crypto.py`, `backend/app/security/supabase.py`, anything touching tokens or
-`TOKEN_ENC_KEY` — need a deliberate second review; don't self-merge them.
+`TOKEN_ENC_KEY` — are the highest-risk area, so a second review is **encouraged** where a reviewer
+is available. It is **not required**, though: the area owner may self-merge them (call out in the
+PR that it went in without a second review).
 
 ## Watch-outs
 
@@ -153,13 +208,85 @@ The owner of an area is the default reviewer for PRs touching it (every ticket a
   backend removed, error envelope hardened, auth race fixed, CI hygiene done, review-remediation
   test/polish landed. **T10 (posts API) done** — `POST /api/posts` + `GET /api/posts?userId=`,
   track upsert, and the reusable Postgres-backed rate-limit helper (ADR-0011) + camelCase response
-  DTOs (ADR-0012) are the first social-API precedents. The React SPA is on
+  DTOs (ADR-0012) are the first social-API precedents. **T11 (reactions) done** —
+  `POST`/`DELETE /api/posts/{id}/reactions` (idempotent add / own-only remove) returning fresh
+  per-type counts (`ReactionCountsOut`), reusing the T10 rate-limit + DTO patterns (satisfies
+  BE-5). **T12 (comments) done** — `POST`/`GET /api/posts/{id}/comments` (both login-gated;
+  create is rate-limited + trims/length-validates `body`, list returns newest-first with nested
+  author DTO), satisfies BE-6. The React SPA is on
   **Vercel** (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`,
   `/api/health` → `db: true`), Spotify login works end-to-end. Repo: **`brinkmusic/Brink`**
   (public). Remaining remediation: T75, T76 (see
-  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **Next feature work: T11 (reactions).**
+  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **T90–T93 (developer tooling) done** —
+  the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
+  (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
+  pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
+  implements the ticket, so no separate follow-up PR (`close-session` owns the end-of-session
+  validate + branch-cleanup + handoff). Plus the **`docs-sync` CI gate**
+  (`.github/workflows/docs-sync.yml`) that fails any PR changing source without touching docs
+  (`no-docs` label = escape hatch). `develop` and `main` are now branch-protected: PR required, up
+  to date, checks `api/web/secrets/docs-sync` green, admins included. **T13 (follow + feed) done**
+  — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
+  `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
+  counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
+  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **T22 (Spotify token refresh) done** —
+  `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
+  (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
+  unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against
+  T02). This was a missing prerequisite discovered while starting T20 — both **T20 (now-playing)**
+  and **T21 (snapshot)** build on it and are now genuinely unblocked. **T20 (now-playing) done** —
+  `GET /api/me/now-playing` (login-gated) + `spotify.get_currently_playing`, returning the
+  normalized currently-playing track or `{ data: null }` for the empty/degraded cases (nothing
+  playing, no linked Spotify, Spotify error) — the backend half of SP-1/UI-10 (the surface is T44).
+  **T39 (analytics contract + medallion schemas) done** — added `ModelArtifact` + bronze `*_raw`
+  landing tables, moved `Track`/`Play` → `silver` and `Cluster`/`ModelMetrics` → `gold`, dropped
+  the unused `UserStats`/`TasteVector`/`Compatibility` + `User.clusterId` (ADR-0003/0009). The
+  migration is **hand-written and applied manually by Andrea on `brink-dev`** (SET SCHEMA preserves
+  rows). This unblocks **T21** (bronze/silver now exist) and the analytics spine (033/034/036).
+  **T21 (Spotify play snapshot) done** — `POST /api/snapshot` (cron-authed by `X-Cron-Secret`)
+  lands each Spotify-linked user's recently-played into `bronze.spotify_recently_played_raw`, then
+  conforms to silver (`upsert_track` + `Play` deduped on `userId+playedAt`); one bounded 429
+  backoff; `.github/workflows/snapshot.yml` triggers it ~every 2h (satisfies SP-2/SP-4/SP-5/
+  INFRA-3). **Deploy step for Andrea:** set `CRON_SECRET` on Render + add `SNAPSHOT_URL`/
+  `CRON_SECRET` GitHub repo secrets, or the cron 401s. **T09 (server-side Spotify login) done** —
+  server-side OAuth for the Jinja frontend: `GET /auth/login` → `/auth/callback` → `/auth/logout`
+  (PKCE via Supabase; encrypted `brink_oauth` handshake cookie carrying the verifier + CSRF state;
+  encrypted `brink_session` cookie holding the Supabase session). `require_user` now also reads the
+  session cookie with **refresh-on-expiry** (Bearer path unchanged); the Spotify tokens are captured
+  server-side in the callback. New `app/security/session.py` owns the session cookie (reuse it for
+  any future gated page). Login buttons wired and `/feed` gated (anon → login), reversing PR #60's
+  temporary public feed. Re-implements the **AUTH-1/2/4** login surface server-side (identity/crypto
+  from T02/T06 reused). **Deploy step for Andrea:** add the deployed `/auth/callback` URL to the
+  Supabase Auth Redirect URLs *and* the Spotify app redirect allow-list, then do one real login to
+  confirm the server exchange returns the Spotify refresh token (the only path not covered by tests).
+  **Policy change (owner):** a second review on auth/crypto changes is now *encouraged, not
+  required* — the owner may self-merge. **T37 (Alembic schema reflection) done** — `env.py` now sets
+  `include_schemas=True` + an `include_name` schema allow-list + a schema-qualified `include_object`
+  check, so `--autogenerate` sees the T39 medallion schemas and ignores Supabase's own schemas
+  (verified with `alembic check`: no drift); this clears the follow-up T39 flagged. **First
+  `develop → main` release (#79) shipped** — Render (which builds `main`) was 64 commits stale, so
+  T09 login, the Jinja pages, and the snapshot endpoint were 404 in production and the snapshot cron
+  couldn't fire (GitHub runs `schedule` only from the default branch). Post-release, `/` (200),
+  `/auth/login` (307), and gated `/feed` (303) are live. **T23 (snapshot-500 remediation) done** —
+  the release surfaced the snapshot cron 500-ing; two fixes: (1) the real cause — `_ingest_user`
+  inserted each `Play` before the `Track` it FK-references, so on Postgres a batch of new tracks hit
+  a `ForeignKeyViolation`; now it `session.flush()`es each upserted Track first (the SQLite suite
+  missed this because SQLite doesn't enforce FKs — a new `fk_session` test fixture turns them on).
+  (2) hardening — `get_valid_access_token` decrypted stored tokens unguarded, so a `TOKEN_ENC_KEY`
+  mismatch (`InvalidTag`) would crash the whole run; it now degrades an unreadable token to `None`
+  (skip that user) via `_safe_decrypt`. Verified end-to-end against `brink-dev` (50 plays ingested).
+  **Follow-up:** the same insert-ordering gap likely affects the T10 posts endpoint for a brand-new
+  track (upsert_track + Post in one commit) — worth a check. **Next backend feature: T50 (artist
+  storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still
+  gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
+
+> **⚠ In transition (ADR-0013).** The topology below describes the React/Vite SPA on Vercel, which
+> is still the live frontend. As the Jinja/HTMX pages served by FastAPI reach parity, the frontend
+> is served by **Render** (the same app as the API) and the separate Vercel SPA is retired. Until
+> then both exist and this section still applies. When the new frontend goes live on Render, its URL
+> (not just the Vercel URL) must be in the Supabase/Spotify redirect allow-lists (tracked in T09).
 
 - **Frontend:** Vercel serves the React SPA at `brink-theta.vercel.app` (project root `apps/web`),
   deploying from `main`. Supabase Auth **URL config** must list the Vercel URL in Site URL +

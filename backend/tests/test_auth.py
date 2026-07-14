@@ -15,14 +15,20 @@ from app.db import get_session
 from app.deps import AuthError, require_user
 from app.main import app
 from app.models import SpotifyToken, User
+from app.security import session as login_session
 
 
-def _request(auth_header=None):
-    # A stand-in for a real web request, carrying just the headers require_user reads.
+def _request(auth_header=None, cookies=None):
+    # A stand-in for a real web request, carrying the headers and cookies require_user reads.
+    # `url` is needed only by the cookie-refresh path (to decide the Secure flag).
     headers = {}
     if auth_header is not None:
         headers["authorization"] = auth_header
-    return SimpleNamespace(headers=headers)
+    return SimpleNamespace(
+        headers=headers,
+        cookies=cookies or {},
+        url=SimpleNamespace(scheme="https"),
+    )
 
 
 def _su(**overrides):
@@ -67,6 +73,71 @@ def test_invalid_token_raises_401(monkeypatch):
     monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: None)
     with pytest.raises(AuthError) as exc:
         require_user(_request("Bearer bad"), session=MagicMock())
+    assert exc.value.status == 401
+
+
+# --- session-cookie auth for the server-rendered pages (T09) ---------------------
+
+# No Bearer header AND no session cookie -> 401 (not a crash).
+def test_no_bearer_and_no_cookie_raises_401():
+    with pytest.raises(AuthError) as exc:
+        require_user(_request(None), session=MagicMock())
+    assert exc.value.status == 401
+
+
+# A valid session cookie (fresh access token) authenticates the page request — no Bearer.
+def test_valid_session_cookie_authenticates(monkeypatch):
+    su = _su(id="abcdef12-3456-7890-abcd-ef1234567890")
+    monkeypatch.setattr(login_session, "decode", lambda raw: {"access_token": "AT", "refresh_token": "RT"})
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: su if token == "AT" else None)
+
+    user = require_user(
+        _request(None, cookies={login_session.SESSION_COOKIE: "x"}),
+        session=_new_user_session(),
+    )
+
+    assert user.supabase_user_id == su.id
+
+
+# An expired access token triggers a refresh, and the refreshed cookie is re-set.
+def test_expired_session_cookie_is_refreshed(monkeypatch):
+    su = _su(id="abcdef12-3456-7890-abcd-ef1234567890")
+    monkeypatch.setattr(login_session, "decode", lambda raw: {"access_token": "OLD", "refresh_token": "RT"})
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: None)  # OLD is expired
+    new_session = SimpleNamespace(user=su, access_token="NEW", refresh_token="RT2", expires_at=1)
+    monkeypatch.setattr(deps.supabase, "refresh_session", lambda rt: new_session if rt == "RT" else None)
+    reset = {}
+    monkeypatch.setattr(
+        login_session, "set_cookie",
+        lambda resp, access, refresh, expires_at, secure: reset.update(access=access, refresh=refresh),
+    )
+
+    user = require_user(
+        _request(None, cookies={login_session.SESSION_COOKIE: "x"}),
+        session=_new_user_session(),
+        response=SimpleNamespace(),
+    )
+
+    assert user.supabase_user_id == su.id
+    assert reset == {"access": "NEW", "refresh": "RT2"}  # cookie re-set with the fresh tokens
+
+
+# A refresh that Supabase rejects -> 401 (the page will redirect to login).
+def test_expired_cookie_failed_refresh_raises_401(monkeypatch):
+    monkeypatch.setattr(login_session, "decode", lambda raw: {"access_token": "OLD", "refresh_token": "RT"})
+    monkeypatch.setattr(deps.supabase, "get_user_from_token", lambda token: None)
+
+    def boom(rt):
+        raise RuntimeError("refresh token revoked")
+
+    monkeypatch.setattr(deps.supabase, "refresh_session", boom)
+
+    with pytest.raises(AuthError) as exc:
+        require_user(
+            _request(None, cookies={login_session.SESSION_COOKIE: "x"}),
+            session=MagicMock(),
+            response=SimpleNamespace(),
+        )
     assert exc.value.status == 401
 
 

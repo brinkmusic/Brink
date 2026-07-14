@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -53,12 +53,32 @@ The feed is the app's home surface, and it must be driven by a real follow graph
 | `backend/tests/test_feed.py` | CREATE | feed query tests |
 
 ## Testing Checklist
-- [ ] follow without a session → 401
-- [ ] following yourself → 400
-- [ ] following unknown user → 404
-- [ ] follow then `GET /api/feed` includes the followee's posts; unfollow removes them
-- [ ] feed posts carry correct per-type reaction counts, comment count, and viewer reaction flags
-- [ ] duplicate follow is a no-op (composite PK)
+- [x] follow without a session → 401
+- [x] following yourself → 400
+- [x] following unknown user → 404
+- [x] follow then `GET /api/feed` includes the followee's posts; unfollow removes them
+- [x] feed posts carry correct per-type reaction counts, comment count, and viewer reaction flags
+- [x] duplicate follow is a no-op (composite PK)
+
+## Implementation notes (as built)
+- **Routers:** `backend/app/routers/follow.py` (`POST`/`DELETE /api/follow/{userId}`, idempotent via
+  the `Follow` composite PK, own-only unfollow, `follow` rate-limit action) and
+  `backend/app/routers/feed.py` (`GET /api/feed`). DTOs `FollowStateOut` + `FeedPostOut` added to
+  `schemas.py`; both routers registered in `main.py`. Tests: `test_follow.py`, `test_feed.py`
+  (conftest's in-memory DB now includes the `Follow` table).
+- **No N+1:** the feed runs a fixed 4 queries regardless of post count — posts (joined to track +
+  author), then grouped reaction counts, comment counts, and the viewer's own reactions.
+- **Response shapes:** `reactionCounts` and `viewerReactions` always carry every reaction type
+  (zeros / `false` included) for a stable frontend shape, mirroring T11's `ReactionCountsOut`.
+- **Scope note — author added (agreed extension):** the feed post includes a nested `author`
+  (`displayName`/`handle`/`avatarUrl`, reusing T12's `AuthorOut`) beyond the fields this ticket
+  originally listed, so the T41 feed UI can show who posted without an N+1 author lookup. Approved
+  during implementation.
+- **Deliberately deferred:** feed **pagination** (the ticket's "if any" — not built; follow-up if
+  the feed grows) and no-follow **suggestions** (out of scope — new users see only their own posts).
+- **Close-out** (move backlog→completed, flip **BE-4**/**BE-7** in requirements.md, update the
+  CLAUDE.md status line + tickets README) is folded into **this PR** (pre-merge close-out, per T93)
+  rather than a separate follow-up.
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable

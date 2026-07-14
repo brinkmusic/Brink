@@ -1,10 +1,10 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: High
 category: Feature
 tags: [spotify, snapshots, scheduling, github-actions]
-blocked_by: [010]
+blocked_by: [010, 039]
 blocks: []
 parent_ticket: null
 owner: Andrea
@@ -40,7 +40,7 @@ The original T21 added a `crons` entry to `vercel.json`. **ADR-0006 supersedes t
 - **Integrity:** the unique constraint on `(userId, playedAt)` in `backend/app/models.py` makes duplicate plays structurally impossible even if the job double-runs.
 
 ## Current State (on `develop`)
-- Present after the auth port (T06): `backend/app/spotify.py` (server-side token refresh, `get_valid_access_token`), `backend/app/deps.py`, encrypted `SpotifyToken` storage.
+- Present after **T22**: `backend/app/spotify.py` (server-side token refresh, `get_valid_access_token`); plus `backend/app/deps.py` and encrypted `SpotifyToken` storage (T06). (The refresh helper was built in T22, not T06 — earlier notes here misattributed it.)
 - `Play` and `Track` already modeled in `backend/app/models.py`.
 - No snapshot router (`backend/app/routers/snapshot.py`) and no `.github/workflows/snapshot.yml` yet.
 - `upsert_track` is introduced by T10 (hence `blocked_by: [010]`).
@@ -54,11 +54,27 @@ The original T21 added a `crons` entry to `vercel.json`. **ADR-0006 supersedes t
 | `backend/tests/test_snapshot.py` | CREATE | tests |
 
 ## Testing Checklist
-- [ ] mock recently-played → inserts new plays, skips duplicates (dedup on userId+playedAt)
-- [ ] 429 from Spotify → backoff path, no crash
-- [ ] user without a linked Spotify token is skipped
-- [ ] request without `CRON_SECRET` → 401
-- [ ] workflow file valid; schedules ~2h + `workflow_dispatch`
+- [x] mock recently-played → inserts new plays, skips duplicates (dedup on userId+playedAt)
+- [x] 429 from Spotify → backoff path, no crash
+- [x] user without a linked Spotify token is skipped
+- [x] request without `CRON_SECRET` → 401
+- [x] workflow file valid; schedules ~2h + `workflow_dispatch`
+
+## Implementation notes (as built)
+- `backend/app/routers/snapshot.py` — `POST /api/snapshot`, authed by the `X-Cron-Secret` header
+  (fails closed with 401 if the header is wrong or `CRON_SECRET` isn't configured). Iterates
+  Spotify-linked users (join on `SpotifyToken`), lands the raw payload into
+  `bronze.spotify_recently_played_raw`, then conforms to silver: `upsert_track` + insert `Play`
+  deduped on `(userId, playedAt)`; commits per user. Returns
+  `{usersProcessed, usersSkipped, playsInserted}`.
+- `backend/app/spotify.py` — `get_recently_played(session, user_id)` (uses `get_valid_access_token`);
+  one bounded 429 backoff+retry via a patchable `_sleep`; returns `None` (skip) on no-token/error.
+- `.github/workflows/snapshot.yml` — ~2h cron + `workflow_dispatch`; `curl -f` POSTs the endpoint
+  with `X-Cron-Secret`. **Requires two GitHub repo secrets: `SNAPSHOT_URL` + `CRON_SECRET`**, and a
+  matching `CRON_SECRET` env var on the Render backend — a manual deploy step (Andrea).
+- Satisfies **SP-2, SP-4, SP-5, INFRA-3**. Tests in `test_snapshot.py`; full suite 110 passed.
+- Bronze `payload` column is `JSONB` in Postgres, `JSON` under SQLite (`.with_variant`) so the
+  in-memory test DB can build the table.
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable

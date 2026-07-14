@@ -47,6 +47,7 @@ from typing import Any, Optional
 
 from cuid2 import Cuid
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -165,11 +166,8 @@ class User(SQLModel, table=True):
     # When the account was created. The database fills this in with the current
     # time automatically (server_default CURRENT_TIMESTAMP).
     created_at: datetime = _created_at()
-    # Which taste "cluster" this user was grouped into by the analytics job.
-    # ondelete SET NULL: if a cluster is deleted, keep the user but clear this link.
-    cluster_id: Optional[str] = Field(
-        default=None, sa_column=_fk("clusterId", "Cluster.id", ondelete="SET NULL", nullable=True)
-    )
+    # NOTE (T39): the old `cluster_id` link was dropped — a user's taste cluster is now
+    # computed on read (ADR-0003), not stored as a column here.
 
 
 # The Spotify access keys for one user, so the backend can talk to Spotify on
@@ -192,6 +190,8 @@ class SpotifyToken(SQLModel, table=True):
 # they're optional because we don't always have them.
 class Track(SQLModel, table=True):
     __tablename__ = "Track"
+    # T39 (ADR-0009): Track is "silver" (conformed) data — it lives in the `silver` schema.
+    __table_args__ = {"schema": "silver"}
 
     spotify_id: str = Field(sa_column=Column("spotifyId", Text, primary_key=True))
     title: str = Field(sa_column=Column("title", Text, nullable=False))
@@ -228,12 +228,16 @@ class Play(SQLModel, table=True):
         Index("Play_userId_playedAt_key", "userId", "playedAt", unique=True),
         # A plain (non-unique) index just makes "find all plays for this user" fast.
         Index("Play_userId_idx", "userId"),
+        # T39 (ADR-0009): Play is "silver" (conformed) data — it lives in the `silver` schema.
+        {"schema": "silver"},
     )
 
     id: str = _pk_cuid()
+    # userId still links to User in the default (public) schema — a cross-schema link, which
+    # Postgres supports. Track now lives in `silver`, so its foreign key target is schema-qualified.
     user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE"))
     # ondelete RESTRICT: you can't delete a Track while plays still point to it.
-    track_id: str = Field(sa_column=_fk("trackId", "Track.spotifyId", ondelete="RESTRICT"))
+    track_id: str = Field(sa_column=_fk("trackId", "silver.Track.spotifyId", ondelete="RESTRICT"))
     played_at: datetime = Field(sa_column=Column("playedAt", DateTime, nullable=False))
 
 
@@ -248,7 +252,8 @@ class Post(SQLModel, table=True):
 
     id: str = _pk_cuid()
     user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE"))
-    track_id: str = Field(sa_column=_fk("trackId", "Track.spotifyId", ondelete="RESTRICT"))
+    # Track now lives in the `silver` schema (T39), so its foreign key target is schema-qualified.
+    track_id: str = Field(sa_column=_fk("trackId", "silver.Track.spotifyId", ondelete="RESTRICT"))
     caption: Optional[str] = Field(default=None, sa_column=Column("caption", Text, nullable=True))
     # Must be one of the PostSource values (MANUAL or SPOTIFY) — see the enum above.
     source: PostSource = Field(
@@ -340,40 +345,22 @@ class RateLimitHit(SQLModel, table=True):
 
 # ---------------------------------------------------------------------------
 # The tables below are RESULTS written by the Python analytics job (not by users).
-# JSONB columns hold flexible structured data (lists/objects), like a mini
-# document inside one cell — used where the shape varies (e.g. a list of top
-# tracks). One row per user for the per-user stats tables.
+# They live in the `gold` schema (T39 / ADR-0009): the curated outputs the app reads.
+# JSONB columns hold flexible structured data (lists/objects), like a mini document
+# inside one cell — used where the shape varies (e.g. a cluster centroid vector).
+#
+# NOTE (T39): `UserStats`, `TasteVector`, and `Compatibility` USED to live here but were
+# dropped — those per-user numbers (top tracks, taste vector, compatibility, cluster
+# assignment) are now computed ON READ from the stored model artifacts (ADR-0003), so
+# there's no per-user results table to keep in sync.
 # ---------------------------------------------------------------------------
-
-
-# Pre-computed stats shown on a user's profile (their top tracks, streak, etc.).
-class UserStats(SQLModel, table=True):
-    __tablename__ = "UserStats"
-
-    user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE", primary_key=True))
-    top_tracks: Any = Field(sa_column=Column("topTracks", JSONB, nullable=False))
-    top_artists: Any = Field(sa_column=Column("topArtists", JSONB, nullable=False))
-    top_genres: Any = Field(sa_column=Column("topGenres", JSONB, nullable=False))
-    streak_days: int = Field(sa_column=Column("streakDays", Integer, nullable=False))
-    total_plays_30d: int = Field(sa_column=Column("totalPlays30d", Integer, nullable=False))
-    computed_at: datetime = Field(sa_column=Column("computedAt", DateTime, nullable=False))
-
-
-# A user's "taste fingerprint" — a list of numbers summarizing their music taste,
-# used to compare how similar two people are.
-class TasteVector(SQLModel, table=True):
-    __tablename__ = "TasteVector"
-
-    user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE", primary_key=True))
-    vector: Any = Field(sa_column=Column("vector", JSONB, nullable=False))
-    coverage: float = Field(sa_column=Column("coverage", Float, nullable=False))  # how complete it is
-    computed_at: datetime = Field(sa_column=Column("computedAt", DateTime, nullable=False))
 
 
 # A group of users with similar taste, produced by the clustering algorithm.
 # (Note: id is set by the analytics job, so it has no auto cuid default here.)
 class Cluster(SQLModel, table=True):
     __tablename__ = "Cluster"
+    __table_args__ = {"schema": "gold"}  # a curated analytics result (T39 / ADR-0009)
 
     id: str = Field(sa_column=Column("id", Text, primary_key=True))
     label: str = Field(sa_column=Column("label", Text, nullable=False))          # human-friendly name
@@ -382,20 +369,11 @@ class Cluster(SQLModel, table=True):
     computed_at: datetime = Field(sa_column=Column("computedAt", DateTime, nullable=False))
 
 
-# A similarity score between two users (0..1). Both user IDs together form the ID.
-class Compatibility(SQLModel, table=True):
-    __tablename__ = "Compatibility"
-    __table_args__ = (Index("Compatibility_userAId_idx", "userAId"),)
-
-    user_a_id: str = Field(sa_column=Column("userAId", Text, primary_key=True))
-    user_b_id: str = Field(sa_column=Column("userBId", Text, primary_key=True))
-    score: float = Field(sa_column=Column("score", Float, nullable=False))
-
-
 # Quality metrics about the machine-learning models themselves (how well they did).
 # One row per model, keyed by its name.
 class ModelMetrics(SQLModel, table=True):
     __tablename__ = "ModelMetrics"
+    __table_args__ = {"schema": "gold"}  # a curated analytics result (T39 / ADR-0009)
     # WHY this line: the tool we use (Pydantic) reserves names starting with
     # "model_", so we tell it to allow our "model_name" field without complaining.
     model_config = {"protected_namespaces": ()}
@@ -411,3 +389,61 @@ class ModelMetrics(SQLModel, table=True):
         default=None, sa_column=Column("featureImportances", JSONB, nullable=True)
     )
     computed_at: datetime = Field(sa_column=Column("computedAt", DateTime, nullable=False))
+
+
+# The self-describing output of a trained model (T39 / ADR-0003). "Self-describing" means the
+# row carries EVERYTHING the on-read inference needs — the feature order, the scaler stats, and
+# the model parameters — so nothing is hardcoded in the app. One row per model.
+# WHY snake_case columns here (unlike the legacy camelCase tables above): this is a NEW table we
+# own, not one inherited from the old Prisma schema, so the DB column names match the Python names.
+class ModelArtifact(SQLModel, table=True):
+    __tablename__ = "ModelArtifact"
+    __table_args__ = {"schema": "gold"}  # a curated analytics result (T39 / ADR-0009)
+    model_config = {"protected_namespaces": ()}  # allow the "model_name" field (see ModelMetrics)
+
+    model_name: str = Field(sa_column=Column("model_name", Text, primary_key=True))  # "kmeans" | "popularity_regression"
+    feature_order: Any = Field(sa_column=Column("feature_order", JSONB, nullable=False))  # ordered feature names
+    scaler_mean: Any = Field(sa_column=Column("scaler_mean", JSONB, nullable=False))      # per-feature StandardScaler mean
+    scaler_std: Any = Field(sa_column=Column("scaler_std", JSONB, nullable=False))        # per-feature StandardScaler std
+    params: Any = Field(sa_column=Column("params", JSONB, nullable=False))                # model params (centroids / coefficients)
+    computed_at: datetime = Field(sa_column=Column("computed_at", DateTime, nullable=False))
+
+
+# ---------------------------------------------------------------------------
+# BRONZE raw landing tables (T39 / ADR-0009): the untouched, append-only "as it arrived" copy of
+# external data, before it's cleaned/conformed into the silver tables. We keep the raw payload as
+# JSONB so nothing from the source is lost; a later "silver" step reads these and writes Track/Play.
+# ---------------------------------------------------------------------------
+
+
+# One row per Spotify "recently played" fetch for a user (the snapshot job T21 writes these).
+class SpotifyRecentlyPlayedRaw(SQLModel, table=True):
+    __tablename__ = "spotify_recently_played_raw"
+    __table_args__ = {"schema": "bronze"}
+
+    id: str = _pk_cuid()
+    # Plain text (not a foreign key): bronze is a decoupled, immutable landing zone — it must be able
+    # to hold raw rows even if the referenced user/track isn't conformed into silver yet.
+    user_id: str = Field(sa_column=Column("user_id", Text, nullable=False))
+    # JSONB in Postgres (prod); the `.with_variant(JSON, "sqlite")` makes the same column a plain
+    # JSON type under SQLite so the in-memory test DB can build this table (SQLite has no JSONB).
+    payload: Any = Field(
+        sa_column=Column("payload", JSONB().with_variant(JSON(), "sqlite"), nullable=False)
+    )  # the raw Spotify API response
+    fetched_at: datetime = Field(
+        sa_column=Column("fetched_at", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP"))
+    )
+
+
+# One row per raw Kaggle track record (the ingest job T31 writes these).
+class KaggleTracksRaw(SQLModel, table=True):
+    __tablename__ = "kaggle_tracks_raw"
+    __table_args__ = {"schema": "bronze"}
+
+    id: str = _pk_cuid()
+    payload: Any = Field(
+        sa_column=Column("payload", JSONB().with_variant(JSON(), "sqlite"), nullable=False)
+    )  # the raw Kaggle row
+    ingested_at: datetime = Field(
+        sa_column=Column("ingested_at", DateTime, nullable=False, server_default=sa_text("CURRENT_TIMESTAMP"))
+    )
