@@ -54,7 +54,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 5 — Frontend / UX-UI (UI)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| UI-1 | Post composer with Spotify catalog search → publish. | T40 | ◻ |
+| UI-1 | Post composer with Spotify catalog search → publish. | T40 | ✅ |
 | UI-2 | Feed reads `/api/feed`; manual + Spotify cards. | T41 | ✅ |
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ✅ |

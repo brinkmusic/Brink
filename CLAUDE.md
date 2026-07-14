@@ -235,7 +235,11 @@ PR that it went in without a second review).
   `GET /api/feed`, and `backend/app/static/reactions.js` calls the T11 reactions API from the
   browser (optimistic, reconciled with server counts), satisfying UI-2/UI-3. **T42 (comments UI) done**
   — each feed post card has a comment toggle + panel that lists and adds comments via the T12 API
-  (`backend/app/static/comments.js`), satisfying UI-4. **T22 (Spotify token refresh) done** —
+  (`backend/app/static/comments.js`), satisfying UI-4. **T40 (composer + catalog search) done** —
+  `GET /api/search?q=` (`backend/app/routers/search.py`, login-gated + rate-limited) backed by a new
+  client-credentials path in `backend/app/spotify.py` (app-level token, so handle users can search),
+  plus a composer card on the feed (`backend/app/static/composer.js`) that searches, then publishes
+  via `POST /api/posts`, satisfying UI-1. **T22 (Spotify token refresh) done** —
   `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
   (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
   unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against

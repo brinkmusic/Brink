@@ -36,6 +36,10 @@ CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 # Spotify Web API endpoint for the user's recently-played tracks (last 50 max) — the snapshot tap.
 RECENTLY_PLAYED_URL = "https://api.spotify.com/v1/me/player/recently-played"
 
+# Spotify Web API catalog-search endpoint — used by the composer's song search (T40). Unlike the
+# endpoints above it needs no USER token: an app-level ("client credentials") token is enough.
+SPOTIFY_SEARCH_URL = "https://api.spotify.com/v1/search"
+
 # If Spotify says "too many requests" (429), wait at most this long before the single retry, so a
 # rate-limit never turns into a long hang.
 MAX_BACKOFF_SECONDS = 10
@@ -227,3 +231,96 @@ def _request_refreshed_token(refresh_token: str) -> Optional[dict]:
         return None
 
     return response.json()
+
+
+# ---- App-level (client-credentials) access, for catalog search (T40) ----
+#
+# Catalog search doesn't act on behalf of a user, so instead of a user's token it uses an
+# "app token" from Spotify's client-credentials grant. That token is the same for everyone and
+# lasts ~1h, so we cache it in-process and only ask Spotify for a new one when it's about to
+# expire. WHY a cache: search is called on every keystroke in the composer — re-fetching a token
+# each time would be slow and hammer Spotify's token endpoint.
+_client_token: dict = {"value": None, "expires_at": 0.0}
+
+
+def _get_client_credentials_token() -> Optional[str]:
+    # Return a cached app-level token, fetching a fresh one only when the cache is empty/expired.
+    # None (never a raise) when we have no credentials or Spotify refuses — the caller degrades.
+    now = time.time()
+    if _client_token["value"] and _client_token["expires_at"] > now:
+        return _client_token["value"]
+
+    settings = get_settings()
+    client_id = settings.spotify_client_id
+    client_secret = settings.spotify_client_secret
+    if not client_id or not client_secret:
+        return None
+
+    try:
+        # client_credentials grant: the app authenticates itself via HTTP Basic auth (id + secret).
+        response = httpx.post(
+            SPOTIFY_TOKEN_URL,
+            data={"grant_type": "client_credentials"},
+            auth=(client_id, client_secret),
+            timeout=10,
+        )
+    except httpx.HTTPError:
+        logger.warning("spotify client-credentials request errored", exc_info=True)
+        return None
+
+    if response.status_code != 200:
+        logger.warning("spotify client-credentials returned %s", response.status_code)
+        return None
+
+    data = response.json()
+    token = data.get("access_token")
+    if not token:
+        return None
+    # Cache until a minute before expiry, so we never hand back a token that dies mid-request.
+    _client_token["value"] = token
+    _client_token["expires_at"] = now + int(
+        data.get("expires_in", DEFAULT_EXPIRES_IN_SECONDS)
+    ) - EXPIRY_BUFFER_SECONDS
+    return token
+
+
+def search_tracks(q: str, limit: int = 10) -> Optional[list[dict]]:
+    # Search Spotify's catalog for tracks matching `q`. Returns a list of normalized track dicts
+    # (snake_case, matching upsert_track / TrackOut) or None on any failure (no credentials,
+    # network error, non-200) so the router can return a clean error instead of a 500. Shape:
+    #   {"spotify_id", "title", "artist_name", "album_art_url", "popularity"}
+    token = _get_client_credentials_token()
+    if token is None:
+        return None
+
+    try:
+        response = httpx.get(
+            SPOTIFY_SEARCH_URL,
+            params={"q": q, "type": "track", "limit": limit},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+    except httpx.HTTPError:
+        logger.warning("spotify search request errored", exc_info=True)
+        return None
+
+    if response.status_code != 200:
+        logger.warning("spotify search returned %s", response.status_code)
+        return None
+
+    items = response.json().get("tracks", {}).get("items", [])
+    results = []
+    for item in items:
+        artist_name = ", ".join(a.get("name", "") for a in item.get("artists", []))
+        images = item.get("album", {}).get("images", [])
+        album_art_url = images[0]["url"] if images else None
+        results.append(
+            {
+                "spotify_id": item["id"],
+                "title": item["name"],
+                "artist_name": artist_name,
+                "album_art_url": album_art_url,
+                "popularity": item.get("popularity"),
+            }
+        )
+    return results

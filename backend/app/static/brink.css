@@ -163,6 +163,46 @@ body {
 .step-list p { margin: 0; color: var(--mute); font-size: 0.92rem; line-height: 1.5; }
 .steps > * + * { margin-top: 1rem; }
 
+/* ---- Composer (feed, T40) ---- */
+.composer { position: relative; }
+.composer-search,
+.composer-caption {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.composer-search:focus-visible,
+.composer-caption:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.composer-results {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--ink);
+  max-height: 15rem;
+  overflow-y: auto;
+}
+.composer-result {
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.composer-result:hover,
+.composer-result:focus-visible { background: var(--panel); outline: none; }
+.composer-result-empty { color: var(--mute); cursor: default; }
+.composer-selected { display: grid; gap: 0.6rem; }
+.composer-track { margin: 0; display: flex; flex-direction: column; }
+.composer-track-title { font-weight: 600; font-size: 0.95rem; }
+.composer-track-artist { color: var(--mute); font-size: 0.85rem; }
+.composer-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
 /* ---- Feed: post cards ---- */
 .post {
   display: flex;
