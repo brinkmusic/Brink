@@ -58,7 +58,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-2 | Feed reads `/api/feed`; manual + Spotify cards. | T41 | ✅ |
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ✅ |
-| UI-5 | Follow/unfollow buttons + follower counts. | T43 | ◻ |
+| UI-5 | Follow/unfollow buttons + follower counts. | T43 | ✅ |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44 | ◻ |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |

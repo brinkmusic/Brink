@@ -63,7 +63,10 @@
           {% if p.caption %}
             <p class="post-caption">"{{ p.caption }}"</p>
           {% endif %}
-          <p class="post-meta">{{ p.author }} · shared {{ p.when }}</p>
+          <p class="post-meta">
+            <a class="post-author" href="/u/{{ p.author_handle }}">{{ p.author }}</a>
+            · shared {{ p.when }}
+          </p>
 
           {# Reaction bar. data-post-id tells the script which post to react to; each
              button carries its type. "reacted" marks the ones this viewer already tapped. #}

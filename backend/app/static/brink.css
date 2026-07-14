@@ -203,6 +203,26 @@ body {
 .composer-track-artist { color: var(--mute); font-size: 0.85rem; }
 .composer-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 
+/* ---- Profile page (T43) ---- */
+.profile-header { display: grid; gap: 0.75rem; }
+.profile-id { display: flex; align-items: center; gap: 0.75rem; }
+.profile-avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background: linear-gradient(to bottom right, var(--accent), var(--hot));
+  background-size: cover;
+  background-position: center;
+}
+.profile-name { margin: 0; font-size: 1.25rem; }
+.profile-handle { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
+.profile-counts { display: flex; gap: 1.25rem; color: var(--mute); font-size: 0.9rem; }
+.profile-counts b { color: var(--text); font-variant-numeric: tabular-nums; }
+.follow-btn { justify-self: start; }
+.post-author { color: var(--text); text-decoration: none; font-weight: 500; }
+.post-author:hover { color: var(--accent); }
+
 /* ---- Feed: post cards ---- */
 .post {
   display: flex;
