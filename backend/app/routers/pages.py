@@ -7,8 +7,10 @@
 #
 # Pages so far:
 #   GET /      -> the public landing page (what a visitor sees before signing in)
-#   GET /feed  -> the feed of songs people have shared, read from the posts the
-#                 T10 API creates (Post + Track rows). Read-only, no login needed.
+#   GET /feed  -> the feed page. Reuses the shared build_feed() (app/routers/feed.py) so it
+#                 shows the SAME posts as GET /api/feed (people you follow + your own), each
+#                 with live reaction counts. Login-gated (T09); the reaction buttons call the
+#                 T11 reactions API from the browser (T41).
 
 import logging
 from datetime import datetime, timezone
@@ -17,11 +19,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.db import get_session
 from app.deps import AuthError, require_user
-from app.models import Post, Track
+from app.routers.feed import build_feed
 
 logger = logging.getLogger(__name__)
 
@@ -72,38 +74,40 @@ def _ago(when: datetime) -> str:
     return f"{hours // 24}d ago"
 
 
-# Read the most recent shared songs from the database, newest first. This is the SAME
-# data the T10 posts API creates (Post rows, each joined to its Track). We return plain
-# dictionaries — not live database rows — so the template can safely use them after the
-# database session has closed.
-def _recent_posts(session: Session, limit: int = 20) -> list[dict]:
+# Build the list of feed posts for the template. We REUSE the shared feed builder
+# (app/routers/feed.build_feed) so the page shows EXACTLY the same feed as GET /api/feed
+# (posts from people you follow plus your own, with reaction counts and which reactions are
+# yours) — no duplicated query logic. Then we reshape each item for the template: flatten the
+# nested track fields, turn the ISO timestamp into a friendly "3m ago", and collect the
+# reaction types the viewer already tapped into a set the template can test with `in`.
+def _feed_items(session: Session, user) -> list[dict]:
     try:
-        rows = session.exec(
-            # Post JOINed to its Track (same join the T10 GET /api/posts uses), newest
-            # first, capped so the page never tries to render thousands of rows.
-            select(Post, Track)
-            .join(Track, Track.spotify_id == Post.track_id)
-            .order_by(Post.created_at.desc())
-            .limit(limit)
-        ).all()
-    except Exception as e:  # noqa: BLE001 — any DB problem should just show an empty feed
+        raw = build_feed(session, user)
+    except Exception as e:  # noqa: BLE001 — any DB problem shows an empty feed, never a crash
         # No database reachable (e.g. running locally without credentials) or a transient
         # outage: log it and show an empty feed rather than crashing the whole page.
-        logger.warning("feed query failed, showing empty feed: %s", e)
+        logger.warning("feed build failed, showing empty feed: %s", e)
         return []
 
-    return [
-        {
-            "user_id": post.user_id,
-            "caption": post.caption,
-            "source": post.source.value,
-            "title": track.title,
-            "artist": track.artist_name,
-            "album_art": track.album_art_url,
-            "when": _ago(post.created_at),
-        }
-        for post, track in rows
-    ]
+    items = []
+    for it in raw:
+        # viewerReactions is {type: True/False}; keep just the types set to True.
+        mine = {kind for kind, on in it["viewerReactions"].items() if on}
+        items.append(
+            {
+                "id": it["id"],
+                "author": it["author"]["displayName"],
+                "title": it["track"]["title"],
+                "artist": it["track"]["artistName"],
+                "album_art": it["track"]["albumArtUrl"],
+                "caption": it["caption"],
+                "when": _ago(datetime.fromisoformat(it["createdAt"])),
+                "counts": it["reactionCounts"],
+                "mine": mine,
+                "comment_count": it["commentCount"],
+            }
+        )
+    return items
 
 
 # The feed page: a list of the songs people have shared. Read-only, so no login is
@@ -117,11 +121,12 @@ def feed(request: Request, session: Session = Depends(get_session)):
     # old, now-rotated token and eventually be logged out.
     refreshed = Response()
     try:
-        require_user(request, session=session, response=refreshed)
+        user = require_user(request, session=session, response=refreshed)
     except AuthError:
         return RedirectResponse("/auth/login", status_code=303)
 
-    posts = _recent_posts(session)
+    # Reuse the shared feed builder so the page matches GET /api/feed exactly (T41).
+    posts = _feed_items(session, user)
     page = templates.TemplateResponse(
         request,
         "feed.html",
