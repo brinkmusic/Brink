@@ -7,6 +7,7 @@
 from datetime import datetime, timezone
 
 from app.db import get_session
+from app.deps import AuthError, require_user
 from app.main import app
 from app.models import User
 
@@ -50,8 +51,14 @@ def test_search_empty_query_is_400(client, db_session, as_user):
     assert res.status_code == 400
 
 
-# Search requires a login (Brink is private).
+# Search requires a login (Brink is private). We override require_user to raise, matching how
+# the other endpoints' unauthenticated tests are written (no dependence on a real DB session).
 def test_search_requires_login(client):
+    def raise_auth_error():
+        raise AuthError("invalid session")
+
+    app.dependency_overrides[require_user] = raise_auth_error
+    app.dependency_overrides[get_session] = lambda: None
     res = client.get("/api/search?q=redbone")
     assert res.status_code == 401
 
