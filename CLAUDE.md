@@ -242,7 +242,7 @@ PR that it went in without a second review).
   via `POST /api/posts`, satisfying UI-1. **T43 (follow UI) done** — a minimal profile page
   `GET /u/{handle}` (`backend/app/templates/profile.html`) with follower counts + a Follow/Unfollow
   button (`backend/app/static/follow.js` → T13 API); feed authors link to it. Full "Wrapped" stats
-  are still T44 (needs T14). Satisfies UI-5. **T22 (Spotify token refresh) done** —
+  are still T44 (needs T14). Satisfies UI-5. **T51 (artist upload UI) done (with caveats)** — an `/artist` page (`backend/app/templates/artist.html`) with a JPEG/PNG≤10MB upload box for artist accounts that runs the T50 signed-upload flow (`backend/app/static/artist-upload.js`); satisfies MEDIA-2. NOTE: the real Supabase Storage upload is unverified locally (MEDIA-5 integration check), and displaying private-bucket images needs a signed read URL not yet built (open T50 question). **T22 (Spotify token refresh) done** —
   `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
   (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
   unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against

@@ -24,7 +24,7 @@ from sqlmodel import Session, select
 
 from app.db import get_session
 from app.deps import AuthError, require_user
-from app.models import Follow, Post, Track, User
+from app.models import ArtistPost, Follow, Post, Track, User
 from app.routers.feed import build_feed
 
 logger = logging.getLogger(__name__)
@@ -211,6 +211,45 @@ def profile(handle: str, request: Request, session: Session = Depends(get_sessio
         page = templates.TemplateResponse(
             request, "profile.html", {"page_title": f"{data['display_name']} · Brink", "p": data}
         )
+    for key, value in refreshed.raw_headers:
+        if key == b"set-cookie":
+            page.raw_headers.append((key, value))
+    return page
+
+
+# The artist "behind-the-scenes" page (T51): an artist account's promo posts, plus (for the artist
+# themselves) an upload box to add a new one. Login-gated; the upload UI only shows for artist
+# accounts (User.is_artist) — the T50 API is the real gate (403 for non-artists), this just hides
+# the box for everyone else. The actual file upload goes browser -> Supabase Storage via a signed
+# URL (see static/artist-upload.js).
+@router.get("/artist", response_class=HTMLResponse)
+def artist_page(request: Request, session: Session = Depends(get_session)):
+    refreshed = Response()
+    try:
+        user = require_user(request, session=session, response=refreshed)
+    except AuthError:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    # This artist's existing promo posts, newest-first.
+    rows = session.exec(
+        select(ArtistPost)
+        .where(ArtistPost.artist_user_id == user.id)
+        .order_by(ArtistPost.created_at.desc())
+    ).all()
+    posts = [
+        {
+            "image_url": post.image_url,
+            "caption": post.caption,
+            "when": _ago(post.created_at),
+        }
+        for post in rows
+    ]
+
+    page = templates.TemplateResponse(
+        request,
+        "artist.html",
+        {"page_title": "Artist · Brink", "is_artist": user.is_artist, "posts": posts},
+    )
     for key, value in refreshed.raw_headers:
         if key == b"set-cookie":
             page.raw_headers.append((key, value))
