@@ -2,7 +2,7 @@
   "name": "brink",
   "private": true,
   "version": "0.1.0",
-  "description": "Brink monorepo root: tooling + git hooks. App code lives in apps/web (frontend, npm) and backend/ (FastAPI, uv).",
+  "description": "Brink repo root: tooling + git hooks (pre-commit secret guard via the prepare script). App code lives in backend/ (the FastAPI app — API + Jinja frontend, uv) and analytics/ (uv).",
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true"
   }
