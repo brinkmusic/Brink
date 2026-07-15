@@ -326,8 +326,17 @@ PR that it went in without a second review).
   `backend/app/db.py` does) and a passing smoke test reading a `silver."Track"` row count
   (schema-qualified after T39 moved `Track` into `silver`); `uv.lock` committed. AN-8/INFRA-4 stay
   **◧ partial** — both also need T38's GitHub Actions pipeline workflow, out of scope here. Its merge
-  unblocks **T31** (Kaggle genre join). **Next backend feature: T31 (Jonah) is unblocked; T32 stays
-  gated on T31; T14 (profile analytics) still gated on T33/T35.**
+  unblocks **T31** (Kaggle genre join). **T31 (Kaggle ingest + Track join) done** —
+  `analytics/ingest_kaggle.py` lands the CSV raw into `bronze.kaggle_tracks_raw` (replaced each
+  run, so re-running never duplicates) and joins onto `silver.Track` by `spotifyId`/`track_id`,
+  filling in `danceability/energy/valence/tempo/loudness/popularity` + `kaggleMatched` on matches;
+  non-matches are left alone (the fallback is T33). Coverage is logged, not hidden (ADR-0004).
+  **Scope note (disclosed, not an ADR change):** ran against a **temporary ~114k substitute**
+  (`SpotifyAudioFeaturesApril2019.csv`, gitignored under `analytics/data/`) instead of the ≈1M+ set
+  ADR-0004 calls for, since that set wasn't available — coverage against brink-dev is currently
+  **14/343 (4.1%)**. Swapping in the real set later is just re-running the script against the new
+  file. AN-1/DATA-1 marked **✅ interim dataset**. Its merge unblocks **T32**. **Next backend
+  feature: T32 (Jonah) is unblocked; T14 (profile analytics) still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
 
