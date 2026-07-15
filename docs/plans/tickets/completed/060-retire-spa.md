@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Medium
 category: Tech-Debt
@@ -11,6 +11,19 @@ owner: Sebastian
 ---
 
 # Feature: Retire the React/Vite SPA (T60, re-scoped from "retire mocks")
+
+## ✅ Done (2026-07-15) — code/docs; two owner infra steps remain
+Deleted `apps/web/` entirely (35 files: SPA source, mocks, lib, pages, components, `vercel.json`).
+Removed the `web` CI job, the `apps/web/src/` docs-sync path, the `apps/web` Dependabot group, and the
+PR-template frontend checkbox. Confirmed the git-hooks secret guard survives (the `prepare` script was
+already in the **root** `package.json`). Synced README, root `package.json`, `.env.example`,
+`.gitignore`, the `close-session`/`get-me-started` skills, and `CLAUDE.md`; flipped **BE-2 / DATA-4 /
+UI-9** ✅; appended a dated "SPA retired" note to ADR-0013. Backend suite green (179). Also fixed a
+dangling comment in `backend/app/routers/auth.py` (comment-only).
+**⚠ Still needs Andrea (infra — can't be done in the PR):** (1) drop the required **`web`** status
+check from `develop` + `main` branch protection so PRs don't hang; (2) **decommission the Vercel
+project**. **Follow-up flagged:** ticket **T003** (email auth) still references deleted `apps/web`
+files and needs its own re-scope to Jinja.
 
 ## ⚠ Re-scoped (2026-07-15)
 Originally "delete the mock data files from `apps/web/`." That framing is obsolete: the SPA pages

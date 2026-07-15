@@ -28,8 +28,9 @@ Run the same checks CI will, so nothing merges on a red suite:
 
 - **Backend tests:** `cd backend && uv run pytest`. Report pass/fail with the count. A failure here
   is a stop — do not proceed to cleanup/handoff as if the work is done.
-- **Frontend build + lint:** `cd apps/web && npm run build` and `npm run lint`. (Skip only if this
-  session touched no frontend and none is affected — say why.)
+- **Frontend:** the frontend is server-rendered Jinja/HTMX inside the FastAPI app (the React/Vite SPA
+  was retired in T60), so it's covered by the backend `pytest` run above (`tests/test_pages.py`).
+  There is no separate `npm build`/`lint` step.
 - Note anything skipped and why. This pass is a report, not a fix; if it's red, the session's real
   state is "work in progress," and the handoff must say that.
 
