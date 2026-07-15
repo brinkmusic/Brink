@@ -13,6 +13,6 @@ def test_can_read_track_count():
     # returns a plain integer (0 or more) — we don't care about the exact count,
     # just that the connection + query round-trip works.
     with get_engine().connect() as conn:
-        count = conn.execute(text('SELECT COUNT(*) FROM "Track"')).scalar()
+        count = conn.execute(text('SELECT COUNT(*) FROM silver."Track"')).scalar()
     assert isinstance(count, int)
     assert count >= 0
