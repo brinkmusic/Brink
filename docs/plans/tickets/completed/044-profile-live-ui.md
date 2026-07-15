@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -11,6 +11,16 @@ owner: Andrea
 ---
 
 # Feature: Profile page — your listening summary (T44, re-scoped)
+
+## ✅ Done (2026-07-15)
+Shipped the full re-scoped ticket: `app/stats.py` computes the live listening summary (top tracks,
+top artists, recent listens, 30-day count, streak) from `Play`; `/u/{handle}` renders it with an
+own-profile now-playing badge, a "link Spotify" prompt, and empty states (`profile.html` + `brink.css`).
+Tests: `tests/test_stats.py` + new `tests/test_pages.py` cases; full suite green (179).
+**Partial-requirement note:** T44 covers the *listening* portion of UI-6 / UI-10 / AN-7 only —
+cluster + compatibility (UI-6), the feed now-playing badge and other-users' now-playing (UI-10), and
+top **genres** (AN-7) are deferred to a slimmed **T14**, still blocked on the analytics spine
+(T33/T35) and the Kaggle genre join (T31).
 
 ## Rationale
 Per [ADR-0014](../../../decisions/adr/0014-feed-manual-posts-listening-summary.md), a user's Spotify

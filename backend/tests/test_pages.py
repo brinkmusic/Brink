@@ -46,6 +46,7 @@ from app.models import (
     ArtistPost,
     Comment,
     Follow,
+    Play,
     Post,
     PostSource,
     Reaction,
@@ -286,6 +287,67 @@ def test_profile_missing_handle_is_404(client, db_session, monkeypatch):
     res = client.get("/u/nobody-here")
     assert res.status_code == 404
     assert "couldn't find that profile" in res.text
+
+
+# ---- T44: profile listening summary + now-playing badge ----
+
+
+def _seed_target_with_plays(db_session, handle="dj-nova"):
+    # A user (not the viewer) with a couple of plays, so we can view THEIR profile and see the
+    # listening summary. Track must be inserted before the Play that references it (FKs are on).
+    target = User(handle=handle, display_name="DJ Nova", spotify_id="sp_nova",
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.add(Track(spotify_id="t_pulse", title="Pulse", artist_name="Nova"))
+    db_session.commit()
+    db_session.refresh(target)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db_session.add(Play(user_id=target.id, track_id="t_pulse", played_at=now))
+    db_session.commit()
+    return target
+
+
+def test_profile_shows_listening_summary(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    _seed_target_with_plays(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/dj-nova").text
+    assert "Listening" in body
+    assert "Pulse" in body            # the played track shows in top tracks / recent
+    assert "day streak" in body
+    assert "plays" in body
+
+
+def test_own_profile_without_spotify_shows_link_prompt(client, db_session, monkeypatch):
+    # The viewer (handle "viewer") has no linked Spotify and no plays -> link-Spotify prompt.
+    _seed_viewer(db_session)
+    # No Spotify token exists, so now-playing resolves to None without any network call; stub it
+    # anyway to keep the test hermetic.
+    monkeypatch.setattr("app.spotify.get_currently_playing", lambda s, u: None)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/viewer").text
+    assert "Link Spotify" in body
+
+
+def test_own_profile_shows_now_playing_badge(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    # Pretend the viewer is currently playing a track (T20 shape: is_playing + normalized track).
+    monkeypatch.setattr(
+        "app.spotify.get_currently_playing",
+        lambda s, u: {"is_playing": True,
+                      "track": {"title": "Midnight", "artist_name": "Aurora",
+                                "album_art_url": None}},
+    )
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/viewer").text
+    assert "Now playing" in body
+    assert "Midnight" in body
 
 
 # ---- T51: artist page + upload UI ----
