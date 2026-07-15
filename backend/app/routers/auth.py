@@ -28,9 +28,9 @@ from app.security.crypto import decrypt, encrypt
 
 router = APIRouter()
 
-# The Spotify permissions the login asks for. Kept identical to what the old React SPA
-# requested (apps/web/src/context/AuthContext.tsx) so the server-side login grants the
-# same access the snapshot (T21) and now-playing (T20) features already depend on.
+# The Spotify permissions the login asks for. These are the scopes the snapshot (T21) and
+# now-playing (T20) features depend on: read the user's email, recently-played, top tracks,
+# and currently-playing. (Kept identical to what the old React SPA requested before T60.)
 SPOTIFY_SCOPES = (
     "user-read-email user-read-recently-played user-top-read user-read-currently-playing"
 )

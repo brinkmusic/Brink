@@ -6,21 +6,18 @@ touching the repo.
 
 ## What Brink is
 
-React/Vite SPA (Vercel) + a **FastAPI/Python API** (Render) + **Supabase** (Postgres + Auth +
-Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
+A single **FastAPI/Python app** (Render) serving both the JSON API and the **HTML frontend** (Jinja2
+templates + HTMX) + **Supabase** (Postgres + Auth + Storage) + a Python/scikit-learn analytics batch
+job (GitHub Actions cron).
 
-> **Stack:** the API is a **FastAPI / Python** app (SQLModel + Alembic) on **Render**; the
-> React/Vite SPA is on **Vercel** and calls it same-origin via an `/api/*` rewrite; **Supabase**
-> provides Postgres, Auth, and Storage. See
-> [ADR-0010](docs/decisions/adr/0010-fastapi-render-backend.md) for how the backend moved here from
-> an earlier TypeScript/Vercel/Prisma stack (removed in T08). All backend work is in `backend/`.
-
-> **⚠ Frontend transitioning ([ADR-0013](docs/decisions/adr/0013-python-frontend.md)).** The
-> frontend is moving from the React/Vite SPA to **HTML pages served by the FastAPI backend**
-> (Jinja2 templates + HTMX, in `backend/app/templates/` and `backend/app/routers/pages.py`), so the
-> whole app is one Python codebase we can all read and defend. The React/Vite `apps/web/` SPA stays
-> as a fallback until the Python pages reach parity, then it is retired. Server-side Spotify login
-> for the new frontend is tracked in **T09**.
+> **Stack:** one **FastAPI / Python** app (SQLModel + Alembic) on **Render** serves **both** the
+> `/api/*` JSON endpoints and the server-rendered HTML pages (Jinja2 + HTMX, in
+> `backend/app/templates/` + `backend/app/routers/pages.py`); **Supabase** provides Postgres, Auth,
+> and Storage. See [ADR-0010](docs/decisions/adr/0010-fastapi-render-backend.md) (backend moved here
+> from an earlier TypeScript/Vercel/Prisma stack, removed in T08) and
+> [ADR-0013](docs/decisions/adr/0013-python-frontend.md) (the frontend became these Python-served
+> pages). **The separate React/Vite SPA (`apps/web/`) was retired in T60** — the whole app is now one
+> Python codebase we can all read and defend. All work is in `backend/` (+ `analytics/`).
 
 **Source of truth — read these before planning any work:**
 - `docs/plans/requirements.md` — requirement catalog (`AUTH-*`, `BE-*`, `SP-*`, `AN-*`, `UI-*`, `MEDIA-*`, `INFRA-*`, `DATA-*`) + requirement→ticket traceability. Data model: `backend/app/models.py` (SQLModel). Decisions: `docs/decisions/`.
@@ -32,9 +29,10 @@ Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
   in `backend/tests/`, DB migrations in `backend/alembic/`.
 - `backend/app/templates/` + `backend/app/static/` — the **Python frontend**: HTML pages
   (Jinja2 templates; HTMX to come) served by FastAPI, with routes in `backend/app/routers/pages.py` (ADR-0013).
-- `apps/web/` — React/Vite SPA frontend (TypeScript). **Legacy**: being replaced by the Jinja/HTMX
-  pages above per [ADR-0013](docs/decisions/adr/0013-python-frontend.md); kept as a fallback until parity.
 - `analytics/` — Python pipeline (`uv`-managed). Created in T30.
+
+*(The `apps/web/` React/Vite SPA was retired in T60 — [ADR-0013](docs/decisions/adr/0013-python-frontend.md).
+The frontend is the Jinja/HTMX pages under `backend/app/` above.)*
 - `docs/plans/` — spec + tickets (source of truth above).
 
 ## Commands
@@ -42,31 +40,27 @@ Storage) + a Python/scikit-learn analytics batch job (GitHub Actions cron).
 Local dev reads the root `.env` (the `brink-dev` Supabase project), so it never touches production.
 
 ```
-# API + Python frontend — the FastAPI app serves BOTH the JSON API and the HTML pages
+# The whole app — one process. The FastAPI app serves BOTH the JSON API and the HTML pages
 # (ADR-0013). Visit http://127.0.0.1:3001/ for the pages, /api/* for the API.
 cd backend && uv run uvicorn app.main:app --reload --port 3001
-
-# Legacy React/Vite SPA — only until it's retired per ADR-0013. Separate terminal,
-# Vite on 127.0.0.1:5173, proxies /api -> :3001.
-cd apps/web && npm run dev
 ```
 
-- **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest` (after T30 — `analytics/` does not exist yet).
-- **Build frontend:** `cd apps/web && npm run build` · **Lint:** `cd apps/web && npm run lint`.
+- **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest`.
+- **Frontend** is server-rendered Jinja/HTMX in `backend/` — no separate build/lint step (the
+  React/Vite SPA was retired in T60).
 
 ## Hard rules
 
 1. **`develop` is the integration branch; `main` is production. Never push to either directly.**
    Every change goes on a branch and through a PR **into `develop`**. One ticket = one PR.
-   `main` only receives `develop` via a release PR — and only once the Vercel env vars are set,
-   because Vercel deploys production from `main`.
+   `main` only receives `develop` via a release PR, and Render deploys production from `main`.
 2. **Branches:** name them `<type>/<ticket-id>-<slug>` where type is
    `feat | fix | chore | docs | ci` (e.g. `feat/T10-posts-api`, `chore/repo-governance`).
    Branch off the latest `develop`, keep them short-lived, and **delete the branch after its PR
    merges**. Don't let a branch drift far behind `develop` — rebase or re-sync instead.
-3. **Never commit secrets.** `.env` (root) and `apps/web/.env` are git-ignored and stay that way.
-   Secrets live only in those files locally and in the Render (backend) / Vercel (frontend) / GitHub
-   env. If you ever see a secret in tracked files, stop and flag it.
+3. **Never commit secrets.** The root `.env` is git-ignored and stays that way. Secrets live only in
+   that file locally and in the Render (app) / GitHub (CI + cron) env. If you ever see a secret in
+   tracked files, stop and flag it.
 4. **TDD (expected practice).** Write a failing test first, then minimal code to pass,
    with frequent small commits. Claude Code agents should use the `test-driven-development`
    skill; everyone else follows the same loop by hand. This is the expected workflow, not an
@@ -90,12 +84,12 @@ These are expectations, not automated guarantees — they set how we work.
 - **Smallest change that satisfies the ticket.** Surface follow-ups as notes; don't silently
   build them.
 - **Reuse before reinventing.** Search for an existing helper before writing a new one. Shared
-  logic lives in `backend/app/` (backend) and `apps/web/src` shared modules (frontend) — extend
-  or import it; don't copy-paste or write a second version of something that already exists. If
-  you find duplication, factor it out as part of the change.
+  logic lives in `backend/app/` (API + Jinja page routes/templates) — extend or import it; don't
+  copy-paste or write a second version of something that already exists. If you find duplication,
+  factor it out as part of the change.
 - **Comments: explain both *what* and *why*, written for a reader new to the language/stack.**
   This repo is read by a mixed team including a non-technical owner, so code must be *followable
-  by someone who doesn't already know* Python/SQLModel/FastAPI/React. This deliberately overrides
+  by someone who doesn't already know* Python/SQLModel/FastAPI/Jinja/HTMX. This deliberately overrides
   the usual "why, not what" convention. Concretely:
   - Every file that does real work opens with a short **`WHAT THIS FILE IS`** comment (2–5 lines,
     plain English) covering its purpose and why it exists.
@@ -178,17 +172,17 @@ must use `ALTER TABLE ... SET SCHEMA` (preserves rows) — never autogenerate's 
   reached only through the backend's ORM (SQLModel/SQLAlchemy).
 - Root `.env`: `DATABASE_URL`/`DIRECT_URL` (Supabase pooler 6543/5432), `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`, `SPOTIFY_CLIENT_ID`/`SECRET`, `TOKEN_ENC_KEY`.
-- `apps/web/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
-- **Getting the values (onboarding):** `.env` files are git-ignored and never shared in the
-  repo. Copy `.env.example`, then get the real secret values from the Render (backend) /
-  Vercel (frontend) / GitHub env or ask Andrea. Don't paste secrets into chat, issues, or commits.
-- **Git hooks:** running `npm install` points git at `.githooks/` (a pre-commit secret guard).
-  If you skipped install, run `git config core.hooksPath .githooks` once.
+- **Getting the values (onboarding):** the `.env` file is git-ignored and never shared in the
+  repo. Copy `.env.example`, then get the real secret values from the Render (app) / GitHub env or
+  ask Andrea. Don't paste secrets into chat, issues, or commits.
+- **Git hooks:** running `npm install` (root `package.json`'s `prepare` script) points git at
+  `.githooks/` (a pre-commit secret guard). If you skipped it, run
+  `git config core.hooksPath .githooks` once.
 
 ## Ownership & review (CODEOWNERS intent)
 
 - **Andrea** — backend / API / auth / DB (`backend/`).
-- **Sebastian** — frontend (`apps/web/`).
+- **Sebastian** — frontend: the Jinja/HTMX page layer (`backend/app/templates|static|routers/pages.py`).
 - **Jonah** — analytics (`analytics/`).
 
 The owner of an area is the default reviewer for PRs touching it (every ticket also has an
@@ -213,10 +207,9 @@ PR that it went in without a second review).
   per-type counts (`ReactionCountsOut`), reusing the T10 rate-limit + DTO patterns (satisfies
   BE-5). **T12 (comments) done** — `POST`/`GET /api/posts/{id}/comments` (both login-gated;
   create is rate-limited + trims/length-validates `body`, list returns newest-first with nested
-  author DTO), satisfies BE-6. The React SPA is on
-  **Vercel** (`brink-theta.vercel.app`), FastAPI on **Render** (`brink-xg7p.onrender.com`,
-  `/api/health` → `db: true`), Spotify login works end-to-end. Repo: **`brinkmusic/Brink`**
-  (public). Remaining remediation: T75, T76 (see
+  author DTO), satisfies BE-6. The app (API + Jinja frontend) runs on **Render**
+  (`brink-xg7p.onrender.com`, `/api/health` → `db: true`), Spotify login works end-to-end. Repo:
+  **`brinkmusic/Brink`** (public). Remaining remediation: T75, T76 (see
   `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **T90–T93 (developer tooling) done** —
   the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
   (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
@@ -229,7 +222,20 @@ PR that it went in without a second review).
   — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
   `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
   counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
-  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **T22 (Spotify token refresh) done** —
+  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **Frontend (Python, ADR-0013): the
+  landing page + login-gated feed shipped (#60), and T41 (feed + live reactions) done** — the feed
+  page reuses the shared `build_feed()` (extracted in `backend/app/routers/feed.py`) so it matches
+  `GET /api/feed`, and `backend/app/static/reactions.js` calls the T11 reactions API from the
+  browser (optimistic, reconciled with server counts), satisfying UI-2/UI-3. **T42 (comments UI) done**
+  — each feed post card has a comment toggle + panel that lists and adds comments via the T12 API
+  (`backend/app/static/comments.js`), satisfying UI-4. **T40 (composer + catalog search) done** —
+  `GET /api/search?q=` (`backend/app/routers/search.py`, login-gated + rate-limited) backed by a new
+  client-credentials path in `backend/app/spotify.py` (app-level token, so handle users can search),
+  plus a composer card on the feed (`backend/app/static/composer.js`) that searches, then publishes
+  via `POST /api/posts`, satisfying UI-1. **T43 (follow UI) done** — a minimal profile page
+  `GET /u/{handle}` (`backend/app/templates/profile.html`) with follower counts + a Follow/Unfollow
+  button (`backend/app/static/follow.js` → T13 API); feed authors link to it. Full "Wrapped" stats
+  are still T44 (needs T14). Satisfies UI-5. **T51 (artist upload UI) done (with caveats)** — an `/artist` page (`backend/app/templates/artist.html`) with a JPEG/PNG≤10MB upload box for artist accounts that runs the T50 signed-upload flow (`backend/app/static/artist-upload.js`); satisfies MEDIA-2. NOTE: the real Supabase Storage upload is unverified locally (MEDIA-5 integration check), and displaying private-bucket images needs a signed read URL not yet built (open T50 question). **T22 (Spotify token refresh) done** —
   `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
   (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
   unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against
@@ -275,29 +281,62 @@ PR that it went in without a second review).
   (2) hardening — `get_valid_access_token` decrypted stored tokens unguarded, so a `TOKEN_ENC_KEY`
   mismatch (`InvalidTag`) would crash the whole run; it now degrades an unreadable token to `None`
   (skip that user) via `_safe_decrypt`. Verified end-to-end against `brink-dev` (50 plays ingested).
-  **Follow-up:** the same insert-ordering gap likely affects the T10 posts endpoint for a brand-new
-  track (upsert_track + Post in one commit) — worth a check. **Next backend feature: T50 (artist
-  storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still
-  gated on T35.**
+  **T62 (FK-ordering hardening) done** — confirmed that follow-up: `db_session` now enforces FKs
+  (`PRAGMA foreign_keys=ON`) suite-wide, which surfaced 30 failures = 1 real bug (the T10 posts
+  endpoint had the same parent-before-child insert — now `flush()`es the Track before the Post) + 29
+  test-seed conveniences SQLite's lax default had hidden (fixed to commit parents before children;
+  `as_user` now persists the caller). Root cause: the models use FK columns without ORM
+  `relationship()`, so SQLAlchemy doesn't insert in FK order — parents must be flushed/committed
+  first. Also corrected the CLAUDE.md line that wrongly said Render deploys from `develop` (it's
+  `main`). **T50 (artist storage backend) done** — the artist BTS portal's server half:
+  `POST /api/artist/sign-upload` mints a Supabase Storage signed upload URL (service role) for the
+  private `artist-images` bucket at a caller-namespaced path, and `POST /api/artist/posts` creates an
+  `ArtistPost` (image URL + caption + optional `linkedTrackId`). Both are **artist-only** (caller must
+  be `User.isArtist == true`, else 403) with the artist always taken from the login (unspoofable, like
+  T10's `Post`); JPEG/PNG ≤ 10 MB is enforced at the request-contract level (ADR-0007/0008, technical
+  validation only — no moderation), satisfying BE-9/MEDIA-1/MEDIA-3. New `app/routers/artist.py` +
+  `create_signed_upload_url` in `security/supabase.py`. The private `artist-images` bucket has been
+  created in `brink-dev` (done). Its merge unblocks **T51** (artist upload UI) and **T52**
+  (per-post engagement). **T52 (artist engagement) done** — engagement on artist posts, under
+  `/api/artist`: `POST`/`DELETE /posts/{id}/reactions` and `POST`/`GET /posts/{id}/comments` are
+  login-gated but open to **any** user (the audience), while `GET /posts/{id}/engagement` is
+  **owner-only** (403 for a non-owner) and returns the owning artist's reaction + comment counts
+  (satisfies MEDIA-4). Because a foreign key targets one table and `ArtistPost` is not `Post`, this
+  added **new `ArtistReaction` + `ArtistComment` tables** (mirrors of `Reaction`/`Comment`, reusing
+  the `ReactionType` enum + rate-limit helper) rather than making the existing social tables
+  polymorphic — keeping the blast radius off the T10–T13 path. **Scope note:** the ticket assumed
+  T11/T12's reactions/comments already attached to artist posts (they don't), so with owner sign-off
+  it was widened to also build that write path; a **view count is deferred** (no artist-post read
+  path to count from yet — T51). **Deploy step for Andrea:** apply the migration to `brink-dev` —
+  `cd backend && uv run alembic upgrade head` (creates the two tables; reuses the existing
+  `ReactionType` enum, so no `CREATE TYPE`), same manual-apply pattern as T39. Its merge readies the
+  engagement API for **T51** to render. **T40–T43 + T51 frontend and T44 shipped; released to
+  production (`develop → main` #97, back-merged #98) — the composer/reactions/comments/follow and the
+  profile are now live on Render.** **T44 (profile listening summary) done** — per
+  [ADR-0014](docs/decisions/adr/0014-feed-manual-posts-listening-summary.md) a user's Spotify
+  listening surfaces on their profile (`/u/{handle}`), not the feed: new `app/stats.py` computes top
+  tracks/artists, recent listens, 30-day count, and listening streak live over `Play` (ADR-0003, no
+  `UserStats` table), rendered with an own-profile now-playing badge (me-scoped T20), a "link Spotify"
+  prompt, and empty states. T44 was **re-scoped** (ADR-0014): the feed stays manual-only, and the
+  analytics half — cluster/compatibility (UI-6) + top genres (AN-7) + feed/other-user now-playing
+  (UI-10) — is deferred to the slimmed **T14**, still blocked on the analytics spine (T33/T35) and the
+  Kaggle genre join (T31); UI-6/UI-10/AN-7 are marked **◧ partial**. **Next backend feature: the
+  analytics spine (031/033/034, Jonah) is unblocked; T14 (profile analytics) still gated on T33/T35.**
 
-## Deployment topology (ADR-0010, T07)
+## Deployment topology (ADR-0010, T07, ADR-0013, T60)
 
-> **⚠ In transition (ADR-0013).** The topology below describes the React/Vite SPA on Vercel, which
-> is still the live frontend. As the Jinja/HTMX pages served by FastAPI reach parity, the frontend
-> is served by **Render** (the same app as the API) and the separate Vercel SPA is retired. Until
-> then both exist and this section still applies. When the new frontend goes live on Render, its URL
-> (not just the Vercel URL) must be in the Supabase/Spotify redirect allow-lists (tracked in T09).
+> **One app, one host (since T60).** The separate React/Vite SPA on Vercel was retired ([ADR-0013](docs/decisions/adr/0013-python-frontend.md)),
+> so the frontend and API are the **same FastAPI app on Render**. The deployed Render `/auth/callback`
+> URL must be in the Supabase Auth + Spotify redirect allow-lists, or Spotify login can't return.
 
-- **Frontend:** Vercel serves the React SPA at `brink-theta.vercel.app` (project root `apps/web`),
-  deploying from `main`. Supabase Auth **URL config** must list the Vercel URL in Site URL +
-  Redirect URLs, or Spotify login can't return to the deployed site.
-- **Backend:** FastAPI on **Render** (`backend/`, config in `render.yaml`) — build `uv sync`,
-  start `uvicorn app.main:app`. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
-  `SPOTIFY_*`, `TOKEN_ENC_KEY`) live only in Render, never committed.
-- **Wiring:** the Vercel project's **root directory is `apps/web`** (it builds only the SPA).
-  `apps/web/vercel.json` rewrites `/api/:path*` → the Render URL, so the browser still calls
-  same-origin `/api/*` (no CORS). Vercel deploys the frontend from `main`; Render deploys the
-  backend from `develop`.
-- **Note:** the frontend still calls a legacy POC `/api/state` path (`apps/web/src/lib/backend.ts`)
-  that FastAPI does not implement, so it 404s; those mock social features are replaced by the real
-  API in T10–T14, and the `/api/state` calls are removed in T60.
+- **App (API + frontend):** one FastAPI service on **Render** (`backend/`, config in `render.yaml`)
+  — build `uv sync`, start `uvicorn app.main:app`. It serves the `/api/*` JSON endpoints **and** the
+  server-rendered Jinja/HTMX pages (`/`, `/feed`, `/u/{handle}`, `/artist`, `/auth/*`), same-origin,
+  so there's no CORS and no rewrite layer. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
+  `SPOTIFY_*`, `TOKEN_ENC_KEY`, `CRON_SECRET`) live only in Render, never committed.
+- **Release flow:** **Render deploys production from `main`**, so changes reach production only via a
+  `develop → main` release PR, and each release must be followed by a back-merge of `main` into
+  `develop` (or the next release PR is blocked as BEHIND, since `main` protection is `strict`).
+- **Retired in T60:** the Vercel project, `apps/web/vercel.json`'s `/api/*` rewrite, the legacy
+  `/api/state` POC path, and the `web` CI build job (also removed from branch-protection required
+  checks). If a separate JS frontend is ever reintroduced, restore the CI job + required check.

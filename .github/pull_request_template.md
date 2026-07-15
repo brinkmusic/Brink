@@ -14,8 +14,7 @@
 - [ ] Scope matches exactly one ticket — no extra features, abstractions, or error handling.
 - [ ] The ticket's acceptance criteria are met.
 - [ ] Reused existing helpers instead of duplicating logic where one already existed.
-- [ ] Tests added/updated and `npm test` passes (Python: `uv run pytest`).
-- [ ] Frontend builds (`cd apps/web && npm run build`) and lints (`npm run lint`) if `apps/web/` changed.
+- [ ] Tests added/updated and the backend suite passes (`cd backend && uv run pytest`).
 - [ ] No secrets committed — `.env` files stay git-ignored.
 - [ ] Docs updated in this PR: ADR for any decision/deviation (`docs/decisions/adr/`), spec/ticket
       changes (`docs/plans/`), and `CLAUDE.md` if commands/env/conventions/status changed.

@@ -31,15 +31,17 @@ The detailed, authoritative docs live under `docs/` — read these before planni
 
 ## 2. Architecture
 
-> **Stack:** a **FastAPI / Python** API (SQLModel + Alembic) on **Render**, a **React / Vite** SPA
-> on **Vercel** that calls it same-origin via an `/api/*` rewrite, and **Supabase** for Postgres,
-> Auth, and Storage. Analytics is a Python/scikit-learn batch job. (An earlier TypeScript/Vercel
-> backend was removed in T08 — see [ADR-0010](./docs/decisions/adr/0010-fastapi-render-backend.md).)
-> Current build status lives in [`CLAUDE.md`](./CLAUDE.md).
+> **Stack:** a single **FastAPI / Python** app (SQLModel + Alembic) on **Render** that serves
+> **both** the JSON API and the **HTML frontend** (Jinja2 templates + HTMX, server-rendered), with
+> **Supabase** for Postgres, Auth, and Storage. Analytics is a Python/scikit-learn batch job. (An
+> earlier TypeScript/Vercel backend was removed in T08, and the separate React/Vite SPA was retired
+> in T60 — see [ADR-0010](./docs/decisions/adr/0010-fastapi-render-backend.md) and
+> [ADR-0013](./docs/decisions/adr/0013-python-frontend.md).) Current build status lives in
+> [`CLAUDE.md`](./CLAUDE.md).
 
 ```
-Browser (React + Vite SPA, Supabase Auth)
-        │  fetch /api/*   (Vercel rewrites /api/* → Render)
+Browser (HTML pages served by FastAPI, server-side Supabase Auth)
+        │  same-origin /api/* and /pages
         ▼
 FastAPI app (Python, backend/, on Render) ── SQLModel ──▶ Supabase Postgres
         │                                                  (Auth + Storage too)
@@ -49,8 +51,8 @@ We own Spotify token refresh (encrypted at rest)
 Analytics: Python / scikit-learn batch job (analytics/, GitHub Actions cron) ──▶ same Postgres
 ```
 
-- **`apps/web/`** — React + TypeScript + Vite SPA (frontend), deployed on Vercel.
-- **`backend/`** — the API: FastAPI app (Python, `uv`-managed), on Render.
+- **`backend/`** — the whole app: FastAPI (Python, `uv`-managed) serving the JSON API **and** the
+  Jinja/HTMX HTML frontend, on Render. (The old React/Vite SPA under `apps/web/` was retired in T60.)
 - **`analytics/`** — Python pipeline, `uv`-managed (added in T30).
 - **`docs/`** — requirements, tickets, and decision records.
 
@@ -62,20 +64,16 @@ token (AES-256-GCM). The Supabase Data API is disabled — tables are reached on
 
 ## 3. Running it locally
 
-Local dev needs **two terminals** (the frontend and the FastAPI backend). You need a root `.env`
-and `apps/web/.env` — secrets are git-ignored and shared separately; copy `.env.example` and ask
-Andrea for the values.
+Local dev needs **one terminal** — the FastAPI app serves both the API and the HTML pages. You need
+a root `.env` (secrets are git-ignored and shared separately; copy `.env.example` and ask Andrea for
+the values).
 
 ```bash
-# Terminal 1 — frontend (Vite on 127.0.0.1:5173, proxies /api -> :3001)
-cd apps/web && npm install && npm run dev
-
-# Terminal 2 — API on :3001 (FastAPI)
+# API + HTML frontend on :3001 (FastAPI). Visit http://127.0.0.1:3001/ for the pages, /api/* for the API.
 cd backend && uv run uvicorn app.main:app --reload --port 3001
 ```
 
 - **Test:** `cd backend && uv run pytest` (backend). Analytics: `cd analytics && uv run pytest`.
-- **Build frontend:** `cd apps/web && npm run build`
 
 See CLAUDE.md for the env-var list and migration details (SQLModel + Alembic).
 
@@ -84,12 +82,13 @@ See CLAUDE.md for the env-var list and migration details (SQLModel + Alembic).
 ## 4. Branching & deploying
 
 - **`develop`** is the integration branch — every change goes through a PR into `develop`.
-- **`main`** is production — Vercel deploys the frontend; the ADR-0010 cutover is complete and the
-  FastAPI backend runs on Render. `develop` reaches `main` only via a release PR (and only once
-  env vars are set). **Never push to `main` or `develop` directly.**
+- **`main`** is production — **Render** deploys the whole app (API + Jinja frontend) from `main`.
+  `develop` reaches `main` only via a release PR (and only once env vars are set). **Never push to
+  `main` or `develop` directly.** (The old Vercel SPA host was retired in T60.)
 - Branch naming: `<type>/<ticket-id>-<slug>` (e.g. `feat/T10-posts-api`). One ticket = one PR.
 
-CI (`.github/workflows/ci.yml`) runs tests, the web build, and a secret scan on every PR.
+CI (`.github/workflows/ci.yml`) runs the backend tests and a secret scan on every PR (the frontend
+`web` build job was removed in T60 with the SPA).
 
 ---
 

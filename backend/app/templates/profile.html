@@ -1,0 +1,144 @@
+{#
+  WHAT THIS FILE IS
+  A user's profile page: their name/handle, follower + following counts, a Follow/Unfollow
+  button (hidden on your own profile), and the songs they've shared. This is the minimal
+  profile that gives the follow feature (T43) a home; the richer "Wrapped"-style stats come
+  later with T44. The Follow button is made live by static/follow.js.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stack">
+  <div class="profile-header card">
+    <div class="profile-id">
+      <span
+        class="profile-avatar"
+        {% if p.avatar_url %}style="background-image: url('{{ p.avatar_url }}')"{% endif %}
+        aria-hidden="true"
+      ></span>
+      <div>
+        <h1 class="profile-name">{{ p.display_name }}</h1>
+        <p class="profile-handle">@{{ p.handle }}</p>
+      </div>
+    </div>
+
+    <div class="profile-counts">
+      <span><b class="follower-count">{{ p.follower_count }}</b> followers</span>
+      <span><b>{{ p.following_count }}</b> following</span>
+    </div>
+
+    {# No Follow button on your own profile — you can't follow yourself (the server enforces
+       this too, returning 400). #}
+    {% if not p.is_self %}
+    <button
+      type="button"
+      class="btn follow-btn {{ 'btn-ghost' if p.is_following else 'btn-spotify' }}"
+      data-user-id="{{ p.id }}"
+      data-following="{{ 'true' if p.is_following else 'false' }}"
+      aria-pressed="{{ 'true' if p.is_following else 'false' }}"
+      onclick="toggleFollow(this)"
+    >{{ 'Following' if p.is_following else 'Follow' }}</button>
+    {% endif %}
+  </div>
+
+  {# Now-playing badge (T44/UI-10) — own profile only; hidden when nothing is playing. #}
+  {% if now_playing %}
+  <div class="now-playing card">
+    <span class="np-dot" aria-hidden="true"></span>
+    <span class="np-label">Now playing</span>
+    <span class="np-track">{{ now_playing.title }} — {{ now_playing.artist_name }}</span>
+  </div>
+  {% endif %}
+
+  {# Listening summary (T44): what this person actually plays, from their snapshot history.
+     ADR-0014 — listening surfaces here on the profile, not in the feed. #}
+  {% if p.top_tracks or p.recent %}
+  <section class="listening card">
+    <h2 class="section-title">Listening</h2>
+    <div class="listening-stats">
+      <span><b>{{ p.streak }}</b> day streak</span>
+      <span><b>{{ p.plays_30d }}</b> plays · last 30 days</span>
+    </div>
+
+    {% if p.top_tracks %}
+    <div class="listening-block">
+      <h3>Top tracks</h3>
+      <ol class="top-list">
+        {% for t in p.top_tracks %}
+        <li>
+          <span class="top-title">{{ t.title }}</span>
+          <span class="top-artist">{{ t.artist }}</span>
+          <span class="top-plays">{{ t.plays }} plays</span>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+
+    {% if p.top_artists %}
+    <div class="listening-block">
+      <h3>Top artists</h3>
+      <ol class="top-list">
+        {% for a in p.top_artists %}
+        <li><span class="top-title">{{ a.name }}</span> <span class="top-plays">{{ a.plays }} plays</span></li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+
+    {% if p.recent %}
+    <div class="listening-block">
+      <h3>Recent listens</h3>
+      <ul class="recent-list">
+        {% for r in p.recent %}
+        <li>
+          {% if r.album_art %}<img class="recent-art" src="{{ r.album_art }}" alt="" />{% endif %}
+          <span class="recent-title">{{ r.title }}</span>
+          <span class="recent-artist">{{ r.artist }}</span>
+          <span class="recent-when">{{ r.when }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </section>
+  {% elif p.is_self and not p.has_spotify %}
+  {# Your own profile, no linked Spotify yet — prompt to connect so we can show your listening. #}
+  <div class="card empty">
+    <p>Connect Spotify to see your listening here.</p>
+    <p><a class="btn btn-spotify" href="/auth/login">Link Spotify 🎧</a></p>
+  </div>
+  {% elif p.is_self %}
+  {# Linked, but the snapshot hasn't captured any plays yet. #}
+  <div class="card empty">
+    <p>No listening yet — play some music on Spotify and it'll show up here. 🎧</p>
+  </div>
+  {% endif %}
+
+  <h2 class="section-title">Shared songs</h2>
+  {% if p.posts %}
+    <div class="stack">
+      {% for post in p.posts %}
+      <article class="post">
+        <div class="post-art">
+          {% if post.album_art %}<img src="{{ post.album_art }}" alt="" />{% endif %}
+        </div>
+        <div class="post-body">
+          <p class="post-track">{{ post.title }}</p>
+          <p class="post-artist">{{ post.artist }}</p>
+          {% if post.caption %}<p class="post-caption">"{{ post.caption }}"</p>{% endif %}
+          <p class="post-meta">shared {{ post.when }}</p>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card empty">
+      <p>{{ p.display_name }} hasn't shared any songs yet. 🎧</p>
+    </div>
+  {% endif %}
+</section>
+
+{# Makes the Follow/Unfollow button live (calls the T13 follow API). #}
+<script src="/static/follow.js"></script>
+{% endblock %}

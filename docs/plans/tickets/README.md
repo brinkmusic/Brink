@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T37**, **T39**, T70–T74, T77, T78, **T90–T93**). The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T37**, **T39**, **T40**, **T41**, **T42**, **T43**, **T44**, **T50**, **T51**, **T52**, **T60**, **T62**, T70–T74, T77, T78, **T90–T93**). **T60 retired the React/Vite SPA** (`apps/web/` deleted, ADR-0013) — the frontend is now solely the Jinja/HTMX pages served by the FastAPI backend; two owner infra steps remain (drop the `web` branch-protection check + decommission Vercel). **T44 (profile listening summary)** ships the ADR-0014 listening surface (top tracks/artists, recent, streak, 30-day, own-profile now-playing, link-Spotify prompt); the analytics half (cluster/compat/genres) is deferred to the slimmed **T14**. The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
 
 ## How these relate to the rest of the docs
 
@@ -15,7 +15,7 @@ This directory **supersedes** the old single-file `2026-06-22-brink-implementati
 
 Each file has YAML frontmatter + sections:
 
-- **frontmatter** — `status`, `priority`, `complexity`, `category`, `owner`, `tags`, `blocked_by`, `blocks`. `owner` is the default reviewer/assignee by code area: **Andrea** (backend — `backend/`, auth, Spotify, DB), **Jonah** (analytics — `analytics/`), **Sebastian** (frontend — `apps/web/`).
+- **frontmatter** — `status`, `priority`, `complexity`, `category`, `owner`, `tags`, `blocked_by`, `blocks`. `owner` is the default reviewer/assignee by code area: **Andrea** (backend — `backend/`, auth, Spotify, DB), **Jonah** (analytics — `analytics/`), **Sebastian** (frontend — the Jinja/HTMX pages under `backend/app/templates|static|routers/pages.py`; the `apps/web/` SPA was retired in T60).
 - **Rationale / Summary** — why it exists, what it does.
 - **Source** — requirement IDs + ADRs.
 - **Scope (In / Out)** — explicit boundaries.
@@ -45,25 +45,26 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 
 | Wave | Tickets |
 |---|---|
-| **0 (ready)** | `003` `030` `050` |
-| 1 | `021` `031` `040` `051` |
-| 2 | `032` `034` `036` `041` `042` `043` `052` |
+| **0 (ready)** | `003` `030` ~~`050`~~ ✅ |
+| 1 | `021` `031` ~~`040`~~ ✅ ~~`051`~~ ✅ |
+| 2 | `032` `034` `036` ~~`041`~~ ✅ ~~`042`~~ ✅ ~~`043`~~ ✅ ~~`052`~~ ✅ |
 | 3 | `033` `038` `045` |
 | 4 | `035` |
 | 5 | `014` |
-| 6 | `044` |
-| 7 | `060` |
+| 6 | ~~`044`~~ ✅ |
+| 7 | ~~`060`~~ ✅ |
 | 8 | `061` |
 
 **Ready to start now** (all `blocked_by` merged, as of T13):
-- `003` (Sebastian) · `050` (Andrea) · `030` (Jonah) — these never had blockers.
-- **Newly unblocked by T10:** **`040` — post composer + Spotify catalog search (Sebastian).** (`011`, `012` done.)
-- **Newly unblocked by T13 (follow + feed):** the follow/feed UIs — `041` `043` (Sebastian) — once their own remaining blockers are merged.
+- `003` (Sebastian) · `030` (Jonah) — these never had blockers.
+- **Done (with caveats):** `051` — artist upload UI (Sebastian). Built the `/artist` page + upload flow; the real Storage upload + private-image read URL still need a real environment / a T50 decision.
+- **Done:** **`040` — composer + Spotify catalog search (Sebastian + Andrea).** `GET /api/search` (client-credentials) + a composer on the feed that publishes via `POST /api/posts`.
+- **Done:** `041` — feed + live reactions, `042` — comments UI (Sebastian) — the feed page reuses `build_feed()` and reacts/comments via the T11/T12 APIs from the browser.
 - **`009` (server-side Spotify login) done** — the ADR-0013 Jinja shell (PR #60) merged and this landed on top; the Python frontend can now sign users in and gate `/feed`.
 
 The wave numbers below are *dependency depth*, not live status — a ticket is startable as soon as its `blocked_by` are merged, which is what the "Ready to start now" list above reflects. Update that list whenever a wave of blockers merges.
 
-Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-profile spine).
+Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-profile spine). **Note (2026-07-15):** T44's *listening* half was decoupled from this spine and shipped ahead of it (ADR-0014 + the T44/T14 re-scope) — it needs only `Play` data (T21) + now-playing (T20). What still runs down this spine is the T14 analytics layer (cluster/compatibility/genres) that later augments the profile.
 
 ### Review-remediation wave (2026-07-02) — `070`–`078`
 
@@ -89,6 +90,6 @@ pattern (`backend/app/...`).
 
 ## Working a ticket
 
-Per `CLAUDE.md`: branch off `develop` as `<type>/T<NN>-<slug>`, **one ticket = one PR into `develop`** (never `main`), TDD with a failing test first. The owner of the touched area (Andrea = backend, Sebastian = apps/web, Jonah = analytics) is the default reviewer.
+Per `CLAUDE.md`: branch off `develop` as `<type>/T<NN>-<slug>`, **one ticket = one PR into `develop`** (never `main`), TDD with a failing test first. The owner of the touched area (Andrea = backend, Sebastian = the Jinja frontend in `backend/app/`, Jonah = analytics) is the default reviewer.
 
 > The `.tdd/` directory (if present) is an optional local tooling workspace for the maintainer and is gitignored — it is **not** the source of truth. These files are.

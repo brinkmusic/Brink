@@ -24,6 +24,8 @@ EXPECTED_TABLES = {
     "Comment",
     "Follow",
     "ArtistPost",
+    "ArtistReaction",  # added in T52 — engagement on artist posts
+    "ArtistComment",   # added in T52 — engagement on artist posts
     "RateLimitHit",  # added in T10 for rate limiting (ADR-0011)
     # silver schema — conformed play/track data
     "silver.Track",

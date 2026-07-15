@@ -11,9 +11,9 @@
 # callers aren't forced to use aliases.
 
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
 
 from app.models import PostSource, ReactionType
@@ -62,6 +62,28 @@ class ReactionBody(CamelModel):
 # There is deliberately no user field: the author is always the authenticated caller.
 class CommentBody(CamelModel):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+
+
+# The body of POST /api/artist/sign-upload (T50). Both fields are the "technical validation"
+# ADR-0007/ADR-0008 call for — enforced here so a bad request is a 400 before any logic runs
+# (there is NO content/NSFW moderation, only these format/size checks):
+#   content_type -> a Literal of exactly the two allowed image types, so anything else (gif,
+#                   pdf, ...) is rejected as a 400. The frontend sends the file's MIME type.
+#   size_bytes   -> the file's size; gt=0 rejects an empty/absent size and le=10 MiB caps it.
+# There is deliberately no artistUserId field: the artist is always the authenticated caller.
+class SignUploadBody(CamelModel):
+    content_type: Literal["image/jpeg", "image/png"]
+    size_bytes: Annotated[int, Field(gt=0, le=10 * 1024 * 1024)]
+
+
+# The body of POST /api/artist/posts (T50). image_url is the object URL of the already-uploaded
+# image (via the signed URL above); caption is required (the ArtistPost.caption column is NOT
+# NULL); linked_track_id optionally ties the post to a song. No artistUserId here either — the
+# author is always the authenticated caller, so it cannot be spoofed from the body.
+class CreateArtistPostBody(CamelModel):
+    image_url: str
+    caption: str
+    linked_track_id: Optional[str] = None
 
 
 # --- Responses ---------------------------------------------------------------------
@@ -141,3 +163,33 @@ class FeedPostOut(CamelModel):
     reaction_counts: dict[str, int]
     comment_count: int
     viewer_reactions: dict[str, bool]
+
+
+# What POST /api/artist/sign-upload returns (T50): the pieces the browser needs to upload the
+# file itself. `path` is the object's location in the bucket (also stored later as part of the
+# image URL); `signed_url` + `token` are Supabase's single-use upload credentials.
+class SignUploadOut(CamelModel):
+    path: str
+    signed_url: str
+    token: str
+
+
+# An ArtistPost as the API returns it (T50): its own fields only, an explicit allow-list.
+class ArtistPostOut(CamelModel):
+    id: str
+    artist_user_id: str
+    image_url: str
+    caption: str
+    linked_track_id: Optional[str] = None
+    created_at: datetime
+
+
+# What GET /api/artist/posts/{id}/engagement returns to the OWNING artist (T52, MEDIA-4): how their
+# post is performing. `reaction_counts` always carries an entry for every reaction type (zeros
+# included), like ReactionCountsOut, so the artist page renders a stable set of badges; `comment_count`
+# is how many comments the post has. (A view count is a deferred follow-up — there is no public
+# artist-post read path to count views from yet; that surface is the artist UI, T51.)
+class ArtistEngagementOut(CamelModel):
+    post_id: str
+    reaction_counts: dict[str, int]
+    comment_count: int
