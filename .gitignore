@@ -12,6 +12,9 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
+# Analytics: local dataset files (large, sourced manually — never committed)
+analytics/data/
+
 # Node
 node_modules/
 dist/
