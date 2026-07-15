@@ -1,0 +1,22 @@
+[project]
+name = "analytics"
+version = "0.1.0"
+description = "Brink analytics — Python/scikit-learn batch pipeline (ADR-0003)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=3.0.3",
+    "psycopg[binary]>=3.3.4",
+    "python-dotenv>=1.2.2",
+    "scikit-learn>=1.9.0",
+    "sqlalchemy>=2.0.51",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

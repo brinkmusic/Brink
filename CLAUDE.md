@@ -320,8 +320,14 @@ PR that it went in without a second review).
   prompt, and empty states. T44 was **re-scoped** (ADR-0014): the feed stays manual-only, and the
   analytics half — cluster/compatibility (UI-6) + top genres (AN-7) + feed/other-user now-playing
   (UI-10) — is deferred to the slimmed **T14**, still blocked on the analytics spine (T33/T35) and the
-  Kaggle genre join (T31); UI-6/UI-10/AN-7 are marked **◧ partial**. **Next backend feature: the
-  analytics spine (031/033/034, Jonah) is unblocked; T14 (profile analytics) still gated on T33/T35.**
+  Kaggle genre join (T31); UI-6/UI-10/AN-7 are marked **◧ partial**. **T30 (analytics scaffold) done**
+  — `uv init` an `analytics/` package (scikit-learn, pandas, SQLAlchemy, psycopg) with `analytics/db.py`
+  (SQLAlchemy engine off the root `.env`'s `DATABASE_URL`, normalizing the Supabase pooler URL like
+  `backend/app/db.py` does) and a passing smoke test reading a `silver."Track"` row count
+  (schema-qualified after T39 moved `Track` into `silver`); `uv.lock` committed. AN-8/INFRA-4 stay
+  **◧ partial** — both also need T38's GitHub Actions pipeline workflow, out of scope here. Its merge
+  unblocks **T31** (Kaggle genre join). **Next backend feature: T31 (Jonah) is unblocked; T32 stays
+  gated on T31; T14 (profile analytics) still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
 
