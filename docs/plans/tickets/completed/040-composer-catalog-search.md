@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Medium
 category: Feature
@@ -50,10 +50,10 @@ A `Composer` component plus a `GET /api/search` Spotify catalog-search endpoint 
 | `backend/tests/test_search.py` | CREATE | search endpoint tests |
 
 ## Testing Checklist
-- [ ] empty `q` → 400
-- [ ] search returns normalized track results
-- [ ] publishing from the composer creates a persisted `Post` (via T10)
-- [ ] a handle user (no Spotify) can still search and publish
+- [x] empty `q` → 400
+- [x] search returns normalized track results
+- [x] publishing from the composer creates a persisted `Post` (via T10)
+- [x] a handle user (no Spotify) can still search and publish (search uses an app-level token)
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -64,3 +64,21 @@ A `Composer` component plus a `GET /api/search` Spotify catalog-search endpoint 
 
 ## Notes
 Branch off `develop` as `feat/T40-composer`; one PR back into `develop` (never `main`). Owner: Sebastian (UI) + Andrea (`backend/app/routers/search.py`).
+
+## Outcome (as built)
+Both halves built in one PR (ADR-0013 Python frontend). Andrea gave the OK to build the backend
+half.
+
+- **Search endpoint (backend):** `backend/app/routers/search.py` — `GET /api/search?q=` (login
+  required, per-user rate-limited, empty `q` → 400). It calls a new **client-credentials** path in
+  `backend/app/spotify.py` (`_get_client_credentials_token` with an in-process cache +
+  `search_tracks`) so search works with an **app-level** Spotify token — no user Spotify link
+  needed (handle users can search). Returns normalized camelCase `TrackOut`. A Spotify outage /
+  missing credentials returns a clean 502, never a 500. Tests: `backend/tests/test_search.py`.
+- **Composer (frontend):** a card at the top of the feed (`feed.html` + `static/composer.js`):
+  debounced search → pick a result → optional caption → Share, which `POST /api/posts` (T10, source
+  MANUAL) then reloads the feed so the new post shows at the top. Track titles rendered with
+  `textContent` (no HTML injection).
+- **Files:** `backend/app/routers/search.py`, `backend/app/spotify.py`, `backend/app/main.py`,
+  `backend/app/templates/feed.html`, `backend/app/static/composer.js`, `backend/app/static/brink.css`,
+  `backend/tests/test_search.py`, `backend/tests/test_pages.py`. Satisfies **UI-1**. Full suite green (162).

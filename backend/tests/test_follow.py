@@ -101,9 +101,11 @@ def test_follow_over_rate_limit_returns_429(client, as_user, db_session, monkeyp
 # Unfollowing removes the Follow row and reports following=false.
 def test_unfollow_removes_row(client, as_user, db_session):
     _seed_target(db_session)
+    # Seed the caller "me" BEFORE the Follow row that references it — as_user persists "me", and the
+    # test DB enforces the Follow.followerId foreign key.
+    as_user(_user("me"), session=db_session)
     db_session.add(Follow(follower_id="me", following_id="target-1"))
     db_session.commit()
-    as_user(_user("me"), session=db_session)
 
     res = client.delete("/api/follow/target-1")
     assert res.status_code == 200

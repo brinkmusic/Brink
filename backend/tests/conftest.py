@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -26,6 +27,9 @@ from app.db import get_session
 from app.deps import require_user
 from app.main import app
 from app.models import (
+    ArtistComment,
+    ArtistPost,
+    ArtistReaction,
     Comment,
     Follow,
     Play,
@@ -55,6 +59,14 @@ def db_session():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    # Enforce FOREIGN KEY constraints. WHY: SQLite ignores foreign keys unless you turn them on
+    # per-connection (`PRAGMA foreign_keys=ON`), so without this the tests silently accept rows
+    # that Postgres would reject — which is exactly how the T23 snapshot-500 (a Play inserted
+    # before the Track it references) slipped through the suite. Turning it on here makes every
+    # test that uses this fixture catch that whole class of insert-ordering / dangling-FK bug.
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_fks(dbapi_connection, _record):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
     # T39 (ADR-0009): some models now live in Postgres schemas (silver.Track, silver.Play, ...).
     # SQLite has no schemas, so we tell SQLAlchemy to translate every medallion schema to "no
     # schema" (None) for tests — the schema-qualified tables collapse into the one in-memory DB,
@@ -65,7 +77,7 @@ def db_session():
     )
     tables = [m.__table__ for m in (
         User, Track, Play, Post, Reaction, Comment, Follow, SpotifyToken,
-        SpotifyRecentlyPlayedRaw, RateLimitHit,
+        SpotifyRecentlyPlayedRaw, RateLimitHit, ArtistPost, ArtistReaction, ArtistComment,
     )]
     SQLModel.metadata.create_all(engine, tables=tables)
     with Session(engine) as session:
@@ -97,6 +109,15 @@ def as_user():
     def _install(user, session=None):
         if session is None:
             session = MagicMock()
+        elif isinstance(session, Session):
+            # A REAL database session (not a MagicMock): persist the acting user so endpoints that
+            # foreign-key-reference the caller (Post.userId, Reaction.userId, Comment.userId,
+            # Follow.followerId) satisfy that FK now that the test DB enforces foreign keys (see
+            # db_session above). merge() is insert-or-update by primary key, so it's safe even when a
+            # test also seeds this same user (e.g. the feed "me" viewer). We skip this for MagicMock
+            # sessions — those tests assert on mock calls (e.g. commit count) and don't hit a real DB.
+            session.merge(user)
+            session.commit()
         app.dependency_overrides[require_user] = lambda: user
         app.dependency_overrides[get_session] = lambda: session
         return session

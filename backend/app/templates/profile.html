@@ -1,0 +1,69 @@
+{#
+  WHAT THIS FILE IS
+  A user's profile page: their name/handle, follower + following counts, a Follow/Unfollow
+  button (hidden on your own profile), and the songs they've shared. This is the minimal
+  profile that gives the follow feature (T43) a home; the richer "Wrapped"-style stats come
+  later with T44. The Follow button is made live by static/follow.js.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stack">
+  <div class="profile-header card">
+    <div class="profile-id">
+      <span
+        class="profile-avatar"
+        {% if p.avatar_url %}style="background-image: url('{{ p.avatar_url }}')"{% endif %}
+        aria-hidden="true"
+      ></span>
+      <div>
+        <h1 class="profile-name">{{ p.display_name }}</h1>
+        <p class="profile-handle">@{{ p.handle }}</p>
+      </div>
+    </div>
+
+    <div class="profile-counts">
+      <span><b class="follower-count">{{ p.follower_count }}</b> followers</span>
+      <span><b>{{ p.following_count }}</b> following</span>
+    </div>
+
+    {# No Follow button on your own profile — you can't follow yourself (the server enforces
+       this too, returning 400). #}
+    {% if not p.is_self %}
+    <button
+      type="button"
+      class="btn follow-btn {{ 'btn-ghost' if p.is_following else 'btn-spotify' }}"
+      data-user-id="{{ p.id }}"
+      data-following="{{ 'true' if p.is_following else 'false' }}"
+      aria-pressed="{{ 'true' if p.is_following else 'false' }}"
+      onclick="toggleFollow(this)"
+    >{{ 'Following' if p.is_following else 'Follow' }}</button>
+    {% endif %}
+  </div>
+
+  {% if p.posts %}
+    <div class="stack">
+      {% for post in p.posts %}
+      <article class="post">
+        <div class="post-art">
+          {% if post.album_art %}<img src="{{ post.album_art }}" alt="" />{% endif %}
+        </div>
+        <div class="post-body">
+          <p class="post-track">{{ post.title }}</p>
+          <p class="post-artist">{{ post.artist }}</p>
+          {% if post.caption %}<p class="post-caption">"{{ post.caption }}"</p>{% endif %}
+          <p class="post-meta">shared {{ post.when }}</p>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card empty">
+      <p>{{ p.display_name }} hasn't shared any songs yet. 🎧</p>
+    </div>
+  {% endif %}
+</section>
+
+{# Makes the Follow/Unfollow button live (calls the T13 follow API). #}
+<script src="/static/follow.js"></script>
+{% endblock %}

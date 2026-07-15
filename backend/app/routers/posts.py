@@ -63,6 +63,13 @@ def create_post(
 
     # Make sure the song exists (or is refreshed) before the post links to it.
     track = upsert_track(session, body.track)
+    # Write the Track to the database NOW, before adding the Post that foreign-key-references it.
+    # WHY: our models declare FK columns but no ORM relationships, so SQLAlchemy inserts rows in the
+    # order they were added, NOT in foreign-key dependency order — so without this flush a brand-new
+    # Track and its Post could be sent to Postgres in an order that violates Post.trackId's FK (the
+    # same failure mode as the T23 snapshot-500). flush() sends the pending Track in this same
+    # transaction; the commit below still finalizes everything together.
+    session.flush()
 
     # The author is ALWAYS the authenticated user — never taken from the request body, so it
     # can't be spoofed. source/caption come from the (already validated) body.

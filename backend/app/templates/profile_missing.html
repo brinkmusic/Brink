@@ -1,0 +1,15 @@
+{#
+  WHAT THIS FILE IS
+  The "profile not found" page — shown when someone opens /u/<handle> for a handle that
+  doesn't exist (a stale or mistyped link). A friendly page instead of a raw error.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stack">
+  <div class="card empty">
+    <p>We couldn't find that profile. The link may be wrong or the account has moved.</p>
+    <p><a class="btn btn-ghost" href="/feed">Back to the feed</a></p>
+  </div>
+</section>
+{% endblock %}

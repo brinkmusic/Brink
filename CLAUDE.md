@@ -229,7 +229,20 @@ PR that it went in without a second review).
   — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
   `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
   counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
-  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **T22 (Spotify token refresh) done** —
+  + BE-7. Its merge unblocks the follow/feed UIs (T41, T43). **Frontend (Python, ADR-0013): the
+  landing page + login-gated feed shipped (#60), and T41 (feed + live reactions) done** — the feed
+  page reuses the shared `build_feed()` (extracted in `backend/app/routers/feed.py`) so it matches
+  `GET /api/feed`, and `backend/app/static/reactions.js` calls the T11 reactions API from the
+  browser (optimistic, reconciled with server counts), satisfying UI-2/UI-3. **T42 (comments UI) done**
+  — each feed post card has a comment toggle + panel that lists and adds comments via the T12 API
+  (`backend/app/static/comments.js`), satisfying UI-4. **T40 (composer + catalog search) done** —
+  `GET /api/search?q=` (`backend/app/routers/search.py`, login-gated + rate-limited) backed by a new
+  client-credentials path in `backend/app/spotify.py` (app-level token, so handle users can search),
+  plus a composer card on the feed (`backend/app/static/composer.js`) that searches, then publishes
+  via `POST /api/posts`, satisfying UI-1. **T43 (follow UI) done** — a minimal profile page
+  `GET /u/{handle}` (`backend/app/templates/profile.html`) with follower counts + a Follow/Unfollow
+  button (`backend/app/static/follow.js` → T13 API); feed authors link to it. Full "Wrapped" stats
+  are still T44 (needs T14). Satisfies UI-5. **T51 (artist upload UI) done (with caveats)** — an `/artist` page (`backend/app/templates/artist.html`) with a JPEG/PNG≤10MB upload box for artist accounts that runs the T50 signed-upload flow (`backend/app/static/artist-upload.js`); satisfies MEDIA-2. NOTE: the real Supabase Storage upload is unverified locally (MEDIA-5 integration check), and displaying private-bucket images needs a signed read URL not yet built (open T50 question). **T22 (Spotify token refresh) done** —
   `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
   (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
   unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against
@@ -275,10 +288,37 @@ PR that it went in without a second review).
   (2) hardening — `get_valid_access_token` decrypted stored tokens unguarded, so a `TOKEN_ENC_KEY`
   mismatch (`InvalidTag`) would crash the whole run; it now degrades an unreadable token to `None`
   (skip that user) via `_safe_decrypt`. Verified end-to-end against `brink-dev` (50 plays ingested).
-  **Follow-up:** the same insert-ordering gap likely affects the T10 posts endpoint for a brand-new
-  track (upsert_track + Post in one commit) — worth a check. **Next backend feature: T50 (artist
-  storage) is ready; the analytics spine (031/033/034, Jonah) is unblocked; T14 (profile) still
-  gated on T35.**
+  **T62 (FK-ordering hardening) done** — confirmed that follow-up: `db_session` now enforces FKs
+  (`PRAGMA foreign_keys=ON`) suite-wide, which surfaced 30 failures = 1 real bug (the T10 posts
+  endpoint had the same parent-before-child insert — now `flush()`es the Track before the Post) + 29
+  test-seed conveniences SQLite's lax default had hidden (fixed to commit parents before children;
+  `as_user` now persists the caller). Root cause: the models use FK columns without ORM
+  `relationship()`, so SQLAlchemy doesn't insert in FK order — parents must be flushed/committed
+  first. Also corrected the CLAUDE.md line that wrongly said Render deploys from `develop` (it's
+  `main`). **T50 (artist storage backend) done** — the artist BTS portal's server half:
+  `POST /api/artist/sign-upload` mints a Supabase Storage signed upload URL (service role) for the
+  private `artist-images` bucket at a caller-namespaced path, and `POST /api/artist/posts` creates an
+  `ArtistPost` (image URL + caption + optional `linkedTrackId`). Both are **artist-only** (caller must
+  be `User.isArtist == true`, else 403) with the artist always taken from the login (unspoofable, like
+  T10's `Post`); JPEG/PNG ≤ 10 MB is enforced at the request-contract level (ADR-0007/0008, technical
+  validation only — no moderation), satisfying BE-9/MEDIA-1/MEDIA-3. New `app/routers/artist.py` +
+  `create_signed_upload_url` in `security/supabase.py`. The private `artist-images` bucket has been
+  created in `brink-dev` (done). Its merge unblocks **T51** (artist upload UI) and **T52**
+  (per-post engagement). **T52 (artist engagement) done** — engagement on artist posts, under
+  `/api/artist`: `POST`/`DELETE /posts/{id}/reactions` and `POST`/`GET /posts/{id}/comments` are
+  login-gated but open to **any** user (the audience), while `GET /posts/{id}/engagement` is
+  **owner-only** (403 for a non-owner) and returns the owning artist's reaction + comment counts
+  (satisfies MEDIA-4). Because a foreign key targets one table and `ArtistPost` is not `Post`, this
+  added **new `ArtistReaction` + `ArtistComment` tables** (mirrors of `Reaction`/`Comment`, reusing
+  the `ReactionType` enum + rate-limit helper) rather than making the existing social tables
+  polymorphic — keeping the blast radius off the T10–T13 path. **Scope note:** the ticket assumed
+  T11/T12's reactions/comments already attached to artist posts (they don't), so with owner sign-off
+  it was widened to also build that write path; a **view count is deferred** (no artist-post read
+  path to count from yet — T51). **Deploy step for Andrea:** apply the migration to `brink-dev` —
+  `cd backend && uv run alembic upgrade head` (creates the two tables; reuses the existing
+  `ReactionType` enum, so no `CREATE TYPE`), same manual-apply pattern as T39. Its merge readies the
+  engagement API for **T51** to render. **Next backend feature: the analytics spine (031/033/034,
+  Jonah) is unblocked; T14 (profile) still gated on T35.**
 
 ## Deployment topology (ADR-0010, T07)
 
@@ -296,8 +336,10 @@ PR that it went in without a second review).
   `SPOTIFY_*`, `TOKEN_ENC_KEY`) live only in Render, never committed.
 - **Wiring:** the Vercel project's **root directory is `apps/web`** (it builds only the SPA).
   `apps/web/vercel.json` rewrites `/api/:path*` → the Render URL, so the browser still calls
-  same-origin `/api/*` (no CORS). Vercel deploys the frontend from `main`; Render deploys the
-  backend from `develop`.
+  same-origin `/api/*` (no CORS). **Both Vercel (frontend) and Render (backend) deploy from `main`**
+  — so backend changes reach production only via a `develop → main` release PR, and each release
+  must be followed by a back-merge of `main` into `develop` (or the next release PR is blocked as
+  BEHIND, since `main` protection is `strict`).
 - **Note:** the frontend still calls a legacy POC `/api/state` path (`apps/web/src/lib/backend.ts`)
   that FastAPI does not implement, so it 404s; those mock social features are replaced by the real
   API in T10–T14, and the `/api/state` calls are removed in T60.

@@ -163,6 +163,85 @@ body {
 .step-list p { margin: 0; color: var(--mute); font-size: 0.92rem; line-height: 1.5; }
 .steps > * + * { margin-top: 1rem; }
 
+/* ---- Composer (feed, T40) ---- */
+.composer { position: relative; }
+.composer-search,
+.composer-caption {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.composer-search:focus-visible,
+.composer-caption:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.composer-results {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--ink);
+  max-height: 15rem;
+  overflow-y: auto;
+}
+.composer-result {
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.composer-result:hover,
+.composer-result:focus-visible { background: var(--panel); outline: none; }
+.composer-result-empty { color: var(--mute); cursor: default; }
+.composer-selected { display: grid; gap: 0.6rem; }
+.composer-track { margin: 0; display: flex; flex-direction: column; }
+.composer-track-title { font-weight: 600; font-size: 0.95rem; }
+.composer-track-artist { color: var(--mute); font-size: 0.85rem; }
+.composer-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+/* ---- Artist page (T51) ---- */
+.artist-upload { display: grid; gap: 0.6rem; }
+.artist-file { color: var(--mute); font-size: 0.85rem; font-family: inherit; }
+.artist-caption {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.artist-caption:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.artist-status { margin: 0; color: var(--mute); font-size: 0.8rem; min-height: 1rem; }
+.artist-post { display: grid; gap: 0.5rem; }
+.artist-post-img { width: 100%; border-radius: 0.75rem; display: block; }
+.artist-post-caption { margin: 0; font-size: 0.95rem; }
+
+/* ---- Profile page (T43) ---- */
+.profile-header { display: grid; gap: 0.75rem; }
+.profile-id { display: flex; align-items: center; gap: 0.75rem; }
+.profile-avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background: linear-gradient(to bottom right, var(--accent), var(--hot));
+  background-size: cover;
+  background-position: center;
+}
+.profile-name { margin: 0; font-size: 1.25rem; }
+.profile-handle { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
+.profile-counts { display: flex; gap: 1.25rem; color: var(--mute); font-size: 0.9rem; }
+.profile-counts b { color: var(--text); font-variant-numeric: tabular-nums; }
+.follow-btn { justify-self: start; }
+.post-author { color: var(--text); text-decoration: none; font-weight: 500; }
+.post-author:hover { color: var(--accent); }
+
 /* ---- Feed: post cards ---- */
 .post {
   display: flex;
@@ -186,6 +265,69 @@ body {
 .post-artist { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
 .post-caption { margin: 0.4rem 0 0; font-size: 0.9rem; color: var(--text); font-style: italic; }
 .post-meta { margin: 0.4rem 0 0; color: var(--mute); font-size: 0.75rem; }
+
+/* ---- Reaction buttons (feed, T41) ---- */
+.reactions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.react-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mute);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.react-btn:hover { border-color: var(--accent); color: var(--text); }
+.react-btn:disabled { opacity: 0.6; cursor: default; }
+.react-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A reaction the viewer has left themselves: filled-in and on-brand. */
+.react-btn.reacted { border-color: var(--accent); background: rgba(157, 141, 241, 0.15); color: var(--text); }
+.react-emoji { line-height: 1; }
+.react-count { font-variant-numeric: tabular-nums; }
+
+/* ---- Comments (feed, T42) ---- */
+.comments { margin-top: 0.5rem; }
+.comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 9999px;
+}
+.comment-toggle:hover { color: var(--text); }
+.comment-count { font-variant-numeric: tabular-nums; }
+.comment-panel { margin-top: 0.5rem; }
+.comment-list { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.4rem; }
+.comment { font-size: 0.85rem; line-height: 1.4; }
+.comment-author { font-weight: 600; margin-right: 0.4rem; }
+.comment-body { color: var(--text); }
+.comment-when { color: var(--mute); font-size: 0.72rem; margin-left: 0.4rem; }
+.comment-empty { color: var(--mute); font-size: 0.85rem; }
+.comment-form { display: flex; gap: 0.5rem; }
+.comment-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.comment-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.comment-form .btn { padding: 0.45rem 0.9rem; font-size: 0.8rem; }
 .empty { color: var(--mute); font-size: 0.95rem; }
 .empty p { margin: 0; }
 

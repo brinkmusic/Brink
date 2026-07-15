@@ -25,7 +25,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
 | BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ✅ |
 | BE-8 | `GET /api/users/:id/profile` — stats + cluster + compatibility. | T14 | ◻ |
-| BE-9 | `POST /api/artist/posts` — create BTS post + optional track. | T50 | ◻ |
+| BE-9 | `POST /api/artist/posts` — create BTS post + optional track. | T50 | ✅ |
 | BE-10 | All mutations: session-gated, validated, consistent error JSON. | every API ticket (ADR-0007) | ◻ |
 | BE-11 | Connection pooling (Supabase pooler) configured. | T01, T05 | ✅ |
 
@@ -54,11 +54,11 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 5 — Frontend / UX-UI (UI)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| UI-1 | Post composer with Spotify catalog search → publish. | T40 | ◻ |
-| UI-2 | Feed reads `/api/feed`; manual + Spotify cards. | T41 | ◻ |
-| UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ◻ |
-| UI-4 | Comments become real input + list. | T42 | ◻ |
-| UI-5 | Follow/unfollow buttons + follower counts. | T43 | ◻ |
+| UI-1 | Post composer with Spotify catalog search → publish. | T40 | ✅ |
+| UI-2 | Feed reads `/api/feed`; manually shared song cards. *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed)* | T41 | ✅ |
+| UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
+| UI-4 | Comments become real input + list. | T42 | ✅ |
+| UI-5 | Follow/unfollow buttons + follower counts. | T43 | ✅ |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44 | ◻ |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
@@ -68,10 +68,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ◻ |
-| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. | T51 | ◻ |
-| MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ◻ |
-| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52 | ◻ |
+| MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ✅ |
+| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. | T51 | ✅ |
+| MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ✅ |
+| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52 | ✅ (reaction + comment counts, owner-only; view count deferred — no artist-post read path yet, T51) |
 | MEDIA-5 | ≥98% upload success across 5 file types up to 10 MB. | T51 | ◻ |
 
 ## Layer 7 — Infrastructure & Scheduling (INFRA)
@@ -95,6 +95,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 - **T39** — analytics schema migration (`ModelArtifact` + medallion bronze/silver/gold). Decision-driven (ADR-0003 / ADR-0009), no original spec req.
 - **T37** — Alembic schema reflection (`include_schemas` + guards) so autogenerate sees the medallion schemas. Tooling follow-up to T39 (ADR-0009), no spec req.
 - **T23** — snapshot-500 remediation: flush each upserted Track before its Play (FK insert-ordering) + guard token decryption so an unreadable token degrades to None. Production bug fix on T21/T22, no spec req.
+- **T62** — FK-ordering hardening: enforce foreign keys in the shared test fixture, fix the posts endpoint's parent-before-child insert, correct the Render deploy-branch doc. Follow-up to T23, no spec req.
 - **T61** — test sweep + k6 + cross-browser E2E. Maps to proposal §6/§11 below.
 
 ## Success-metric traceability (proposal §11)

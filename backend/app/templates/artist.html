@@ -1,0 +1,56 @@
+{#
+  WHAT THIS FILE IS
+  The artist "behind-the-scenes" page (T51): an artist's promo posts, and — for the artist
+  themselves — a box to upload a new one (a JPEG/PNG up to 10 MB) with a caption. The upload
+  goes to Supabase Storage via a signed URL (see static/artist-upload.js). Non-artists just see
+  the posts + a note; the T50 API is the real gate, this only hides the upload box.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="stack">
+  <div>
+    <h1 class="section-title">Behind the scenes</h1>
+    <p class="hero-sub">Promo posts straight from the artist 🎤</p>
+  </div>
+
+  {% if is_artist %}
+  <div class="artist-upload card">
+    <p class="card-label">Share something new</p>
+    <input
+      type="file"
+      class="artist-file"
+      accept="image/jpeg,image/png"
+      onchange="artistFilePicked(this)"
+    />
+    <input type="text" class="artist-caption" placeholder="Add a caption…" maxlength="2000" />
+    <p class="artist-status" role="status"></p>
+    <div class="composer-actions">
+      <button type="button" class="btn btn-spotify artist-share" onclick="artistUpload(this)" disabled>
+        Share 🎶
+      </button>
+    </div>
+  </div>
+  {% else %}
+  <div class="card empty">
+    <p>This is where artists post behind-the-scenes content. Artist accounts only. 🎧</p>
+  </div>
+  {% endif %}
+
+  {% if posts %}
+    <div class="stack">
+      {% for post in posts %}
+      <article class="artist-post card">
+        <img class="artist-post-img" src="{{ post.image_url }}" alt="{{ post.caption }}" />
+        <p class="artist-post-caption">{{ post.caption }}</p>
+        <p class="post-meta">shared {{ post.when }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  {% elif is_artist %}
+    <div class="card empty"><p>No posts yet. Share your first one above. 🎤</p></div>
+  {% endif %}
+</section>
+
+{% if is_artist %}<script src="/static/artist-upload.js"></script>{% endif %}
+{% endblock %}

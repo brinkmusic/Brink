@@ -7,8 +7,10 @@
 #
 # Pages so far:
 #   GET /      -> the public landing page (what a visitor sees before signing in)
-#   GET /feed  -> the feed of songs people have shared, read from the posts the
-#                 T10 API creates (Post + Track rows). Read-only, no login needed.
+#   GET /feed  -> the feed page. Reuses the shared build_feed() (app/routers/feed.py) so it
+#                 shows the SAME posts as GET /api/feed (people you follow + your own), each
+#                 with live reaction counts. Login-gated (T09); the reaction buttons call the
+#                 T11 reactions API from the browser (T41).
 
 import logging
 from datetime import datetime, timezone
@@ -17,11 +19,13 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.db import get_session
 from app.deps import AuthError, require_user
-from app.models import Post, Track
+from app.models import ArtistPost, Follow, Post, Track, User
+from app.routers.feed import build_feed
 
 logger = logging.getLogger(__name__)
 
@@ -72,38 +76,41 @@ def _ago(when: datetime) -> str:
     return f"{hours // 24}d ago"
 
 
-# Read the most recent shared songs from the database, newest first. This is the SAME
-# data the T10 posts API creates (Post rows, each joined to its Track). We return plain
-# dictionaries — not live database rows — so the template can safely use them after the
-# database session has closed.
-def _recent_posts(session: Session, limit: int = 20) -> list[dict]:
+# Build the list of feed posts for the template. We REUSE the shared feed builder
+# (app/routers/feed.build_feed) so the page shows EXACTLY the same feed as GET /api/feed
+# (posts from people you follow plus your own, with reaction counts and which reactions are
+# yours) — no duplicated query logic. Then we reshape each item for the template: flatten the
+# nested track fields, turn the ISO timestamp into a friendly "3m ago", and collect the
+# reaction types the viewer already tapped into a set the template can test with `in`.
+def _feed_items(session: Session, user) -> list[dict]:
     try:
-        rows = session.exec(
-            # Post JOINed to its Track (same join the T10 GET /api/posts uses), newest
-            # first, capped so the page never tries to render thousands of rows.
-            select(Post, Track)
-            .join(Track, Track.spotify_id == Post.track_id)
-            .order_by(Post.created_at.desc())
-            .limit(limit)
-        ).all()
-    except Exception as e:  # noqa: BLE001 — any DB problem should just show an empty feed
+        raw = build_feed(session, user)
+    except Exception as e:  # noqa: BLE001 — any DB problem shows an empty feed, never a crash
         # No database reachable (e.g. running locally without credentials) or a transient
         # outage: log it and show an empty feed rather than crashing the whole page.
-        logger.warning("feed query failed, showing empty feed: %s", e)
+        logger.warning("feed build failed, showing empty feed: %s", e)
         return []
 
-    return [
-        {
-            "user_id": post.user_id,
-            "caption": post.caption,
-            "source": post.source.value,
-            "title": track.title,
-            "artist": track.artist_name,
-            "album_art": track.album_art_url,
-            "when": _ago(post.created_at),
-        }
-        for post, track in rows
-    ]
+    items = []
+    for it in raw:
+        # viewerReactions is {type: True/False}; keep just the types set to True.
+        mine = {kind for kind, on in it["viewerReactions"].items() if on}
+        items.append(
+            {
+                "id": it["id"],
+                "author": it["author"]["displayName"],
+                "author_handle": it["author"]["handle"],  # for linking to their profile (T43)
+                "title": it["track"]["title"],
+                "artist": it["track"]["artistName"],
+                "album_art": it["track"]["albumArtUrl"],
+                "caption": it["caption"],
+                "when": _ago(datetime.fromisoformat(it["createdAt"])),
+                "counts": it["reactionCounts"],
+                "mine": mine,
+                "comment_count": it["commentCount"],
+            }
+        )
+    return items
 
 
 # The feed page: a list of the songs people have shared. Read-only, so no login is
@@ -117,15 +124,131 @@ def feed(request: Request, session: Session = Depends(get_session)):
     # old, now-rotated token and eventually be logged out.
     refreshed = Response()
     try:
-        require_user(request, session=session, response=refreshed)
+        user = require_user(request, session=session, response=refreshed)
     except AuthError:
         return RedirectResponse("/auth/login", status_code=303)
 
-    posts = _recent_posts(session)
+    # Reuse the shared feed builder so the page matches GET /api/feed exactly (T41).
+    posts = _feed_items(session, user)
     page = templates.TemplateResponse(
         request,
         "feed.html",
         {"page_title": "Feed · Brink", "posts": posts},
+    )
+    for key, value in refreshed.raw_headers:
+        if key == b"set-cookie":
+            page.raw_headers.append((key, value))
+    return page
+
+
+# Gather everything a profile page needs: the person, their follower/following counts, whether the
+# viewer already follows them, and their own posts (newest-first). This is the minimal profile that
+# gives the Follow button (T43) a home; the full "Wrapped"-style stats/cluster/compatibility come
+# with T44 (which needs the profile API, T14). Returns None if there's no user with that handle.
+def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
+    person = session.exec(select(User).where(User.handle == handle)).first()
+    if person is None:
+        return None
+
+    # follower_count = people who follow THEM; following_count = people THEY follow.
+    follower_count = session.exec(
+        select(func.count()).select_from(Follow).where(Follow.following_id == person.id)
+    ).one()
+    following_count = session.exec(
+        select(func.count()).select_from(Follow).where(Follow.follower_id == person.id)
+    ).one()
+    # Does the viewer already follow this person? (Follow's PK is (follower_id, following_id).)
+    is_following = session.get(Follow, (viewer_id, person.id)) is not None
+
+    # Their posts, newest-first, joined to each track (simple read-only cards on the profile).
+    rows = session.exec(
+        select(Post, Track)
+        .join(Track, Track.spotify_id == Post.track_id)
+        .where(Post.user_id == person.id)
+        .order_by(Post.created_at.desc())
+    ).all()
+    posts = [
+        {
+            "title": track.title,
+            "artist": track.artist_name,
+            "album_art": track.album_art_url,
+            "caption": post.caption,
+            "when": _ago(post.created_at),
+        }
+        for post, track in rows
+    ]
+
+    return {
+        "id": person.id,
+        "display_name": person.display_name,
+        "handle": person.handle,
+        "avatar_url": person.avatar_url,
+        "follower_count": follower_count,
+        "following_count": following_count,
+        "is_following": is_following,
+        "is_self": person.id == viewer_id,  # hide the Follow button on your own profile
+        "posts": posts,
+    }
+
+
+# A user's profile page: their header, a Follow/Unfollow button + follower counts (T43), and their
+# posts. Login-gated like the rest of the app. `handle` comes from the URL, e.g. /u/andrea-ab12cd.
+@router.get("/u/{handle}", response_class=HTMLResponse)
+def profile(handle: str, request: Request, session: Session = Depends(get_session)):
+    refreshed = Response()
+    try:
+        viewer = require_user(request, session=session, response=refreshed)
+    except AuthError:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    data = _profile_data(session, handle, viewer_id=viewer.id)
+    if data is None:
+        # No such handle — render a friendly 404 page rather than a raw error.
+        page = templates.TemplateResponse(
+            request, "profile_missing.html", {"page_title": "Not found · Brink"}, status_code=404
+        )
+    else:
+        page = templates.TemplateResponse(
+            request, "profile.html", {"page_title": f"{data['display_name']} · Brink", "p": data}
+        )
+    for key, value in refreshed.raw_headers:
+        if key == b"set-cookie":
+            page.raw_headers.append((key, value))
+    return page
+
+
+# The artist "behind-the-scenes" page (T51): an artist account's promo posts, plus (for the artist
+# themselves) an upload box to add a new one. Login-gated; the upload UI only shows for artist
+# accounts (User.is_artist) — the T50 API is the real gate (403 for non-artists), this just hides
+# the box for everyone else. The actual file upload goes browser -> Supabase Storage via a signed
+# URL (see static/artist-upload.js).
+@router.get("/artist", response_class=HTMLResponse)
+def artist_page(request: Request, session: Session = Depends(get_session)):
+    refreshed = Response()
+    try:
+        user = require_user(request, session=session, response=refreshed)
+    except AuthError:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    # This artist's existing promo posts, newest-first.
+    rows = session.exec(
+        select(ArtistPost)
+        .where(ArtistPost.artist_user_id == user.id)
+        .order_by(ArtistPost.created_at.desc())
+    ).all()
+    posts = [
+        {
+            "image_url": post.image_url,
+            "caption": post.caption,
+            "when": _ago(post.created_at),
+        }
+        for post in rows
+    ]
+
+    page = templates.TemplateResponse(
+        request,
+        "artist.html",
+        {"page_title": "Artist · Brink", "is_artist": user.is_artist, "posts": posts},
     )
     for key, value in refreshed.raw_headers:
         if key == b"set-cookie":

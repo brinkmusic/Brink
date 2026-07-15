@@ -33,9 +33,13 @@ NOW = datetime.now(timezone.utc).replace(tzinfo=None)
 # Build a small world: viewer "me", a followee "friend", and an unfollowed "stranger", each with
 # one post. Returns the post ids so tests can assert which appear in the feed.
 def _seed_world(session):
+    # Seed the parents (the three users + the Track) and commit them FIRST: the Posts and the Follow
+    # foreign-key-reference them, and the test DB enforces foreign keys, so the parents must exist
+    # before the children.
     session.add(Track(spotify_id="spot-1", title="A", artist_name="X"))
     for uid in ("me", "friend", "stranger"):
         session.add(_user(uid, uid))
+    session.commit()
     session.add(Post(id="p-me", user_id="me", track_id="spot-1", source=PostSource.MANUAL,
                      created_at=NOW - timedelta(minutes=10)))
     session.add(Post(id="p-friend", user_id="friend", track_id="spot-1", source=PostSource.MANUAL,
@@ -61,6 +65,7 @@ def test_feed_unauthenticated_returns_401(client):
 def test_feed_no_follows_shows_self(client, as_user, db_session):
     db_session.add(Track(spotify_id="spot-1", title="A", artist_name="X"))
     db_session.add(_user("me", "me"))
+    db_session.commit()  # Track + author committed before the Post that references them (FK enforced)
     db_session.add(Post(id="p-me", user_id="me", track_id="spot-1", source=PostSource.MANUAL,
                         created_at=NOW))
     db_session.commit()

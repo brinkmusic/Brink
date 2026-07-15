@@ -22,6 +22,7 @@ from app.deps import AuthError
 from app.rate_limit import RateLimitError
 from app.responses import fail
 from app.routers import (
+    artist,
     auth,
     comments,
     feed,
@@ -31,6 +32,7 @@ from app.routers import (
     pages,
     posts,
     reactions,
+    search,
     snapshot,
 )
 
@@ -61,6 +63,8 @@ app.include_router(follow.router)     # POST/DELETE /api/follow/{userId}
 app.include_router(feed.router)       # GET /api/feed
 app.include_router(now_playing.router)  # GET /api/me/now-playing
 app.include_router(snapshot.router)     # POST /api/snapshot (cron-triggered)
+app.include_router(artist.router)       # POST /api/artist/sign-upload, POST /api/artist/posts
+app.include_router(search.router)       # GET /api/search?q= (Spotify catalog search, T40)
 app.include_router(pages.router)   # GET /, GET /feed — the browser-facing web pages (ADR-0013)
 
 
