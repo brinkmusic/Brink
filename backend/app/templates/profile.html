@@ -41,6 +41,81 @@
     {% endif %}
   </div>
 
+  {# Now-playing badge (T44/UI-10) — own profile only; hidden when nothing is playing. #}
+  {% if now_playing %}
+  <div class="now-playing card">
+    <span class="np-dot" aria-hidden="true"></span>
+    <span class="np-label">Now playing</span>
+    <span class="np-track">{{ now_playing.title }} — {{ now_playing.artist_name }}</span>
+  </div>
+  {% endif %}
+
+  {# Listening summary (T44): what this person actually plays, from their snapshot history.
+     ADR-0014 — listening surfaces here on the profile, not in the feed. #}
+  {% if p.top_tracks or p.recent %}
+  <section class="listening card">
+    <h2 class="section-title">Listening</h2>
+    <div class="listening-stats">
+      <span><b>{{ p.streak }}</b> day streak</span>
+      <span><b>{{ p.plays_30d }}</b> plays · last 30 days</span>
+    </div>
+
+    {% if p.top_tracks %}
+    <div class="listening-block">
+      <h3>Top tracks</h3>
+      <ol class="top-list">
+        {% for t in p.top_tracks %}
+        <li>
+          <span class="top-title">{{ t.title }}</span>
+          <span class="top-artist">{{ t.artist }}</span>
+          <span class="top-plays">{{ t.plays }} plays</span>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+
+    {% if p.top_artists %}
+    <div class="listening-block">
+      <h3>Top artists</h3>
+      <ol class="top-list">
+        {% for a in p.top_artists %}
+        <li><span class="top-title">{{ a.name }}</span> <span class="top-plays">{{ a.plays }} plays</span></li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+
+    {% if p.recent %}
+    <div class="listening-block">
+      <h3>Recent listens</h3>
+      <ul class="recent-list">
+        {% for r in p.recent %}
+        <li>
+          {% if r.album_art %}<img class="recent-art" src="{{ r.album_art }}" alt="" />{% endif %}
+          <span class="recent-title">{{ r.title }}</span>
+          <span class="recent-artist">{{ r.artist }}</span>
+          <span class="recent-when">{{ r.when }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </section>
+  {% elif p.is_self and not p.has_spotify %}
+  {# Your own profile, no linked Spotify yet — prompt to connect so we can show your listening. #}
+  <div class="card empty">
+    <p>Connect Spotify to see your listening here.</p>
+    <p><a class="btn btn-spotify" href="/auth/login">Link Spotify 🎧</a></p>
+  </div>
+  {% elif p.is_self %}
+  {# Linked, but the snapshot hasn't captured any plays yet. #}
+  <div class="card empty">
+    <p>No listening yet — play some music on Spotify and it'll show up here. 🎧</p>
+  </div>
+  {% endif %}
+
+  <h2 class="section-title">Shared songs</h2>
   {% if p.posts %}
     <div class="stack">
       {% for post in p.posts %}

@@ -317,8 +317,18 @@ PR that it went in without a second review).
   path to count from yet — T51). **Deploy step for Andrea:** apply the migration to `brink-dev` —
   `cd backend && uv run alembic upgrade head` (creates the two tables; reuses the existing
   `ReactionType` enum, so no `CREATE TYPE`), same manual-apply pattern as T39. Its merge readies the
-  engagement API for **T51** to render. **Next backend feature: the analytics spine (031/033/034,
-  Jonah) is unblocked; T14 (profile) still gated on T35.**
+  engagement API for **T51** to render. **T40–T43 + T51 frontend and T44 shipped; released to
+  production (`develop → main` #97, back-merged #98) — the composer/reactions/comments/follow and the
+  profile are now live on Render.** **T44 (profile listening summary) done** — per
+  [ADR-0014](docs/decisions/adr/0014-feed-manual-posts-listening-summary.md) a user's Spotify
+  listening surfaces on their profile (`/u/{handle}`), not the feed: new `app/stats.py` computes top
+  tracks/artists, recent listens, 30-day count, and listening streak live over `Play` (ADR-0003, no
+  `UserStats` table), rendered with an own-profile now-playing badge (me-scoped T20), a "link Spotify"
+  prompt, and empty states. T44 was **re-scoped** (ADR-0014): the feed stays manual-only, and the
+  analytics half — cluster/compatibility (UI-6) + top genres (AN-7) + feed/other-user now-playing
+  (UI-10) — is deferred to the slimmed **T14**, still blocked on the analytics spine (T33/T35) and the
+  Kaggle genre join (T31); UI-6/UI-10/AN-7 are marked **◧ partial**. **Next backend feature: the
+  analytics spine (031/033/034, Jonah) is unblocked; T14 (profile analytics) still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07)
 

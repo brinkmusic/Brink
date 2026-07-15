@@ -2,7 +2,7 @@
 
 The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement → ticket** map. This replaces the old `brink-spec-design.md`: decisions now live in [`docs/decisions/`](../decisions/), the data model in [`backend/app/models.py`](../../backend/app/models.py) (SQLModel), and the implementation plan in [`tickets/`](tickets/). This file is the glue that proves the proposal's scope is covered.
 
-**Status:** ✅ done · ◻ backlog · **†** = original spec text superseded by a later decision (see [Superseded](#superseded-spec-text)).
+**Status:** ✅ done · ◧ partially done (remainder tracked in the noted ticket) · ◻ backlog · **†** = original spec text superseded by a later decision (see [Superseded](#superseded-spec-text)).
 
 ## Layer 1 — Identity & Auth (AUTH)
 | ID | Acceptance | Ticket(s) | Status |
@@ -47,7 +47,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | AN-4 † | Assign each user to nearest cluster. *(on-read TS; `User.clusterId` dropped)* | T33, T14 | ◻ |
 | AN-5 † | Compatibility = cosine of full taste vectors. *(on-read TS; no pairwise table)* | T35 | ◻ |
 | AN-6 | Popularity regression; persist R²/RMSE/feature-importances. | T36 | ◻ |
-| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(live TS, no `UserStats` table)* | T14 | ◻ |
+| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(live TS, no `UserStats` table)* | T44, T14 | ◧ (T44: top **tracks/artists**, streak, 30-day totals done live over `Play` in `app/stats.py`; top **genres** deferred to T14, needs the T31 Kaggle genre join) |
 | AN-8 | Pipeline idempotent + re-runnable; logs coverage/k/silhouette/R²/RMSE. | T30, T38 | ◻ |
 | AN-9 † | Analytics UI on real model data; no hardcoded constants. *(reads metrics/clusters + on-read values)* | T45 | ◻ |
 
@@ -59,11 +59,11 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ✅ |
 | UI-5 | Follow/unfollow buttons + follower counts. | T43 | ✅ |
-| UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44 | ◻ |
+| UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
 | UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T60 | ◻ |
-| UI-10 | "Now playing" indicator on profile + feed. | T20, T44 | ◻ |
+| UI-10 | "Now playing" indicator on profile + feed. | T20, T44 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up) |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |

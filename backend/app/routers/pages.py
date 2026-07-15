@@ -22,10 +22,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from app import spotify
 from app.db import get_session
 from app.deps import AuthError, require_user
 from app.models import ArtistPost, Follow, Post, Track, User
 from app.routers.feed import build_feed
+from app.stats import listening_summary
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +180,16 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         for post, track in rows
     ]
 
+    # The listening summary (T44): what this person actually plays, computed live from their Play
+    # history (app/stats.py). The "recent" rows carry a raw played_at datetime; format it to a
+    # friendly "3h ago" here, the same way posts do, so the template just prints a string.
+    summary = listening_summary(session, person.id)
+    recent = [
+        {"title": r["title"], "artist": r["artist"], "album_art": r["album_art"],
+         "when": _ago(r["played_at"])}
+        for r in summary["recent"]
+    ]
+
     return {
         "id": person.id,
         "display_name": person.display_name,
@@ -187,6 +199,14 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         "following_count": following_count,
         "is_following": is_following,
         "is_self": person.id == viewer_id,  # hide the Follow button on your own profile
+        # Does THIS person have a linked Spotify? Drives the "link Spotify" prompt on your own
+        # profile when you haven't connected an account (a handle-only user has no plays to show).
+        "has_spotify": person.spotify_id is not None,
+        "top_tracks": summary["top_tracks"],
+        "top_artists": summary["top_artists"],
+        "recent": recent,
+        "plays_30d": summary["plays_30d"],
+        "streak": summary["streak"],
         "posts": posts,
     }
 
@@ -208,8 +228,19 @@ def profile(handle: str, request: Request, session: Session = Depends(get_sessio
             request, "profile_missing.html", {"page_title": "Not found · Brink"}, status_code=404
         )
     else:
+        # Now-playing badge (T44/UI-10): only on your OWN profile. The now-playing lookup (T20) is
+        # "me"-scoped — it uses the logged-in user's own Spotify token — so we can show the viewer
+        # their own current track, but not someone else's. get_currently_playing returns None (never
+        # raises) when nothing is playing / Spotify isn't linked, so the badge simply hides.
+        now_playing = None
+        if data["is_self"]:
+            playing = spotify.get_currently_playing(session, viewer.id)
+            if playing and playing.get("is_playing") and playing.get("track"):
+                now_playing = playing["track"]
         page = templates.TemplateResponse(
-            request, "profile.html", {"page_title": f"{data['display_name']} · Brink", "p": data}
+            request,
+            "profile.html",
+            {"page_title": f"{data['display_name']} · Brink", "p": data, "now_playing": now_playing},
         )
     for key, value in refreshed.raw_headers:
         if key == b"set-cookie":
