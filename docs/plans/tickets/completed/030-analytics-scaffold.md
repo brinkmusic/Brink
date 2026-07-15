@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Low
 category: Tech-Debt
@@ -48,9 +48,9 @@ The whole analytics layer (the graded ML centerpiece) lives in a Python package 
 | `analytics/tests/test_db.py` | CREATE | connection + read test |
 
 ## Testing Checklist
-- [ ] `uv run pytest` connects to the DB and reads a `Track` count
-- [ ] `db.py` reads `DATABASE_URL` from env (no hardcoded creds)
-- [ ] `uv.lock` committed; `uv sync` reproduces the env
+- [x] `uv run pytest` connects to the DB and reads a `Track` count
+- [x] `db.py` reads `DATABASE_URL` from env (no hardcoded creds)
+- [x] `uv.lock` committed; `uv sync` reproduces the env
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -58,6 +58,14 @@ The whole analytics layer (the graded ML centerpiece) lives in a Python package 
 - [x] Testing Checklist has items
 - [x] Dependencies identified (T01 done)
 - [x] Scope boundaries defined
+
+## Outcome
+`uv init` an `analytics/` package (scikit-learn, pandas, SQLAlchemy, psycopg); `analytics/db.py`
+builds a SQLAlchemy engine from the root `.env`'s `DATABASE_URL`, normalizing the Supabase pooler
+URL the same way `backend/app/db.py` does; `analytics/tests/test_db.py` is a smoke test that reads
+a `Track` row count (schema-qualified `silver."Track"` after the T39 schema move landed mid-PR).
+`uv.lock` committed; `uv sync` reproduces the env. AN-8 and INFRA-4 stay partial — both also need
+the GitHub Actions pipeline workflow (T38), which is out of scope here. Unblocks T31/T32.
 
 ## Notes
 Branch off `develop` as `feat/T30-analytics-scaffold`; one PR back into `develop` (never `main`). All Python runs via `uv run ...`; deps pinned in `uv.lock`. Owner: Jonah (analytics).

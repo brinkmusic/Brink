@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T37**, **T39**, **T40**, **T41**, **T42**, **T43**, **T44**, **T50**, **T51**, **T52**, **T60**, **T62**, T70–T74, T77, T78, **T90–T93**). **T60 retired the React/Vite SPA** (`apps/web/` deleted, ADR-0013) — the frontend is now solely the Jinja/HTMX pages served by the FastAPI backend; two owner infra steps remain (drop the `web` branch-protection check + decommission Vercel). **T44 (profile listening summary)** ships the ADR-0014 listening surface (top tracks/artists, recent, streak, 30-day, own-profile now-playing, link-Spotify prompt); the analytics half (cluster/compat/genres) is deferred to the slimmed **T14**. The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T30**, **T37**, **T39**, **T40**, **T41**, **T42**, **T43**, **T44**, **T50**, **T51**, **T52**, **T60**, **T62**, T70–T74, T77, T78, **T90–T93**). **T30** scaffolded the `analytics/` `uv` package + `db.py` Postgres access (AN-8/INFRA-4 stay partial pending T38's GitHub Actions workflow) — unblocks **T31**. **T60 retired the React/Vite SPA** (`apps/web/` deleted, ADR-0013) — the frontend is now solely the Jinja/HTMX pages served by the FastAPI backend; two owner infra steps remain (drop the `web` branch-protection check + decommission Vercel). **T44 (profile listening summary)** ships the ADR-0014 listening surface (top tracks/artists, recent, streak, 30-day, own-profile now-playing, link-Spotify prompt); the analytics half (cluster/compat/genres) is deferred to the slimmed **T14**. The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
 
 ## How these relate to the rest of the docs
 
@@ -45,7 +45,7 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 
 | Wave | Tickets |
 |---|---|
-| **0 (ready)** | `003` `030` ~~`050`~~ ✅ |
+| **0 (ready)** | `003` ~~`030`~~ ✅ ~~`050`~~ ✅ |
 | 1 | `021` `031` ~~`040`~~ ✅ ~~`051`~~ ✅ |
 | 2 | `032` `034` `036` ~~`041`~~ ✅ ~~`042`~~ ✅ ~~`043`~~ ✅ ~~`052`~~ ✅ |
 | 3 | `033` `038` `045` |
@@ -55,8 +55,9 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 | 7 | ~~`060`~~ ✅ |
 | 8 | `061` |
 
-**Ready to start now** (all `blocked_by` merged, as of T13):
-- `003` (Sebastian) · `030` (Jonah) — these never had blockers.
+**Ready to start now** (all `blocked_by` merged, as of T30):
+- `003` (Sebastian) — never had blockers.
+- **Done:** `030` — analytics scaffold + DB access (Jonah). Unblocks `031` (Kaggle genre join), now ready to start (its only blocker, `030`, is merged); `032` stays blocked on `031`.
 - **Done (with caveats):** `051` — artist upload UI (Sebastian). Built the `/artist` page + upload flow; the real Storage upload + private-image read URL still need a real environment / a T50 decision.
 - **Done:** **`040` — composer + Spotify catalog search (Sebastian + Andrea).** `GET /api/search` (client-credentials) + a composer on the feed that publishes via `POST /api/posts`.
 - **Done:** `041` — feed + live reactions, `042` — comments UI (Sebastian) — the feed page reuses `build_feed()` and reacts/comments via the T11/T12 APIs from the browser.
