@@ -91,8 +91,8 @@ purpose, just track it).
 - **Andrea** — backend / API / auth / DB (`backend/`). Auth & crypto files
   (`backend/app/deps.py`, `backend/app/security/*`, anything touching tokens / `TOKEN_ENC_KEY`)
   are highest-risk — a second review is encouraged but not required; the owner may self-merge.
-- **Sebastian** — frontend (`apps/web/`, and — per ADR-0013 — the Jinja/HTMX page layer that
-  lives in `backend/app/templates|static|routers/pages.py`).
+- **Sebastian** — frontend: the Jinja/HTMX page layer in
+  `backend/app/templates|static|routers/pages.py` (ADR-0013; the `apps/web/` SPA was retired in T60).
 - **Jonah** — analytics (`analytics/`).
 
 If a PR lands code in someone else's owned area (e.g. frontend templates inside `backend/`), note

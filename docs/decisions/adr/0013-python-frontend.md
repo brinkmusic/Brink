@@ -89,3 +89,12 @@ in subsequent PRs.
   JSON endpoints coexist.
 - **The repo fully unifies on Python** (+ HTML/HTMX). There is no longer any TypeScript in the
   project once `apps/web/` is retired.
+
+## Update — 2026-07-15 (T60): SPA retired
+
+The retirement this ADR planned is done. The Jinja/HTMX frontend reached parity (landing, server-side
+Spotify login, feed with composer/reactions/comments, profile with follow + listening summary, artist
+page) and is the live production frontend on Render. **T60 deleted `apps/web/` entirely**, removed the
+`web` CI build job (and its branch-protection required check), the `apps/web` Dependabot group, the
+`/api/state` legacy path, and the Vercel deployment. The repo now has no TypeScript. The only feature
+that never had a real implementation on either frontend — the analytics page — remains open as T45.

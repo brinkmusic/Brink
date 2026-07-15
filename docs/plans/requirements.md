@@ -18,7 +18,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
-| BE-2 | Remove `apps/web/src/lib/backend.ts` (calls `/api/state`, 404s since T08) + dead front-end stubs. | T60 | ◻ |
+| BE-2 | Remove `apps/web/src/lib/backend.ts` (`/api/state`) + dead front-end stubs. *(satisfied by retiring the whole SPA — the entire `apps/web/` was deleted in T60, ADR-0013)* | T60 | ✅ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
 | BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. | T13 | ✅ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
@@ -62,7 +62,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
-| UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T60 | ◻ |
+| UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60) |
 | UI-10 | "Now playing" indicator on profile + feed. | T20, T44 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up) |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
@@ -89,7 +89,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | DATA-1 | Load Kaggle audio-feature set; document source; join on `track_id`. | T31 | ◻ |
 | DATA-2 | Seed ~100–200 synthetic users (genre-coherent personas). | T32 | ◻ |
 | DATA-3 | Synthetic users disclosed; never inflate real-user metrics. | T32 | ◻ |
-| DATA-4 | Retire `mocks/*` from production paths once live. | T60 | ◻ |
+| DATA-4 | Retire `mocks/*` from production paths once live. *(the whole SPA — mocks included — was deleted in T60)* | T60 | ✅ |
 
 ## Tickets without a legacy requirement ID
 - **T39** — analytics schema migration (`ModelArtifact` + medallion bronze/silver/gold). Decision-driven (ADR-0003 / ADR-0009), no original spec req.

@@ -5,20 +5,9 @@
 # by this file — a known vulnerability still gets flagged and patched.
 version: 2
 updates:
-  # Frontend npm (apps/web) = the live app. (The root had npm deps only for the legacy
-  # TS backend, removed in T08 — so there's no root npm group anymore.)
-  - package-ecosystem: npm
-    directory: /apps/web
-    schedule:
-      interval: monthly
-    target-branch: develop
-    open-pull-requests-limit: 5
-    groups:
-      web-npm:
-        patterns: ["*"]
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+  # NOTE: the frontend npm group (/apps/web) was removed in T60 — the React/Vite SPA was
+  # retired (ADR-0013) in favour of the Jinja frontend served by the FastAPI backend, so there
+  # is no npm app left to update. Only GitHub Actions and the backend Python deps remain.
   # GitHub Actions.
   - package-ecosystem: github-actions
     directory: /
