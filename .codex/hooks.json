@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"Brink norm: keep docs in sync in the SAME PR (see CLAUDE.md). If you change architecture/behavior, commands, or scope, update the matching ADR (docs/decisions/adr/), ticket (docs/plans/), or CLAUDE.md before opening the PR. The docs-sync CI check enforces this. Tip: run the get-me-started skill to warm up the session.\""
+          }
+        ]
+      }
+    ]
+  }
+}
