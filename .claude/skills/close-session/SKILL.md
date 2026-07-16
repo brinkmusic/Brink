@@ -1,6 +1,6 @@
 ---
 name: close-session
-description: Close out a working session on the Brink repo — the end-of-session bookend to get-me-started. Runs the final-validation gate (full backend test suite + frontend build/lint, working tree clean and pushed, open PRs' CI green), cleans up already-merged branches, and writes the .remember handoff so the next session starts clean. Use at the end of a working session or when someone says "close out the session", "wrap up for the day", "I'm done", "sign off", "final validation", "am I safe to stop", or "write the handoff".
+description: Close out a working session on the Brink repo — the end-of-session bookend to get-me-started. Runs the final-validation gate (full backend test suite — the frontend is server-rendered Jinja with no build/lint step — plus working tree clean and pushed, open PRs' CI green), cleans up already-merged branches, and writes the .remember handoff so the next session starts clean. Use at the end of a working session or when someone says "close out the session", "wrap up for the day", "I'm done", "sign off", "final validation", "am I safe to stop", or "write the handoff".
 ---
 
 # Close Session (Brink session close-out)
@@ -60,7 +60,7 @@ Run the same checks CI will, so nothing merges on a red suite:
 
 End with a compact sign-off:
 
-1. **Validation:** backend tests ✅/❌ (count), frontend build/lint ✅/❌ — the gate result.
+1. **Validation:** backend tests ✅/❌ (count) — the gate result (no separate frontend build since T60).
 2. **Tree:** clean + pushed, or exactly what's dirty/unpushed.
 3. **Branches:** what was pruned (or nothing to prune).
 4. **Handoff:** written to `.remember/remember.md` — one line on the headline state + next step.

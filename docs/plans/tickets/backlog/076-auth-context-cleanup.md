@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Obsolete
 priority: Medium
 complexity: Medium
 category: Fix
@@ -11,6 +11,10 @@ owner: Sebastian
 ---
 
 # Fix: AuthContext cleanup — refire guard, dedupe, deadlock footgun, dead code (T76)
+
+> **OBSOLETE (2026-07-15, coherence sweep T79).** `AuthContext.tsx`, `CallbackPage.tsx`,
+> `LoginPage.tsx`, `NavBar.tsx` were all deleted with the `apps/web/` SPA in T60 (ADR-0013).
+> Login is now server-side (T09) with no browser auth listener at all.
 
 ## Rationale
 Findings **MF1**, **MF2**, **MF3**, **MF5**, **L11** of the [2026-07-02 code review](../../reviews/2026-07-02-code-review-t00-t08.md).
