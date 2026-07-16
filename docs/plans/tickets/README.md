@@ -11,6 +11,10 @@ One file per ticket. **Plain markdown — no tooling required** to read, review,
 
 This directory **supersedes** the old single-file `2026-06-22-brink-implementation-tickets.md`.
 
+**T61 is completed:** the release QA gate now includes backend API route inventory coverage,
+analytics pytest in CI-safe mode, a 5-user k6 script, and `docs/qa-checklist.md` for manual
+browser/load/success-metric evidence.
+
 ## Reading a ticket
 
 Each file has YAML frontmatter + sections:
@@ -53,7 +57,7 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 | 5 | `014` |
 | 6 | ~~`044`~~ ✅ |
 | 7 | ~~`060`~~ ✅ |
-| 8 | `061` |
+| 8 | ~~`061`~~ ✅ |
 
 ### Enablement wave (2026-07-15) — frontend doors for shipped backend features
 

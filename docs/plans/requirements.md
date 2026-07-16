@@ -96,7 +96,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 - **T37** — Alembic schema reflection (`include_schemas` + guards) so autogenerate sees the medallion schemas. Tooling follow-up to T39 (ADR-0009), no spec req.
 - **T23** — snapshot-500 remediation: flush each upserted Track before its Play (FK insert-ordering) + guard token decryption so an unreadable token degrades to None. Production bug fix on T21/T22, no spec req.
 - **T62** — FK-ordering hardening: enforce foreign keys in the shared test fixture, fix the posts endpoint's parent-before-child insert, correct the Render deploy-branch doc. Follow-up to T23, no spec req.
-- **T61** — test sweep + k6 + cross-browser E2E. Maps to proposal §6/§11 below.
+- **T61** — test sweep + k6 + cross-browser E2E. Completed the repeatable QA gate: backend API surface inventory, analytics pytest in CI-safe mode, k6 script, and `docs/qa-checklist.md` for manual browser/load/success-metric evidence. Maps to proposal §6/§11 below.
 
 ## Success-metric traceability (proposal §11)
 | Proposal metric | Met by |
@@ -105,7 +105,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | Upload success ≥ 98% | MEDIA-5 (T51) |
 | 6/6 core features working | BE-3..8, UI-1..6 |
 | Real ML (clustering + regression) | AN-3, AN-5, AN-6 |
-| Load test 5 concurrent users | T61 |
+| Load test 5 concurrent users | T61 — k6 script and thresholds ready; live run is an owner-run release gate |
 
 ## Superseded spec text
 The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagged † above) evolved after it was written — defer to the ADRs:

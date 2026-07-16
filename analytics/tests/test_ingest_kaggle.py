@@ -7,9 +7,11 @@
 # rewrites real listening data in brink-dev.
 
 import csv
+import os
 import uuid
 from pathlib import Path
 
+import pytest
 from sqlalchemy import text
 
 from db import get_engine
@@ -72,6 +74,10 @@ def _write_fixture_csv(path: Path, matched_id: str) -> None:
         })
 
 
+@pytest.mark.skipif(
+    os.getenv("RUN_ANALYTICS_DB_TESTS") != "1",
+    reason="live Supabase analytics DB check; set RUN_ANALYTICS_DB_TESTS=1 to run",
+)
 def test_join_sets_features_and_leaves_unmatched_alone(tmp_path):
     engine = get_engine()
     matched_id = "test_matched_" + uuid.uuid4().hex
@@ -113,6 +119,10 @@ def test_join_sets_features_and_leaves_unmatched_alone(tmp_path):
             _delete_track(conn, unmatched_id)
 
 
+@pytest.mark.skipif(
+    os.getenv("RUN_ANALYTICS_DB_TESTS") != "1",
+    reason="live Supabase analytics DB check; set RUN_ANALYTICS_DB_TESTS=1 to run",
+)
 def test_ingest_is_idempotent(tmp_path):
     engine = get_engine()
     matched_id = "test_idempotent_" + uuid.uuid4().hex
