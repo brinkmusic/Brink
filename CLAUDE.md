@@ -384,6 +384,11 @@ PR that it went in without a second review).
   signed GET 200 byte-identical, unsigned GET 400. That verification also caught that the
   installed supabase-py returns an *absolute* signed URL (older releases returned a relative
   path) — the helper handles both.
+  **T54 (artist audience page) done** — artist profiles (`/u/{handle}` for artist accounts) now
+  render signed artist-image posts with public reaction/comment controls wired to the T52
+  `/api/artist/posts/{id}/...` endpoints, plus owner-only engagement totals on the artist's own
+  profile. `/artist` remains the upload studio; no artist API behavior changed. Satisfies MEDIA-4's
+  visible engagement surface; view count remains deferred.
   **T47 + T15 + T53 released to production (`develop → main` #117, back-merged #118).**
   **T03 (email + password auth) done** — the front door for people **without** Spotify
   ([ADR-0015](docs/decisions/adr/0015-email-password-auth.md), which supersedes ADR-0005's
@@ -400,8 +405,7 @@ PR that it went in without a second review).
   deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
   signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
   auto-login-on-confirm. **Next:
-  T54 (audience artist page: unblocked by T53), T16 (follower lists),
-  T63 (retire capture-spotify); T32 (Jonah)
+  T16 (follower lists), T63 (retire capture-spotify); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)

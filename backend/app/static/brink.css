@@ -280,6 +280,12 @@ body {
 .artist-post { display: grid; gap: 0.5rem; }
 .artist-post-img { width: 100%; border-radius: 0.75rem; display: block; }
 .artist-post-caption { margin: 0; font-size: 0.95rem; }
+.artist-engagement-summary {
+  border-top: 1px solid var(--line);
+  padding-top: 0.65rem;
+  margin-top: 0.2rem;
+}
+.artist-engagement-line { margin: 0; color: var(--mute); font-size: 0.85rem; }
 
 /* ---- Profile page (T43) ---- */
 .profile-header { display: grid; gap: 0.75rem; }

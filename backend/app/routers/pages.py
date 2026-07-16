@@ -25,7 +25,16 @@ from sqlmodel import Session, select
 from app import spotify
 from app.db import get_session
 from app.deps import AuthError, require_user
-from app.models import ArtistPost, Follow, Post, Track, User
+from app.models import (
+    ArtistComment,
+    ArtistPost,
+    ArtistReaction,
+    Follow,
+    Post,
+    ReactionType,
+    Track,
+    User,
+)
 from app.routers.artist import UPLOAD_BUCKET
 from app.routers.feed import build_feed
 from app.security.supabase import create_signed_read_url
@@ -199,6 +208,73 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         for post, track in rows
     ]
 
+    # Artist BTS posts (T54): if this profile belongs to an artist, show their promo posts here
+    # too. WHY on /u/{handle}: user search and feed author links already land on profiles, so this
+    # makes artist content discoverable without inventing a second artist URL. Images are stored as
+    # private bucket paths, so each one gets a signed read URL before the browser sees it.
+    artist_posts = []
+    if person.is_artist:
+        artist_rows = session.exec(
+            select(ArtistPost)
+            .where(ArtistPost.artist_user_id == person.id)
+            .order_by(ArtistPost.created_at.desc())
+        ).all()
+        artist_post_ids = [post.id for post in artist_rows]
+
+        # Start every post with zeroes so templates can render a stable HEART/FIRE/SPARKLE set even
+        # when there is no engagement yet.
+        reaction_counts = {
+            post_id: {kind.value: 0 for kind in ReactionType}
+            for post_id in artist_post_ids
+        }
+        comment_counts = {post_id: 0 for post_id in artist_post_ids}
+        viewer_reactions = {
+            post_id: {kind.value: False for kind in ReactionType}
+            for post_id in artist_post_ids
+        }
+
+        if artist_post_ids:
+            reaction_rows = session.exec(
+                select(ArtistReaction.artist_post_id, ArtistReaction.type, func.count())
+                .where(ArtistReaction.artist_post_id.in_(artist_post_ids))
+                .group_by(ArtistReaction.artist_post_id, ArtistReaction.type)
+            ).all()
+            for post_id, rtype, count in reaction_rows:
+                reaction_counts[post_id][ReactionType(rtype).value] = count
+
+            comment_rows = session.exec(
+                select(ArtistComment.artist_post_id, func.count())
+                .where(ArtistComment.artist_post_id.in_(artist_post_ids))
+                .group_by(ArtistComment.artist_post_id)
+            ).all()
+            for post_id, count in comment_rows:
+                comment_counts[post_id] = count
+
+            mine_rows = session.exec(
+                select(ArtistReaction.artist_post_id, ArtistReaction.type).where(
+                    ArtistReaction.artist_post_id.in_(artist_post_ids),
+                    ArtistReaction.user_id == viewer_id,
+                )
+            ).all()
+            for post_id, rtype in mine_rows:
+                viewer_reactions[post_id][ReactionType(rtype).value] = True
+
+        artist_posts = [
+            {
+                "id": post.id,
+                "image_url": create_signed_read_url(UPLOAD_BUCKET, post.image_url),
+                "caption": post.caption,
+                "when": _ago(post.created_at),
+                "reaction_counts": reaction_counts[post.id],
+                "mine": {
+                    kind for kind, on in viewer_reactions[post.id].items() if on
+                },
+                "comment_count": comment_counts[post.id],
+                "show_owner_engagement": person.id == viewer_id,
+            }
+            for post in artist_rows
+        ]
+
     # The listening summary (T44): what this person actually plays, computed live from their Play
     # history (app/stats.py). The "recent" rows carry a raw played_at datetime; format it to a
     # friendly "3h ago" here, the same way posts do, so the template just prints a string.
@@ -227,6 +303,8 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         "plays_30d": summary["plays_30d"],
         "streak": summary["streak"],
         "posts": posts,
+        "is_artist": person.is_artist,
+        "artist_posts": artist_posts,
     }
 
 

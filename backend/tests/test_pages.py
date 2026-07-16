@@ -51,7 +51,9 @@ from unittest.mock import MagicMock
 from app.db import get_session
 from app.main import app
 from app.models import (
+    ArtistComment,
     ArtistPost,
+    ArtistReaction,
     Comment,
     Follow,
     Play,
@@ -295,6 +297,82 @@ def test_profile_missing_handle_is_404(client, db_session, monkeypatch):
     res = client.get("/u/nobody-here")
     assert res.status_code == 404
     assert "couldn't find that profile" in res.text
+
+
+# ---- T54: artist posts are visible on artist profiles, with audience engagement UI ----
+
+
+def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)  # signed-in fan
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    post = ArtistPost(artist_user_id=artist.id, image_url="stage-name/backstage.jpg",
+                      caption="backstage warmup")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    monkeypatch.setattr(
+        "app.routers.pages.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/stage-name").text
+    assert "Artist posts" in body
+    assert "backstage warmup" in body
+    assert 'src="https://signed/artist-images/stage-name/backstage.jpg?token=readtok"' in body
+    assert "artist-reactions" in body
+    assert "artist-comments" in body
+    assert f'data-post-id="{post.id}"' in body
+    assert "artistReact(this)" in body
+    assert "toggleArtistComments(this)" in body
+    assert "/static/artist-engagement.js" in body
+    assert "Artist-only engagement" not in body
+
+
+def test_artist_profile_owner_sees_engagement_summary(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    artist = _seed_artist(db_session)
+    fan = User(handle="fan", display_name="Fan", created_at=datetime.now(timezone.utc))
+    db_session.add(fan)
+    db_session.commit()
+    db_session.refresh(fan)
+    post = ArtistPost(artist_user_id=artist.id, image_url="the-artist/x.jpg", caption="new clip")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    db_session.add(ArtistReaction(artist_post_id=post.id, user_id=fan.id, type=ReactionType.HEART))
+    db_session.add(ArtistComment(artist_post_id=post.id, user_id=fan.id, body="love this"))
+    db_session.commit()
+    monkeypatch.setattr(
+        "app.routers.pages.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/the-artist").text
+    assert "Artist-only engagement" in body
+    assert "1 comments" in body
+    assert ">1</span>" in body  # public reaction count and owner summary both reflect the heart
+
+
+def test_non_artist_profile_has_no_artist_posts_section(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    target = User(handle="listener", display_name="Listener", created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/listener").text
+    assert "Artist posts" not in body
+    assert "/static/artist-engagement.js" not in body
 
 
 # ---- T44: profile listening summary + now-playing badge ----
