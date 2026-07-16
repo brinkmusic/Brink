@@ -62,10 +62,13 @@ unauthenticated, so the existing user-id-keyed helper needs an IP/email subject)
 - Linking Spotify to an existing email account later (ADR-0005 identity-linking).
 - User-chosen handles (auto-derived handle stays, per the existing AUTH-3 decision).
 
-## Open questions (owner, before coding)
-1. Email confirmations ON (safer, needs a confirm landing page + Supabase redirect config) or
-   OFF (simpler, faster for a course demo)?
-2. Minimum password policy beyond Supabase's default (6 chars)?
+## Owner decisions (Andrea, 2026-07-15)
+1. **Email confirmations ON** — signup requires clicking the confirmation email before login
+   works. Implementation consequences: build the `GET /auth/confirm` landing route, turn on
+   "Confirm email" in the Supabase dashboard (brink-dev first, prod at release), and add the
+   deployed `/auth/confirm` URL to the Supabase redirect allow-list.
+2. **Password minimum = 6 characters** — Supabase's default; enforce the same check in our form
+   for a friendly error before the round-trip.
 
 ## Validation & authz (ADR-0007)
 - Supabase owns password hashing/verification; we never see or store the password.
@@ -101,7 +104,7 @@ unauthenticated, so the existing user-id-keyed helper needs an IP/email subject)
 - [x] Files to Create/Modify is populated
 - [x] Testing Checklist has items
 - [x] Dependencies identified (none — T09 infra is in place)
-- [ ] Open questions above answered by the owner
+- [x] Owner decisions recorded (confirmations ON; 6-char minimum) — ready to start
 
 ## Notes
 Branch `feat/T03-auth-email`. Estimated ~1–1.5 days. Supabase dashboard config needed: enable
