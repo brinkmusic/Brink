@@ -372,6 +372,10 @@ PR that it went in without a second review).
   the `UserSearchOut` allow-list DTO (ADR-0012). Fixes the audit's top gap: follow (T13) shipped
   with no way to *find* a user (`/api/search` is Spotify tracks, not people). Satisfies the
   discoverability half of BE-4.
+  **T46 (user search UI) done** — `base.html` now renders a signed-in "Find people" search box in
+  the shared nav, loading `backend/app/static/user-search.js` to debounce calls to T15's
+  `/api/users/search` and render safe text-only links to `/u/{handle}`. This completes the
+  user-discovery path for follow/profile browsing and satisfies the UI-5 reachability gap.
   **T53 (artist image signed reads) done** — artist images finally display:
   `create_signed_read_url(bucket, path, expires_in=3600)` in `security/supabase.py` (the read
   sibling of T50's upload helper, service role, 1-hour expiry), and the `/artist` page signs each
@@ -396,8 +400,8 @@ PR that it went in without a second review).
   deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
   signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
   auto-login-on-confirm. **Next:
-  T46 (search UI: T15 + T47 both merged, unblocked), T54 (audience artist page: unblocked by
-  T53), T16 (follower lists), T63 (retire capture-spotify); T32 (Jonah)
+  T54 (audience artist page: unblocked by T53), T16 (follower lists),
+  T63 (retire capture-spotify); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)

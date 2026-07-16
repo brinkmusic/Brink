@@ -41,6 +41,21 @@
             <a href="/artist">Artist studio</a>
             {% endif %}
           </nav>
+          {# T46: user discovery. The small form calls the existing T15 user-search API as the
+             person types and renders profile links, so follow no longer depends on knowing a
+             user's exact /u/<handle> URL. The script uses textContent for all API data. #}
+          <form class="user-search" role="search" onsubmit="return userSearchSubmit(this)">
+            <label class="sr-only" for="user-search-input">Find people</label>
+            <input
+              id="user-search-input"
+              class="user-search-input"
+              type="search"
+              placeholder="Find people"
+              autocomplete="off"
+              oninput="userSearch(this)"
+            />
+            <ul class="user-search-results" hidden></ul>
+          </form>
           {# Logout is a plain GET link to /auth/logout (T09), which clears the session cookie
              and returns to the landing page. #}
           <a class="btn btn-ghost" href="/auth/logout">Log out</a>
@@ -71,5 +86,8 @@
         <span class="footer-tag">Music, but social. 🎶</span>
       </div>
     </footer>
+    {% if viewer %}
+    <script src="/static/user-search.js"></script>
+    {% endif %}
   </body>
 </html>
