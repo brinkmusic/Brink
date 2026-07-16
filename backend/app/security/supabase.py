@@ -38,6 +38,41 @@ def _pkce_client() -> Client:
     )
 
 
+def _password_client() -> Client:
+    # A FRESH default client (no PKCE) for email/password auth (T03, ADR-0015). WHY fresh and
+    # NOT the cached admin() client: sign_up / sign_in_with_password store the resulting user
+    # session in the client's in-memory storage. admin() is shared and used for SERVICE-ROLE
+    # calls (verifying tokens, storage) — letting a user session land on it could make a later
+    # admin call act as that user. A throwaway client per call keeps each signup/login isolated
+    # (same reasoning as _pkce_client). WHY still the service-role key: it's the only Supabase
+    # key the server holds, and for sign_up / sign_in_with_password it just authenticates the
+    # request — the password itself is what proves the user — and the client is discarded after.
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise ValueError("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set")
+    return create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+
+def sign_up_email(email: str, password: str, email_redirect_to: Optional[str] = None):
+    # Create an email/password account (ADR-0015). Returns the SDK's AuthResponse, which carries
+    # a `.user` and — only once the email is confirmed — a `.session`. With "Confirm email" ON
+    # (our setting), sign_up returns a user but NO usable session, so the caller shows a "check
+    # your inbox" state rather than logging the person straight in. `email_redirect_to` is where
+    # Supabase's confirmation link sends the browser back (our /auth/confirm URL).
+    credentials = {"email": email, "password": password}
+    if email_redirect_to:
+        credentials["options"] = {"email_redirect_to": email_redirect_to}
+    return _password_client().auth.sign_up(credentials)
+
+
+def sign_in_password(email: str, password: str):
+    # Log in with an email/password (ADR-0015). Returns the SDK's AuthResponse with `.session`
+    # (access + refresh tokens) and `.user` — the SAME shapes the Spotify callback consumes, so
+    # the caller reuses get_or_create_user + login_session.set_cookie. The SDK RAISES on bad
+    # credentials (AuthApiError); the caller catches it and shows a generic, non-enumerating error.
+    return _password_client().auth.sign_in_with_password({"email": email, "password": password})
+
+
 def oauth_authorize(redirect_to: str, scopes: str) -> tuple[str, str]:
     # Start a server-side Spotify login (PKCE). Returns (authorize_url, code_verifier):
     #   - authorize_url — where we redirect the browser to sign in with Spotify.

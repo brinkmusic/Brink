@@ -1,0 +1,50 @@
+{#
+  WHAT THIS FILE IS
+  The "create an account" page for people WITHOUT Spotify (T03, ADR-0015). It shows a simple
+  email + password form that posts to /auth/signup. Because email confirmation is ON, a
+  successful signup does not log you in — the route re-renders this page with `sent = true`,
+  which swaps the form for a "check your inbox" message. The hidden csrf_token field pairs with
+  an encrypted cookie the server set, so a forged cross-site POST is rejected.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="auth-card stack">
+  {% if sent %}
+    {# Post-signup state: the confirmation email is on its way. No form, no session yet. #}
+    <h1>Check your inbox</h1>
+    <p>
+      We sent a confirmation link to <strong>{{ email }}</strong>. Click it to activate your
+      account, then come back and <a href="/auth/login-email">sign in</a>.
+    </p>
+  {% else %}
+    <h1>Create your account</h1>
+    <p class="auth-sub">No Spotify needed — you can always link it later.</p>
+
+    {# Error banner: shown only when the route passed an `error` (bad email, short password, etc.). #}
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+    <form class="auth-form stack" method="post" action="/auth/signup">
+      {# The CSRF token the server also stored in an encrypted cookie; the POST checks they match. #}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+
+      <label for="email">Email</label>
+      {# value prefilled so an error re-render keeps what they typed. type=email gives a basic
+         browser check; the server validates for real. #}
+      <input id="email" name="email" type="email" value="{{ email }}" required autocomplete="email" />
+
+      <label for="password">Password</label>
+      {# minlength gives an instant browser hint; the server enforces the same 6-char minimum. #}
+      <input id="password" name="password" type="password" required minlength="6"
+             autocomplete="new-password" />
+
+      <button class="btn btn-spotify" type="submit">Create account</button>
+    </form>
+
+    <p class="auth-alt">
+      Already have an account? <a href="/auth/login-email">Sign in</a>
+      · or <a href="/auth/login">continue with Spotify</a>
+    </p>
+  {% endif %}
+</section>
+{% endblock %}
