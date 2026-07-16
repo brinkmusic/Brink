@@ -124,6 +124,16 @@ class ReactionCountsOut(CamelModel):
     counts: dict[str, int]
 
 
+# One user in the results of GET /api/users/search (T15): just enough to render a clickable
+# result that links to /u/{handle} — an explicit allow-list, never the whole User row (no email,
+# supabaseUserId, etc.). `is_artist` lets the search UI badge artist accounts.
+class UserSearchOut(CamelModel):
+    id: str
+    handle: str
+    display_name: str
+    is_artist: bool
+
+
 # The public bits of a comment's author (never the whole User row — no email, ids, etc.).
 class AuthorOut(CamelModel):
     display_name: str

@@ -239,7 +239,7 @@ PR that it went in without a second review).
   via `POST /api/posts`, satisfying UI-1. **T43 (follow UI) done** — a minimal profile page
   `GET /u/{handle}` (`backend/app/templates/profile.html`) with follower counts + a Follow/Unfollow
   button (`backend/app/static/follow.js` → T13 API); feed authors link to it. Full "Wrapped" stats
-  are still T44 (needs T14). Satisfies UI-5. **T51 (artist upload UI) done (with caveats)** — an `/artist` page (`backend/app/templates/artist.html`) with a JPEG/PNG≤10MB upload box for artist accounts that runs the T50 signed-upload flow (`backend/app/static/artist-upload.js`); satisfies MEDIA-2. NOTE: the real Supabase Storage upload is unverified locally (MEDIA-5 integration check), and displaying private-bucket images needs a signed read URL not yet built (open T50 question). **T22 (Spotify token refresh) done** —
+  are still T44 (needs T14). Satisfies UI-5. **T51 (artist upload UI) done (with caveats)** — an `/artist` page (`backend/app/templates/artist.html`) with a JPEG/PNG≤10MB upload box for artist accounts that runs the T50 signed-upload flow (`backend/app/static/artist-upload.js`); satisfies MEDIA-2. NOTE: both of T51's caveats were cleared by **T53** — the storage round-trip is verified live on brink-dev and the signed read URL now exists (see the T53 entry below). **T22 (Spotify token refresh) done** —
   `backend/app/spotify.py` `get_valid_access_token(session, user_id)` returns a fresh access token
   (reusing the stored encrypted refresh token via Spotify's token endpoint) or `None` for an
   unlinked / refresh-failed user, satisfying the real **AUTH-5** (which was mis-marked done against
@@ -360,8 +360,28 @@ PR that it went in without a second review).
   free-tier service stops spinning down behind Render's ~50s "waking up" screen; like snapshot.yml
   it **only fires from `main`**, so it activates at the next release (owner: one manual
   `workflow_dispatch` run to verify, and the durable alternative if drift still bites is the paid
-  Starter plan). **Next: T47 →
-  T15/T46 (make follow usable), T53 (broken artist images), T03 (email login); T32 (Jonah)
+  Starter plan). **T47 (authenticated nav) done** — every page route passes the signed-in `viewer`
+  into its template (public `/` uses a new `_optional_viewer()` that returns `None` instead of
+  redirecting), and `base.html` renders a conditional nav: signed out → the landing nav; signed in
+  → Feed, My profile, Artist studio (artists only), Log out. Before this nothing linked to /feed,
+  /artist, your profile, or logout. Fills the audit's gap #2 (UI-2 app shell).
+  **T15 (user search API) done** — `GET /api/users/search?q=` (new
+  `backend/app/routers/users.py`; T16's follower/following lists belong there too): login-gated +
+  rate-limited (ADR-0011), case-insensitive `ILIKE %q%` on handle + display name with SQL
+  wildcards escaped, `q` trimmed with a 2-char minimum, ordered by handle, capped at 20, returning
+  the `UserSearchOut` allow-list DTO (ADR-0012). Fixes the audit's top gap: follow (T13) shipped
+  with no way to *find* a user (`/api/search` is Spotify tracks, not people). Satisfies the
+  discoverability half of BE-4.
+  **T53 (artist image signed reads) done** — artist images finally display:
+  `create_signed_read_url(bucket, path, expires_in=3600)` in `security/supabase.py` (the read
+  sibling of T50's upload helper, service role, 1-hour expiry), and the `/artist` page signs each
+  post's stored path before rendering (the private `artist-images` bucket rejects raw paths, so
+  every image was broken — the T51 caveat). Live-verified against brink-dev storage: upload →
+  signed GET 200 byte-identical, unsigned GET 400. That verification also caught that the
+  installed supabase-py returns an *absolute* signed URL (older releases returned a relative
+  path) — the helper handles both. **Next:
+  T46 (search UI: T15 + T47 both merged, unblocked), T54 (audience artist page: unblocked by
+  T53), T03 (email login); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)

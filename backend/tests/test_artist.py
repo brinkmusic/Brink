@@ -16,6 +16,7 @@ from app.deps import AuthError, require_user
 from app.main import app
 from app.models import ArtistPost, User
 from app.routers import artist
+from app.security import supabase
 
 
 # handle is derived from id so distinct seeded users get distinct handles (User.handle is unique).
@@ -107,6 +108,89 @@ def test_sign_upload_wrong_content_type_returns_400(client, as_user):
     as_user(_artist())
     res = client.post("/api/artist/sign-upload", json=_sign_body(contentType="image/gif"))
     assert res.status_code == 400
+
+
+# --- create_signed_read_url (T53) --------------------------------------------------
+
+# A small fake standing in for the Supabase Storage client, so the helper's REST call is
+# checked WITHOUT hitting the network (same "stub the storage helper" approach the sign-upload
+# tests use). It records the (bucket, path, expires_in) it was asked to sign and returns
+# Supabase's real response shape: {"signedURL": "/object/sign/<bucket>/<path>?token=..."}.
+class _FakeStorage:
+    def __init__(self):
+        self.calls = []
+
+    def from_(self, bucket):
+        self.calls.append(("from_", bucket))
+        return self
+
+    def create_signed_url(self, path, expires_in):
+        self.calls.append(("create_signed_url", path, expires_in))
+        return {"signedURL": f"/object/sign/artist-images/{path}?token=readtok"}
+
+
+class _FakeAdmin:
+    def __init__(self, storage):
+        self.storage = storage
+
+
+# The helper signs the given path in the given bucket and returns a FULL, browser-usable URL:
+# Supabase's relative signedURL prefixed with "{SUPABASE_URL}/storage/v1".
+def test_create_signed_read_url_builds_full_url(monkeypatch):
+    fake = _FakeStorage()
+    monkeypatch.setattr(supabase, "admin", lambda: _FakeAdmin(fake))
+    monkeypatch.setattr(
+        supabase, "get_settings",
+        lambda: type("S", (), {"supabase_url": "https://proj.supabase.co"})(),
+    )
+
+    url = supabase.create_signed_read_url("artist-images", "artist-1/pic.jpg")
+
+    assert fake.calls[0] == ("from_", "artist-images")
+    # a sensible ~1h default expiry is passed through to Supabase
+    assert fake.calls[1] == ("create_signed_url", "artist-1/pic.jpg", 3600)
+    assert url == (
+        "https://proj.supabase.co/storage/v1"
+        "/object/sign/artist-images/artist-1/pic.jpg?token=readtok"
+    )
+
+
+# If the library already returns a FULL absolute URL (the currently installed supabase-py does —
+# verified live against brink-dev), the helper must NOT prefix the host again (that doubled URL
+# 404s and every image breaks).
+def test_create_signed_read_url_keeps_absolute_url(monkeypatch):
+    class _AbsoluteStorage(_FakeStorage):
+        def create_signed_url(self, path, expires_in):
+            return {
+                "signedURL": f"https://proj.supabase.co/storage/v1/object/sign/artist-images/{path}?token=readtok"
+            }
+
+    monkeypatch.setattr(supabase, "admin", lambda: _FakeAdmin(_AbsoluteStorage()))
+    monkeypatch.setattr(
+        supabase, "get_settings",
+        lambda: type("S", (), {"supabase_url": "https://proj.supabase.co"})(),
+    )
+
+    url = supabase.create_signed_read_url("artist-images", "artist-1/pic.jpg")
+
+    assert url == (
+        "https://proj.supabase.co/storage/v1"
+        "/object/sign/artist-images/artist-1/pic.jpg?token=readtok"
+    )
+
+
+# A caller can override the expiry (seconds); it is forwarded to Supabase unchanged.
+def test_create_signed_read_url_honours_custom_expiry(monkeypatch):
+    fake = _FakeStorage()
+    monkeypatch.setattr(supabase, "admin", lambda: _FakeAdmin(fake))
+    monkeypatch.setattr(
+        supabase, "get_settings",
+        lambda: type("S", (), {"supabase_url": "https://proj.supabase.co"})(),
+    )
+
+    supabase.create_signed_read_url("artist-images", "artist-1/pic.jpg", expires_in=60)
+
+    assert fake.calls[1] == ("create_signed_url", "artist-1/pic.jpg", 60)
 
 
 # --- POST /api/artist/posts --------------------------------------------------------

@@ -85,6 +85,26 @@ def create_signed_upload_url(bucket: str, path: str) -> dict:
     return admin().storage.from_(bucket).create_signed_upload_url(path)
 
 
+def create_signed_read_url(bucket: str, path: str, expires_in: int = 3600) -> str:
+    # Mint a Supabase Storage "signed READ url" (T53) — the display-side sibling of
+    # create_signed_upload_url above. WHY it's needed: the artist-images bucket is PRIVATE
+    # (ADR-0008), so a raw storage path in an <img src> is rejected and the image never renders —
+    # not even for the artist who uploaded it. This asks Supabase (as the server, holding the
+    # service-role key) to sign a time-limited URL for one object; expiry (default 1 hour) keeps a
+    # leaked URL short-lived.
+    data = admin().storage.from_(bucket).create_signed_url(path, expires_in)
+    # The key's casing has differed across supabase-py releases ("signedURL" vs "signedUrl"),
+    # so accept either rather than break images on a library upgrade.
+    signed = data.get("signedURL") or data.get("signedUrl") or ""
+    # Likewise the VALUE has differed: older releases return a path RELATIVE to the storage API
+    # (e.g. "/object/sign/<bucket>/<path>?token=..."), while the currently installed one returns
+    # the full absolute URL (verified live against brink-dev — blindly prefixing doubled the host
+    # and broke the image). Only prefix "{SUPABASE_URL}/storage/v1" when we got the relative form.
+    if signed.startswith("http"):
+        return signed
+    return f"{get_settings().supabase_url}/storage/v1{signed}"
+
+
 def get_user_from_token(token: str) -> Optional[User]:
     # Ask Supabase "who does this login token belong to?" It checks the token against
     # Supabase's auth server and returns that user.
