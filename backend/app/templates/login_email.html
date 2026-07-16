@@ -1,0 +1,37 @@
+{#
+  WHAT THIS FILE IS
+  The email + password sign-in page (T03, ADR-0015). It posts to /auth/login-email; on success
+  the route sets the same encrypted session cookie the Spotify login uses and sends you to /feed.
+  This template is also reused by /auth/confirm (after you click the confirmation email), which
+  renders it with an `info` banner telling you your email is confirmed and to sign in.
+  The hidden csrf_token pairs with an encrypted cookie so a forged cross-site POST is rejected.
+#}
+{% extends "base.html" %}
+
+{% block content %}
+<section class="auth-card stack">
+  <h1>Sign in</h1>
+
+  {# Info banner: friendly, non-error message (e.g. "your email is confirmed"). #}
+  {% if info %}<p class="form-info" role="status">{{ info }}</p>{% endif %}
+  {# Error banner: one generic message on failure — we never reveal whether the email exists. #}
+  {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+  <form class="auth-form stack" method="post" action="/auth/login-email">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" value="{{ email }}" required autocomplete="email" />
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+
+    <button class="btn btn-spotify" type="submit">Sign in</button>
+  </form>
+
+  <p class="auth-alt">
+    New here? <a href="/auth/signup">Create an account</a>
+    · or <a href="/auth/login">continue with Spotify</a>
+  </p>
+</section>
+{% endblock %}

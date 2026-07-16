@@ -379,9 +379,25 @@ PR that it went in without a second review).
   every image was broken — the T51 caveat). Live-verified against brink-dev storage: upload →
   signed GET 200 byte-identical, unsigned GET 400. That verification also caught that the
   installed supabase-py returns an *absolute* signed URL (older releases returned a relative
-  path) — the helper handles both. **Next:
+  path) — the helper handles both.
+  **T47 + T15 + T53 released to production (`develop → main` #117, back-merged #118).**
+  **T03 (email + password auth) done** — the front door for people **without** Spotify
+  ([ADR-0015](docs/decisions/adr/0015-email-password-auth.md), which supersedes ADR-0005's
+  magic-link/OTP choice). New `GET`/`POST /auth/signup`, `GET`/`POST /auth/login-email`,
+  `GET /auth/confirm` in `routers/auth.py`; `sign_up_email`/`sign_in_password` wrappers on a fresh
+  default Supabase client in `security/supabase.py`. Success reuses the T09 session cookie +
+  `get_or_create_user` (a handle account, `spotify_id = NULL`). **Email confirmations ON**
+  (signup → "check your inbox", no session until confirmed); **6-char password min**; **first
+  IP-keyed rate limiting** (`_client_ip` trusts Render's `X-Forwarded-For`; `enforce_rate_limit`
+  keyed on `ip:` **and** `email:`, no change to `rate_limit.py`); **CSRF** token on the forms;
+  generic non-enumerating errors. New `signup.html`/`login_email.html` + entry links; added the
+  `python-multipart` dep for form parsing. Satisfies AUTH-3 (now password, not OTP) + AUTH-6.
+  **Deploy step for Andrea:** keep Supabase Email + Confirm-email ON (defaults) and add the
+  deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
+  signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
+  auto-login-on-confirm. **Next:
   T46 (search UI: T15 + T47 both merged, unblocked), T54 (audience artist page: unblocked by
-  T53), T03 (email login); T32 (Jonah)
+  T53), T16 (follower lists), T63 (retire capture-spotify); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)

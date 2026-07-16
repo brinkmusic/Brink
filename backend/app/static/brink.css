@@ -429,3 +429,47 @@ body {
 .recent-title { font-weight: 600; color: var(--text); }
 .recent-artist { color: var(--mute); }
 .recent-when { margin-left: auto; color: var(--mute); font-size: 0.82rem; }
+
+/* ---- Email signup / login forms (T03) ---- */
+/* A narrow centred card holding the auth form, reusing the palette + card look. */
+.auth-card {
+  max-width: 26rem;
+  margin: 2rem auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 1rem;
+  padding: 1.5rem;
+}
+.auth-sub { color: var(--mute); font-size: 0.9rem; margin: 0; }
+.auth-form label { font-size: 0.8rem; color: var(--mute); font-weight: 600; }
+/* Text inputs: full width, dark field, lavender focus ring to match the buttons. */
+.auth-form input[type="email"],
+.auth-form input[type="password"] {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.auth-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.auth-form .btn { width: 100%; justify-content: center; }
+.auth-alt { color: var(--mute); font-size: 0.85rem; }
+/* Feedback banners: pink for errors, lavender-tinted for info. */
+.form-error {
+  border: 1px solid var(--hot);
+  background: rgba(244, 114, 182, 0.12);
+  color: var(--text);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+}
+.form-info {
+  border: 1px solid var(--accent);
+  background: rgba(157, 141, 241, 0.12);
+  color: var(--text);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+}
