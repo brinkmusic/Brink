@@ -13,7 +13,9 @@ services:
     runtime: python
     plan: free
     region: ohio          # US East, matches the Supabase (us-east-1) database
-    branch: develop       # switch to `main` for production once the release PR lands
+    branch: main          # production deploys from `main` (the live service is set this way in
+                          # the Render dashboard; this file must match or a re-applied Blueprint
+                          # would silently deploy `develop` — see the #79 release incident)
     rootDir: backend
     # Install uv (our Python package manager), then install exactly the locked deps
     # (no dev/test tools in production).
@@ -38,4 +40,8 @@ services:
       - key: SPOTIFY_CLIENT_SECRET
         sync: false
       - key: TOKEN_ENC_KEY
+        sync: false
+      # Shared secret the T21 snapshot cron (GitHub Actions) must send as X-Cron-Secret;
+      # without it POST /api/snapshot answers 401.
+      - key: CRON_SECRET
         sync: false

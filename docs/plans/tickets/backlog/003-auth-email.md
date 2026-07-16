@@ -1,70 +1,109 @@
 ---
 status: Backlog
 priority: High
-complexity: Low
+complexity: Medium
 category: Feature
-tags: [auth, frontend, email, supabase]
+tags: [auth, backend, frontend, email, supabase, security]
 blocked_by: []
 blocks: []
 parent_ticket: null
-owner: Sebastian
+owner: Andrea
 ---
 
-# Feature: Email (handle) accounts via Supabase OTP (T03)
+# Feature: Email/password signup + login, server-side (T03)
+
+> **Rewritten 2026-07-15** (coherence sweep T79). The previous version of this ticket targeted
+> the retired `apps/web/` React SPA and Supabase magic-link/OTP. The SPA is gone (T60) and the
+> owner has since decided on **email + password**, so the flow is now server-side, mirroring the
+> T09 Spotify login. Full investigation:
+> [2026-07-15 auth investigation](../../reviews/2026-07-15-auth-email-signup-investigation.md).
 
 ## Rationale
-Brink must honor the in-scope feature of **manual posting without a Spotify account**. On `develop`, login is Spotify-only — `AuthContext.login` calls `signInWithOAuth({ provider: 'spotify' })` and `LoginPage` offers no other path. The server already supports handle users (`requireUser` auto-creates a `User` with a derived unique `handle` and null `spotifyId`; `loadProfile` already branches for "email-only users"). This ticket adds the missing front-door: an email magic-link / OTP sign-in.
+Login today is Spotify-only. Brink must honor **manual posting without a Spotify account**
+(AUTH-3/AUTH-6): a person without Spotify should still be able to sign up, post, react, comment,
+and follow. The investigation confirmed the backend already tolerates handle-only users end to
+end (search uses an app-level Spotify token, stats/now-playing degrade to empty states, the
+snapshot cron skips unlinked users) — the only missing piece is the front door.
 
 ## Summary
-Add an email OTP sign-in path (Supabase `signInWithOtp`) and surface it in `LoginPage`, so a user can create a handle account and use the app without Spotify.
+Server-side email/password signup and login using Supabase Auth (the same provider and Python
+SDK we already call for OAuth), reusing the existing encrypted `brink_session` cookie and
+`get_or_create_user` sync. Plus the first **IP-keyed** rate limiting (signup/login are
+unauthenticated, so the existing user-id-keyed helper needs an IP/email subject).
 
 ## Source
 - Spec reqs: **AUTH-3** (handle accounts), **AUTH-6**
-- ADRs: [ADR-0005](../../../decisions/adr/0005-identity.md) (Supabase Auth; email magic-link/OTP for handle accounts) · [ADR-0010](../../../decisions/adr/0010-fastapi-render-backend.md)
+- ADRs: [ADR-0005](../../../decisions/adr/0005-identity.md) chose magic-link/OTP — this ticket
+  **must open with a new ADR** superseding that choice with email+password (append-only rule).
+  Also [ADR-0011](../../../decisions/adr/0011-rate-limiting.md) (rate-limit helper).
+- Investigation: [2026-07-15](../../reviews/2026-07-15-auth-email-signup-investigation.md)
 
 ## Scope
 ### In Scope
-- `AuthContext` — add `loginWithEmail(email)` → `supabase.auth.signInWithOtp({ email })` (Supabase sends the email; no external vendor).
-- `LoginPage` — "continue with email" input + a "check your inbox" sent state.
-- Confirm the existing `requireUser` sync creates a handle `User` (`spotifyId = null`) on first email login.
+- New ADR: email+password via Supabase Auth (supersedes ADR-0005's OTP choice for this surface).
+- `security/supabase.py`: `sign_up_email(email, password)` + `sign_in_password(email, password)`
+  wrappers (the installed `supabase-auth` client exposes both).
+- `routers/auth.py`: `POST /auth/signup`, `POST /auth/login-email` (+ `GET /auth/confirm` landing
+  if email confirmations are ON) — on success reuse `get_or_create_user` and
+  `login_session.set_cookie` exactly as the Spotify callback does. Pass a real `Response` so
+  refreshed cookies stick.
+- Rate limiting: a `_client_ip` helper that trusts Render's `X-Forwarded-For`, then
+  `enforce_rate_limit` keyed on `ip:<addr>` and `email:<addr>` for signup/login attempts
+  (no change to the helper's table/logic — it already takes an arbitrary subject string).
+- CSRF protection on the forms (same pattern as the T09 state cookie).
+- Jinja: `signup.html` + email login form (new templates), links from `home.html`/`base.html`.
+- Tests: `backend/tests/test_auth_email.py` — signup creates a handle `User`
+  (`spotify_id = NULL`), login sets the session cookie, rate limits fire, wrong password fails
+  cleanly.
+- Docs sync: CLAUDE.md status line, requirements.md AUTH-3/AUTH-6 rows.
 
-### Out of Scope
-- Linking Spotify to an existing email account later — that is ADR-0005 identity-linking, a separate ticket.
-- Resend / any external email vendor (Supabase Auth sends the OTP).
-- **User-chosen handle/display-name signup form** — decided cut: handles are **auto-derived** by `requireUser`. No `SignupPage`, no handle-set endpoint. Users can rename later (separate ticket if ever needed).
+### Out of Scope (file as follow-up tickets when this lands)
+- Password reset flow.
+- Linking Spotify to an existing email account later (ADR-0005 identity-linking).
+- User-chosen handles (auto-derived handle stays, per the existing AUTH-3 decision).
+
+## Open questions (owner, before coding)
+1. Email confirmations ON (safer, needs a confirm landing page + Supabase redirect config) or
+   OFF (simpler, faster for a course demo)?
+2. Minimum password policy beyond Supabase's default (6 chars)?
 
 ## Validation & authz (ADR-0007)
-- **Authorization:** our sync still verifies the Supabase JWT server-side via `get_user()` in `require_user` (Supabase owns the OTP exchange itself).
-- **Business rule:** handle uniqueness is already enforced by the unique `handle` constraint plus the derived-handle policy in `require_user` — no new logic needed.
-- **Integrity:** `User.handle`, `User.email`, `User.supabaseUserId` are each unique in `backend/app/models.py`.
+- Supabase owns password hashing/verification; we never see or store the password.
+- Session semantics identical to Spotify login: JWT validated server-side via `get_user()`.
+- This touches `routers/auth.py` + `security/` — **highest-risk area**; second review encouraged.
 
 ## Current State (on `develop`)
-- `apps/web/src/context/AuthContext.tsx` — `login` is Spotify OAuth only; `loadProfile` already tolerates email-only users (no Spotify provider token).
-- `backend/app/deps.py` — `require_user` auto-creates a handle `User` (derived unique handle, null `spotifyId`) on first login.
-- `apps/web/src/pages/LoginPage.tsx` — Spotify-only UI; no email entry. No `SignupPage.tsx`.
-- No `lib/spotify-auth.ts` exists (the draft's deletion target); PKCE was already removed in T02.
+- `routers/auth.py`: Spotify-only PKCE flow (T09). `deps.py:get_or_create_user` already creates
+  handle users with derived unique handles and `spotify_id = NULL`.
+- `rate_limit.py`: generic subject string, but every caller keys on `user.id`; no IP extraction
+  helper exists.
 
 ## Files to Create/Modify
 | File | Action | Purpose |
 |------|--------|---------|
-| `apps/web/src/context/AuthContext.tsx` | MODIFY | add `loginWithEmail(email)` via `signInWithOtp` |
-| `apps/web/src/pages/LoginPage.tsx` | MODIFY | email input + "check your inbox" state |
-| `backend/tests/test_auth.py` | MODIFY | assert `require_user` creates a handle user (null `spotifyId`) for an email JWT |
+| `docs/decisions/adr/00XX-email-password-auth.md` | CREATE | supersede ADR-0005's OTP choice |
+| `backend/app/security/supabase.py` | MODIFY | sign-up / sign-in-password wrappers |
+| `backend/app/routers/auth.py` | MODIFY | /auth/signup, /auth/login-email (+ /auth/confirm) |
+| `backend/app/deps.py` or `routers/auth.py` | MODIFY | `_client_ip` helper for anon rate limits |
+| `backend/app/templates/signup.html` (+ login form) | CREATE | the front door |
+| `backend/app/templates/home.html`, `base.html` | MODIFY | entry links |
+| `backend/tests/test_auth_email.py` | CREATE | signup/login/rate-limit/failure tests |
 
 ## Testing Checklist
-- [ ] email OTP sign-in returns to the app authenticated
-- [ ] first email login creates a `User` with null `spotifyId` and a unique handle
-- [ ] a second email user whose derived handle collides still gets a unique handle (retry loop)
-- [ ] a handle account can use the app; profile renders for a user with no Spotify
+- [ ] signup creates a Supabase user + a handle `User` row (`spotify_id` NULL, unique handle)
+- [ ] login sets the encrypted session cookie; `/feed` accessible; logout works
+- [ ] wrong password → clean error, no cookie
+- [ ] signup/login rate limit fires per IP and per email
+- [ ] an email-only user can post / react / comment / follow / view profiles (no 500s anywhere)
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
 - [x] Files to Create/Modify is populated
 - [x] Testing Checklist has items
-- [x] Dependencies identified (T01, T02 done)
-- [x] Scope boundaries defined
+- [x] Dependencies identified (none — T09 infra is in place)
+- [ ] Open questions above answered by the owner
 
 ## Notes
-Scope locked: email users get an **auto-derived handle** from `requireUser` (the draft's `SignupPage` + custom-handle flow is cut). This keeps T03 to the email front-door only.
-
-Branch off `develop` as `feat/T03-auth-email`; one PR back into `develop` (never `main`).
+Branch `feat/T03-auth-email`. Estimated ~1–1.5 days. Supabase dashboard config needed: enable
+email provider (it is ON by default) and decide the confirm-email setting; if confirmations are
+ON, add the deployed `/auth/confirm` URL to the redirect allow-list.

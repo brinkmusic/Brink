@@ -64,8 +64,8 @@ cd backend && uv run uvicorn app.main:app --reload --port 3001
 4. **TDD (expected practice).** Write a failing test first, then minimal code to pass,
    with frequent small commits. Claude Code agents should use the `test-driven-development`
    skill; everyone else follows the same loop by hand. This is the expected workflow, not an
-   automated guarantee — CI (`.github/workflows/ci.yml`) runs the backend tests (`uv run pytest`),
-   the frontend build, and a secret scan on every PR, and is what actually blocks untested code.
+   automated guarantee — CI (`.github/workflows/ci.yml`) runs the backend tests (`uv run pytest`)
+   and a secret scan on every PR, and is what actually blocks untested code.
    Don't execute multiple tickets at once.
 5. **Don't widen scope.** Build exactly what the ticket/requirement specifies — no extra
    features, abstractions, or error handling beyond what's asked.
@@ -141,7 +141,8 @@ The work cycle:
   done and tests are green. Deferring to a follow-up PR is still allowed but only as a **stated**
   exception (e.g. a very large PR). Say "close out T<NN>".
 - **`close-session` — end of a *session* (final validation).** The "am I safe to stop?" gate and
-  bookend to `get-me-started`: runs the full backend suite + frontend build/lint, confirms the tree
+  bookend to `get-me-started`: runs the full backend suite (no frontend build step — the frontend
+  is server-rendered Jinja), confirms the tree
   is clean and pushed and open PRs are green, prunes already-merged branches, and writes the
   handoff. Use it when wrapping up ("sign off", "I'm done", "final validation").
 
@@ -209,8 +210,10 @@ PR that it went in without a second review).
   create is rate-limited + trims/length-validates `body`, list returns newest-first with nested
   author DTO), satisfies BE-6. The app (API + Jinja frontend) runs on **Render**
   (`brink-xg7p.onrender.com`, `/api/health` → `db: true`), Spotify login works end-to-end. Repo:
-  **`brinkmusic/Brink`** (public). Remaining remediation: T75, T76 (see
-  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **T90–T93 (developer tooling) done** —
+  **`brinkmusic/Brink`** (public). The 2026-07-02 review's remaining remediation
+  tickets T75/T76 were **obsoleted by T60** (they targeted the retired SPA's `apps/web/` files);
+  the one surviving idea — retiring the legacy `POST /api/auth/capture-spotify` endpoint — is now
+  tracked as T63. **T90–T93 (developer tooling) done** —
   the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
   (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
   pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
@@ -218,7 +221,8 @@ PR that it went in without a second review).
   validate + branch-cleanup + handoff). Plus the **`docs-sync` CI gate**
   (`.github/workflows/docs-sync.yml`) that fails any PR changing source without touching docs
   (`no-docs` label = escape hatch). `develop` and `main` are now branch-protected: PR required, up
-  to date, checks `api/web/secrets/docs-sync` green, admins included. **T13 (follow + feed) done**
+  to date, checks `api/secrets/docs-sync` green, admins included (the `web` check was retired with
+  the SPA in T60). **T13 (follow + feed) done**
   — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
   `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
   counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
@@ -335,8 +339,25 @@ PR that it went in without a second review).
   (`SpotifyAudioFeaturesApril2019.csv`, gitignored under `analytics/data/`) instead of the ≈1M+ set
   ADR-0004 calls for, since that set wasn't available — coverage against brink-dev is currently
   **14/343 (4.1%)**. Swapping in the real set later is just re-running the script against the new
-  file. AN-1/DATA-1 marked **✅ interim dataset**. Its merge unblocks **T32**. **Next backend
-  feature: T32 (Jonah) is unblocked; T14 (profile analytics) still gated on T33/T35.**
+  file. AN-1/DATA-1 marked **✅ interim dataset**. Its merge unblocks **T32**. **T79 (2026-07-15
+  coherence sweep) done** — four parallel reviews (docs↔code coherence, email-auth investigation,
+  frontend-enablement gap audit, Supabase schema audit; reports in
+  `docs/plans/reviews/2026-07-15-*.md`) landed in one chore PR with every easy drift fix (CI/
+  branch-check claims, `render.yaml` branch + `CRON_SECRET` record, stale React-era comments,
+  ADR-0003 language note, `home.html` copy aligned with ADR-0014's manual-posting feed); T75/T76
+  marked **Obsolete** (their target files died with the SPA in T60). The reviews also filed the
+  **enablement wave**: the backend is ahead of the frontend, so **T47** (authenticated nav +
+  logout link — today no page links to /feed, /artist, your profile, or logout), **T15/T46**
+  (user search API/UI — today you can't find a user to follow without hand-typing their URL),
+  **T53** (signed READ urls — artist images upload into a private bucket and currently cannot
+  render at all), **T54** (audience view of artist posts — the whole T52 engagement API is dead
+  code until a page renders it), **T16** (follower/following lists), **T63** (retire the dead
+  capture-spotify endpoint), and a rewritten **T03** (email+password signup/login server-side;
+  needs a new ADR superseding ADR-0005's OTP choice + first IP-keyed rate limiting). Schema audit
+  verdict: no orphaned tables, no drift (`alembic check` clean); bronze/silver/gold + Supabase
+  schemas all accounted for; only optional cleanup is dropping `_prisma_migrations`. **Next: T47 →
+  T15/T46 (make follow usable), T53 (broken artist images), T03 (email login); T32 (Jonah)
+  unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
 

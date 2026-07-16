@@ -4,7 +4,8 @@
 #      /auth/logout. We run the OAuth handshake ourselves (no browser Supabase client),
 #      set an encrypted session cookie, and capture the user's Spotify tokens on the way.
 #   2. The LEGACY browser capture endpoint POST /api/auth/capture-spotify — how the old
-#      React SPA forwarded its Spotify tokens. Kept until the SPA is retired in T60.
+#      React SPA (retired in T60) forwarded its Spotify tokens. Nothing calls it anymore;
+#      removing it is tracked as ticket T63.
 # Both store the Spotify tokens ENCRYPTED so background jobs (the snapshot, T21) can
 # later fetch the user's listening history.
 
