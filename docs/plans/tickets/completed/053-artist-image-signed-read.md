@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Low
 category: Fix
@@ -60,9 +60,12 @@ check rides along.
 | `backend/tests/test_artist_pages.py` (or existing) | MODIFY | route passes signed URLs |
 
 ## Testing Checklist
-- [ ] helper builds the correct Supabase sign endpoint call and returns the URL
-- [ ] artist page renders `<img>` with a signed URL, not a raw path
-- [ ] manual: a real upload on brink-dev displays in the browser (MEDIA-5)
+- [x] helper builds the correct Supabase sign endpoint call and returns the URL
+- [x] artist page renders `<img>` with a signed URL, not a raw path
+- [x] manual: a real upload on brink-dev round-trips (MEDIA-5's storage half) — service-role
+      upload → signed read URL → HTTP 200 with byte-identical content; the unsigned raw path
+      is rejected (400, private bucket confirmed). Browser-side upload UI still worth one look
+      on the deployed app, noted in the PR.
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -74,3 +77,17 @@ check rides along.
 ## Notes
 Branch `fix/T53-artist-image-signed-read`. Do before T54 — an audience page full of broken
 images is worse than none.
+
+## Outcome (2026-07-16)
+As specced:
+- `create_signed_read_url(bucket, path, expires_in=3600)` in `security/supabase.py` — the read
+  sibling of `create_signed_upload_url` (service role, 1-hour default expiry).
+- The `/artist` page route converts each post's stored path → signed URL before rendering, so
+  `artist.html` finally shows the images (it reuses `UPLOAD_BUCKET` from `routers/artist.py`).
+- **Live-verification finding:** the installed supabase-py returns the signed URL as a FULL
+  absolute URL, not the relative path older releases returned — blindly prefixing
+  `{SUPABASE_URL}/storage/v1` doubled the host and 404'd. The helper now handles both shapes
+  (covered by a unit test each), and the round-trip was verified live against brink-dev
+  (upload → signed GET 200, byte-identical; unsigned GET 400).
+- 4 new tests (3 helper + 1 page). Full suite green (183 passed).
+Unblocks **T54** (audience view of artist posts), which consumes this helper.
