@@ -478,6 +478,21 @@ def test_nav_logged_in_shows_app_links(client, db_session, monkeypatch):
     assert "Log in with Spotify" not in body
 
 
+def test_nav_logged_in_shows_user_search(client, db_session, monkeypatch):
+    # T46 puts "find people" in the shared authenticated nav, so every signed-in page can reach
+    # profiles without hand-typing /u/<handle>. The API does the real auth/rate-limit work; this
+    # page test only proves the shared nav renders and loads the browser script.
+    _seed_viewer(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'class="user-search"' in body
+    assert 'placeholder="Find people"' in body
+    assert "userSearch(this)" in body
+    assert "/static/user-search.js" in body
+
+
 def test_nav_logged_in_artist_shows_artist_studio(client, db_session, monkeypatch):
     # A signed-in ARTIST additionally sees the Artist studio link (/artist).
     _ensure_artist_table(db_session)
