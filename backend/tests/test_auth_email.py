@@ -11,12 +11,25 @@
 import re
 from types import SimpleNamespace
 
+import pytest
+
 from app.db import get_session
 from app.main import app
 from app.models import User
 from app.routers import auth as auth_router
+from app.security import crypto
 from app.security import session as login_session
 from app.security import supabase
+
+
+@pytest.fixture(autouse=True)
+def _test_enc_key(monkeypatch):
+    # These routes use REAL encryption for the CSRF cookie (and the session cookie on login).
+    # CI has no TOKEN_ENC_KEY, so the real encrypt/decrypt would raise ValueError → a 500 on
+    # every form render (this is exactly what green-locally/red-in-CI looked like). Pin a fixed
+    # 32-byte key so encryption genuinely works here — the CSRF round-trip is then exercised for
+    # real, not stubbed. Patching crypto._key covers everything that imports encrypt/decrypt.
+    monkeypatch.setattr(crypto, "_key", lambda: b"\x00" * 32)
 
 
 # ---- helpers -------------------------------------------------------------------------
