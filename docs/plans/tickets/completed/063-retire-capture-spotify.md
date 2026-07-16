@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Low
 complexity: Low
 category: Chore
@@ -40,8 +40,9 @@ tickets/ADRs).
 ## Validation & authz (ADR-0007)
 Removal only; shrinks the auth surface.
 
-## Current State (on `develop`)
-- Endpoint mounted and functional; zero callers in templates/static JS.
+## Current State (as built)
+- The legacy endpoint, request model, and endpoint tests are removed. Server-side Spotify login
+  still stores tokens through `/auth/callback` using `_store_spotify_token`.
 
 ## Files to Create/Modify
 | File | Action | Purpose |
@@ -50,8 +51,8 @@ Removal only; shrinks the auth surface.
 | `backend/tests/test_auth.py` (capture tests) | MODIFY | remove/retarget |
 
 ## Testing Checklist
-- [ ] full suite green after removal
-- [ ] `git grep capture-spotify` hits only historical docs
+- [x] full suite green after removal
+- [x] `git grep capture-spotify` hits only historical docs
 - [ ] Spotify login e2e still works (manual, one login on dev)
 
 ## Readiness Checklist
@@ -64,3 +65,10 @@ Removal only; shrinks the auth surface.
 ## Notes
 Branch `chore/T63-retire-capture-spotify`. Auth-area change: second review encouraged, not
 required.
+
+## Outcome
+T63 removed `POST /api/auth/capture-spotify`, the legacy all-optional request model, and the
+capture-specific tests. `backend/app/main.py` no longer describes auth routing as the capture
+endpoint, and live code comments now point at the server-side `/auth/callback` token-capture path.
+Malformed JSON envelope coverage was retargeted to `/api/posts`. No `/auth/login`, `/auth/callback`,
+`/auth/logout`, session cookie, or crypto behavior changed.
