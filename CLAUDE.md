@@ -360,8 +360,14 @@ PR that it went in without a second review).
   free-tier service stops spinning down behind Render's ~50s "waking up" screen; like snapshot.yml
   it **only fires from `main`**, so it activates at the next release (owner: one manual
   `workflow_dispatch` run to verify, and the durable alternative if drift still bites is the paid
-  Starter plan). **Next: T47 →
-  T15/T46 (make follow usable), T53 (broken artist images), T03 (email login); T32 (Jonah)
+  Starter plan). **T15 (user search API) done** — `GET /api/users/search?q=` (new
+  `backend/app/routers/users.py`; T16's follower/following lists belong there too): login-gated +
+  rate-limited (ADR-0011), case-insensitive `ILIKE %q%` on handle + display name with SQL
+  wildcards escaped, `q` trimmed with a 2-char minimum, ordered by handle, capped at 20, returning
+  the `UserSearchOut` allow-list DTO (ADR-0012). Fixes the audit's top gap: follow (T13) shipped
+  with no way to *find* a user (`/api/search` is Spotify tracks, not people). Satisfies the
+  discoverability half of BE-4. **Next: T47 →
+  T46 (search UI: needs T15 + T47), T53 (broken artist images), T03 (email login); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
