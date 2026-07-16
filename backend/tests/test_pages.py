@@ -401,3 +401,60 @@ def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):
 
     body = client.get("/artist").text
     assert "new EP out now" in body
+
+
+# ---- T47: authenticated nav (feed / my profile / artist studio / log out) ----
+#
+# The shared nav (base.html) shows the public landing nav when logged out, and the in-app
+# nav (Feed / My profile / Log out, plus Artist studio for artists) when logged in. These
+# tests exercise both variants via real pages, since the nav is rendered on every page.
+
+
+def test_nav_logged_out_shows_landing_nav(client):
+    # An anonymous visitor to the landing page sees the public nav: the "Log in with Spotify"
+    # button and the in-page anchors — and NONE of the authenticated links.
+    body = client.get("/").text
+    assert "Log in with Spotify" in body
+    assert 'href="#features"' in body
+    # No in-app links leak to a logged-out visitor.
+    assert 'href="/feed"' not in body
+    assert 'href="/auth/logout"' not in body
+
+
+def test_nav_logged_in_shows_app_links(client, db_session, monkeypatch):
+    # A signed-in NON-artist sees Feed, their own profile, and Log out — but not the artist link.
+    viewer = _seed_viewer(db_session)  # handle "viewer", is_artist defaults to False
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'href="/feed"' in body
+    assert f'href="/u/{viewer.handle}"' in body   # My profile → own handle
+    assert 'href="/auth/logout"' in body
+    assert "Artist studio" not in body            # not an artist
+    # The logged-out call to action is gone once you're signed in.
+    assert "Log in with Spotify" not in body
+
+
+def test_nav_logged_in_artist_shows_artist_studio(client, db_session, monkeypatch):
+    # A signed-in ARTIST additionally sees the Artist studio link (/artist).
+    _ensure_artist_table(db_session)
+    _seed_artist(db_session)  # is_artist=True, handle "the-artist"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "Artist studio" in body
+    assert 'href="/artist"' in body
+
+
+def test_nav_logged_in_on_home_page(client, db_session, monkeypatch):
+    # The public landing page ("/") also reflects the logged-in nav when a session cookie is
+    # present, so a signed-in user who lands on "/" can still reach Feed / their profile / logout.
+    _seed_viewer(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/").text
+    assert 'href="/feed"' in body
+    assert 'href="/auth/logout"' in body
