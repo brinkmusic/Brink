@@ -11,6 +11,7 @@ dependencies = [
     "jinja2>=3.1",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.5",
+    "python-multipart>=0.0.32",
     "sqlmodel>=0.0.22",
     "supabase>=2.9",
     "uvicorn[standard]>=0.32",

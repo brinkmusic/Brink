@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -25,9 +25,19 @@ from sqlmodel import Session, select
 from app import spotify
 from app.db import get_session
 from app.deps import AuthError, require_user
-from app.models import ArtistPost, Follow, Post, Track, User
+from app.models import (
+    ArtistComment,
+    ArtistPost,
+    ArtistReaction,
+    Follow,
+    Post,
+    ReactionType,
+    Track,
+    User,
+)
 from app.routers.artist import UPLOAD_BUCKET
 from app.routers.feed import build_feed
+from app.routers.users import FOLLOW_LIST_LIMIT
 from app.security.supabase import create_signed_read_url
 from app.stats import listening_summary
 
@@ -166,7 +176,55 @@ def feed(request: Request, session: Session = Depends(get_session)):
 # viewer already follows them, and their own posts (newest-first). This is the minimal profile that
 # gives the Follow button (T43) a home; the full "Wrapped"-style stats/cluster/compatibility come
 # with T44 (which needs the profile API, T14). Returns None if there's no user with that handle.
-def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
+def _follow_list_items(session: Session, person_id: str, list_kind: str | None) -> dict | None:
+    if list_kind not in {"followers", "following"}:
+        return None
+
+    if list_kind == "followers":
+        # People whose Follow.following_id points at this profile.
+        rows = session.exec(
+            select(User)
+            .join(Follow, Follow.follower_id == User.id)
+            .where(Follow.following_id == person_id)
+            .order_by(User.handle)
+            .limit(FOLLOW_LIST_LIMIT)
+        ).all()
+        title = "Followers"
+        empty = "No followers yet."
+    else:
+        # People this profile follows.
+        rows = session.exec(
+            select(User)
+            .join(Follow, Follow.following_id == User.id)
+            .where(Follow.follower_id == person_id)
+            .order_by(User.handle)
+            .limit(FOLLOW_LIST_LIMIT)
+        ).all()
+        title = "Following"
+        empty = "Not following anyone yet."
+
+    return {
+        "kind": list_kind,
+        "title": title,
+        "empty": empty,
+        "users": [
+            {
+                "handle": user.handle,
+                "display_name": user.display_name,
+                "is_artist": user.is_artist,
+                "avatar_url": user.avatar_url,
+            }
+            for user in rows
+        ],
+    }
+
+
+def _profile_data(
+    session: Session,
+    handle: str,
+    viewer_id: str,
+    list_kind: str | None = None,
+) -> dict | None:
     person = session.exec(select(User).where(User.handle == handle)).first()
     if person is None:
         return None
@@ -199,6 +257,73 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         for post, track in rows
     ]
 
+    # Artist BTS posts (T54): if this profile belongs to an artist, show their promo posts here
+    # too. WHY on /u/{handle}: user search and feed author links already land on profiles, so this
+    # makes artist content discoverable without inventing a second artist URL. Images are stored as
+    # private bucket paths, so each one gets a signed read URL before the browser sees it.
+    artist_posts = []
+    if person.is_artist:
+        artist_rows = session.exec(
+            select(ArtistPost)
+            .where(ArtistPost.artist_user_id == person.id)
+            .order_by(ArtistPost.created_at.desc())
+        ).all()
+        artist_post_ids = [post.id for post in artist_rows]
+
+        # Start every post with zeroes so templates can render a stable HEART/FIRE/SPARKLE set even
+        # when there is no engagement yet.
+        reaction_counts = {
+            post_id: {kind.value: 0 for kind in ReactionType}
+            for post_id in artist_post_ids
+        }
+        comment_counts = {post_id: 0 for post_id in artist_post_ids}
+        viewer_reactions = {
+            post_id: {kind.value: False for kind in ReactionType}
+            for post_id in artist_post_ids
+        }
+
+        if artist_post_ids:
+            reaction_rows = session.exec(
+                select(ArtistReaction.artist_post_id, ArtistReaction.type, func.count())
+                .where(ArtistReaction.artist_post_id.in_(artist_post_ids))
+                .group_by(ArtistReaction.artist_post_id, ArtistReaction.type)
+            ).all()
+            for post_id, rtype, count in reaction_rows:
+                reaction_counts[post_id][ReactionType(rtype).value] = count
+
+            comment_rows = session.exec(
+                select(ArtistComment.artist_post_id, func.count())
+                .where(ArtistComment.artist_post_id.in_(artist_post_ids))
+                .group_by(ArtistComment.artist_post_id)
+            ).all()
+            for post_id, count in comment_rows:
+                comment_counts[post_id] = count
+
+            mine_rows = session.exec(
+                select(ArtistReaction.artist_post_id, ArtistReaction.type).where(
+                    ArtistReaction.artist_post_id.in_(artist_post_ids),
+                    ArtistReaction.user_id == viewer_id,
+                )
+            ).all()
+            for post_id, rtype in mine_rows:
+                viewer_reactions[post_id][ReactionType(rtype).value] = True
+
+        artist_posts = [
+            {
+                "id": post.id,
+                "image_url": create_signed_read_url(UPLOAD_BUCKET, post.image_url),
+                "caption": post.caption,
+                "when": _ago(post.created_at),
+                "reaction_counts": reaction_counts[post.id],
+                "mine": {
+                    kind for kind, on in viewer_reactions[post.id].items() if on
+                },
+                "comment_count": comment_counts[post.id],
+                "show_owner_engagement": person.id == viewer_id,
+            }
+            for post in artist_rows
+        ]
+
     # The listening summary (T44): what this person actually plays, computed live from their Play
     # history (app/stats.py). The "recent" rows carry a raw played_at datetime; format it to a
     # friendly "3h ago" here, the same way posts do, so the template just prints a string.
@@ -216,6 +341,7 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         "avatar_url": person.avatar_url,
         "follower_count": follower_count,
         "following_count": following_count,
+        "follow_list": _follow_list_items(session, person.id, list_kind),
         "is_following": is_following,
         "is_self": person.id == viewer_id,  # hide the Follow button on your own profile
         # Does THIS person have a linked Spotify? Drives the "link Spotify" prompt on your own
@@ -227,20 +353,27 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         "plays_30d": summary["plays_30d"],
         "streak": summary["streak"],
         "posts": posts,
+        "is_artist": person.is_artist,
+        "artist_posts": artist_posts,
     }
 
 
 # A user's profile page: their header, a Follow/Unfollow button + follower counts (T43), and their
 # posts. Login-gated like the rest of the app. `handle` comes from the URL, e.g. /u/andrea-ab12cd.
 @router.get("/u/{handle}", response_class=HTMLResponse)
-def profile(handle: str, request: Request, session: Session = Depends(get_session)):
+def profile(
+    handle: str,
+    request: Request,
+    list_kind: str | None = Query(default=None, alias="list"),
+    session: Session = Depends(get_session),
+):
     refreshed = Response()
     try:
         viewer = require_user(request, session=session, response=refreshed)
     except AuthError:
         return RedirectResponse("/auth/login", status_code=303)
 
-    data = _profile_data(session, handle, viewer_id=viewer.id)
+    data = _profile_data(session, handle, viewer_id=viewer.id, list_kind=list_kind)
     if data is None:
         # No such handle — render a friendly 404 page rather than a raw error.
         page = templates.TemplateResponse(

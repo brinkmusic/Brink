@@ -11,7 +11,7 @@
 # { "detail": [...] }. After our fix it must return 400 { "error": "..." }.
 def test_malformed_json_returns_400_envelope(client):
     res = client.post(
-        "/api/auth/capture-spotify",
+        "/api/posts",
         content="{bad json",
         headers={"Content-Type": "application/json"},
     )

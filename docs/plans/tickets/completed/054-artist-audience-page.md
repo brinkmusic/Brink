@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Medium
 category: Feature
@@ -46,8 +46,10 @@ engagement summary (counts) visible only to the owning artist on their own page.
 ## Validation & authz (ADR-0007)
 All enforcement already server-side (T52); UI only reflects it.
 
-## Current State (on `develop`)
-- `/artist` = own-posts-only upload studio; no audience surface; T52 endpoints unused by any page.
+## Current State (as built)
+- Artist profiles (`/u/{handle}` for `isArtist` users) now render an "Artist posts" section with
+  signed image URLs, captions, public reaction/comment controls, and owner-only engagement totals.
+  `/artist` remains the own-post upload studio.
 
 ## Files to Create/Modify
 | File | Action | Purpose |
@@ -58,9 +60,9 @@ All enforcement already server-side (T52); UI only reflects it.
 | `backend/tests/test_pages.py` | MODIFY | page renders; owner-only counts hidden for others |
 
 ## Testing Checklist
-- [ ] a fan can see an artist's posts with images (T53 URLs) and react/comment
-- [ ] the artist sees engagement counts on their own posts; fans don't
-- [ ] non-artist profiles unaffected
+- [x] a fan can see an artist's posts with images (T53 URLs) and react/comment
+- [x] the artist sees engagement counts on their own posts; fans don't
+- [x] non-artist profiles unaffected
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -71,3 +73,12 @@ All enforcement already server-side (T52); UI only reflects it.
 
 ## Notes
 Branch `feat/T54-artist-audience-page`.
+
+## Outcome
+T54 chose the existing profile URL (`/u/{handle}`) as the audience artist page because user search,
+feed authors, and follow already resolve to profiles. `backend/app/routers/pages.py` now signs each
+artist image path and builds public reaction/comment counts plus the viewer's own reactions for
+artist posts. `backend/app/templates/profile.html` renders the artist-post section, public
+reaction/comment controls, and owner-only engagement totals. `backend/app/static/artist-engagement.js`
+calls the existing T52 endpoints without changing API behavior. The deferred view count remains out
+of scope.

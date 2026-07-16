@@ -213,7 +213,7 @@ PR that it went in without a second review).
   **`brinkmusic/Brink`** (public). The 2026-07-02 review's remaining remediation
   tickets T75/T76 were **obsoleted by T60** (they targeted the retired SPA's `apps/web/` files);
   the one surviving idea — retiring the legacy `POST /api/auth/capture-spotify` endpoint — is now
-  tracked as T63. **T90–T93 (developer tooling) done** —
+  completed as T63. **T90–T93 (developer tooling) done** —
   the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
   (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
   pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
@@ -372,6 +372,14 @@ PR that it went in without a second review).
   the `UserSearchOut` allow-list DTO (ADR-0012). Fixes the audit's top gap: follow (T13) shipped
   with no way to *find* a user (`/api/search` is Spotify tracks, not people). Satisfies the
   discoverability half of BE-4.
+  **T46 (user search UI) done** — `base.html` now renders a signed-in "Find people" search box in
+  the shared nav, loading `backend/app/static/user-search.js` to debounce calls to T15's
+  `/api/users/search` and render safe text-only links to `/u/{handle}`. This completes the
+  user-discovery path for follow/profile browsing and satisfies the UI-5 reachability gap.
+  **T16 (follower/following lists) done** — `GET /api/users/{userId}/followers` and
+  `/following` return capped, login-gated `UserSearchOut` DTOs, and profile follower/following
+  counts link to server-rendered list sections (`?list=followers|following`). This completes the
+  basic social-graph browse path after T15/T46.
   **T53 (artist image signed reads) done** — artist images finally display:
   `create_signed_read_url(bucket, path, expires_in=3600)` in `security/supabase.py` (the read
   sibling of T50's upload helper, service role, 1-hour expiry), and the `/artist` page signs each
@@ -379,9 +387,33 @@ PR that it went in without a second review).
   every image was broken — the T51 caveat). Live-verified against brink-dev storage: upload →
   signed GET 200 byte-identical, unsigned GET 400. That verification also caught that the
   installed supabase-py returns an *absolute* signed URL (older releases returned a relative
-  path) — the helper handles both. **Next:
-  T46 (search UI: T15 + T47 both merged, unblocked), T54 (audience artist page: unblocked by
-  T53), T03 (email login); T32 (Jonah)
+  path) — the helper handles both.
+  **T54 (artist audience page) done** — artist profiles (`/u/{handle}` for artist accounts) now
+  render signed artist-image posts with public reaction/comment controls wired to the T52
+  `/api/artist/posts/{id}/...` endpoints, plus owner-only engagement totals on the artist's own
+  profile. `/artist` remains the upload studio; no artist API behavior changed. Satisfies MEDIA-4's
+  visible engagement surface; view count remains deferred.
+  **T63 (retire capture-spotify) done** — removed the dead browser `POST
+  /api/auth/capture-spotify` endpoint, its legacy request model, and its endpoint tests. Server-side
+  `/auth/callback` still captures Spotify tokens through `_store_spotify_token`; no login/session/
+  crypto behavior changed.
+  **T47 + T15 + T53 released to production (`develop → main` #117, back-merged #118).**
+  **T03 (email + password auth) done** — the front door for people **without** Spotify
+  ([ADR-0015](docs/decisions/adr/0015-email-password-auth.md), which supersedes ADR-0005's
+  magic-link/OTP choice). New `GET`/`POST /auth/signup`, `GET`/`POST /auth/login-email`,
+  `GET /auth/confirm` in `routers/auth.py`; `sign_up_email`/`sign_in_password` wrappers on a fresh
+  default Supabase client in `security/supabase.py`. Success reuses the T09 session cookie +
+  `get_or_create_user` (a handle account, `spotify_id = NULL`). **Email confirmations ON**
+  (signup → "check your inbox", no session until confirmed); **6-char password min**; **first
+  IP-keyed rate limiting** (`_client_ip` trusts Render's `X-Forwarded-For`; `enforce_rate_limit`
+  keyed on `ip:` **and** `email:`, no change to `rate_limit.py`); **CSRF** token on the forms;
+  generic non-enumerating errors. New `signup.html`/`login_email.html` + entry links; added the
+  `python-multipart` dep for form parsing. Satisfies AUTH-3 (now password, not OTP) + AUTH-6.
+  **Deploy step for Andrea:** keep Supabase Email + Confirm-email ON (defaults) and add the
+  deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
+  signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
+  auto-login-on-confirm. **Next:
+  T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)

@@ -9,10 +9,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | AUTH-1 | Spotify login via Supabase provider; first login creates/links a `public.User`. | T02 (browser), T09 (server-side) | ✅ |
 | AUTH-2 | Capture + encrypt the Spotify refresh token server-side in `SpotifyToken`. | T02 (browser), T09 (server-side callback) | ✅ |
-| AUTH-3 † | Passwordless email magic-link/OTP signup (Supabase sends mail). | T03 | ◻ |
+| AUTH-3 † | Email signup for handle accounts — now **email + password** server-side (was magic-link/OTP), per [ADR-0015](../decisions/adr/0015-email-password-auth.md): `/auth/signup` + `/auth/login-email`, confirmations ON, IP+email rate-limited. | T03 | ✅ |
 | AUTH-4 | Every `/api/*` mutation verifies the Supabase JWT. | T02 + every API ticket (ADR-0007); T09 (session cookie) | ✅ base |
 | AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T22 | ✅ |
-| AUTH-6 | Handle accounts work fully except Spotify-derived stats ("link Spotify"). | T03, T44 | ◻ |
+| AUTH-6 | Handle accounts work fully except Spotify-derived stats ("link Spotify"). | T03, T44 | ✅ (T03 gives the email/password front door; a handle user can post/react/comment/follow, and every Spotify surface degrades to empty states + a "link Spotify" prompt on the profile from T44. *Linking* Spotify to an existing email account is a stated follow-up.) |
 
 ## Layer 2 — Backend API + Data Model (BE)
 | ID | Acceptance | Ticket(s) | Status |
@@ -20,7 +20,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (`/api/state`) + dead front-end stubs. *(satisfied by retiring the whole SPA — the entire `apps/web/` was deleted in T60, ADR-0013)* | T60 | ✅ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
-| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. *(T15 added `GET /api/users/search` — the user discoverability follow needs to be usable)* | T13, T15 | ✅ |
+| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. User search and follower/following lists make the graph discoverable. | T13, T15, T16 | ✅ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
 | BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ✅ |
@@ -58,7 +58,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-2 | Feed reads `/api/feed`; manually shared song cards. *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links)* | T41, T47 | ✅ |
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ✅ |
-| UI-5 | Follow/unfollow buttons + follower counts. | T43 | ✅ |
+| UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16 | ✅ |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
@@ -71,7 +71,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ✅ |
 | MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. *(T53 made the uploaded images actually display — signed read URLs for the private bucket)* | T51, T53 | ✅ |
 | MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ✅ |
-| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52 | ✅ (reaction + comment counts, owner-only; view count deferred — no artist-post read path yet, T51) |
+| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52, T54 | ✅ (reaction + comment counts, owner-only on artist profiles; view count deferred) |
 | MEDIA-5 | ≥98% upload success across 5 file types up to 10 MB. | T51, T53 | ◧ (T53 verified the storage round-trip live on brink-dev: service-role upload → signed read URL → 200 with matching bytes, unsigned GET 400; the browser-upload half + the 5-file-type success-rate measurement remain) |
 
 ## Layer 7 — Infrastructure & Scheduling (INFRA)
@@ -112,5 +112,5 @@ The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagge
 - **INFRA-1** — original spec assumed Vercel serverless (`api/`) as the backend. ADR-0010 moved the API to FastAPI on Render; then **T60 retired the Vercel SPA entirely** ([ADR-0013](../decisions/adr/0013-python-frontend.md)), so **Render now serves both the API and the Jinja frontend** — Vercel is no longer used ([ADR-0010](../decisions/adr/0010-fastapi-render-backend.md)).
 - **AN-2/4/5/7/9** — per-user analytics are computed **on read in the API** (written when the backend was TypeScript; since ADR-0010 that means the FastAPI/Python app), not materialized; `UserStats`/`TasteVector`/`Compatibility` tables and `User.clusterId` are dropped, `ModelArtifact` added ([ADR-0003](../decisions/adr/0003-analytics-runtime.md), [ADR-0009](../decisions/adr/0009-medallion-layering.md)).
 - **SP-2 / INFRA-3** — snapshot is triggered by **GitHub Actions**, not Vercel Cron ([ADR-0006](../decisions/adr/0006-scheduling.md)).
-- **AUTH-3** — handle is **auto-derived**; no signup form / custom-handle flow.
+- **AUTH-3** — the front door is **email + password** (not the spec's magic-link/OTP), server-side per [ADR-0015](../decisions/adr/0015-email-password-auth.md); the handle stays **auto-derived** (no custom-handle field on the signup form).
 - Storage is **Supabase Storage** (not Cloudinary); Kaggle set is a genuine ~1M-track source (not `maharshipandya`) ([ADR-0002](../decisions/adr/0002-api-and-persistence.md), [ADR-0004](../decisions/adr/0004-analytics-data-strategy.md)).

@@ -7,6 +7,9 @@
 #}
 {% extends "base.html" %}
 
+{# The artist-post reaction types and emoji. Same enum values as the regular feed reactions. #}
+{% set reaction_kinds = [("HEART", "❤️"), ("FIRE", "🔥"), ("SPARKLE", "✨")] %}
+
 {% block content %}
 <section class="stack">
   <div class="profile-header card">
@@ -23,8 +26,12 @@
     </div>
 
     <div class="profile-counts">
-      <span><b class="follower-count">{{ p.follower_count }}</b> followers</span>
-      <span><b>{{ p.following_count }}</b> following</span>
+      <a class="profile-count-link" href="/u/{{ p.handle }}?list=followers">
+        <b class="follower-count">{{ p.follower_count }}</b> followers
+      </a>
+      <a class="profile-count-link" href="/u/{{ p.handle }}?list=following">
+        <b>{{ p.following_count }}</b> following
+      </a>
     </div>
 
     {# No Follow button on your own profile — you can't follow yourself (the server enforces
@@ -40,6 +47,33 @@
     >{{ 'Following' if p.is_following else 'Follow' }}</button>
     {% endif %}
   </div>
+
+  {% if p.follow_list %}
+  <section class="follow-list card">
+    <h2 class="section-title">{{ p.follow_list.title }}</h2>
+    {% if p.follow_list.users %}
+    <ul class="follow-list-users">
+      {% for u in p.follow_list.users %}
+      <li>
+        <a class="follow-list-user" href="/u/{{ u.handle }}">
+          <span
+            class="profile-avatar follow-list-avatar"
+            {% if u.avatar_url %}style="background-image: url('{{ u.avatar_url }}')"{% endif %}
+            aria-hidden="true"
+          ></span>
+          <span>
+            <span class="follow-list-name">{{ u.display_name }}</span>
+            <span class="follow-list-handle">@{{ u.handle }}{% if u.is_artist %} · artist{% endif %}</span>
+          </span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">{{ p.follow_list.empty }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
 
   {# Now-playing badge (T44/UI-10) — own profile only; hidden when nothing is playing. #}
   {% if now_playing %}
@@ -115,6 +149,73 @@
   </div>
   {% endif %}
 
+  {% if p.is_artist %}
+  <h2 class="section-title">Artist posts</h2>
+  {% if p.artist_posts %}
+    <div class="stack">
+      {% for post in p.artist_posts %}
+      <article class="artist-post card">
+        <img class="artist-post-img" src="{{ post.image_url }}" alt="{{ post.caption }}" />
+        <p class="artist-post-caption">{{ post.caption }}</p>
+        <p class="post-meta">shared {{ post.when }}</p>
+
+        {# Audience reactions on artist posts (T54), backed by T52's /api/artist endpoints. #}
+        <div class="reactions artist-reactions" data-post-id="{{ post.id }}">
+          {% for kind, emoji in reaction_kinds %}
+          <button
+            type="button"
+            class="react-btn{% if kind in post.mine %} reacted{% endif %}"
+            data-type="{{ kind }}"
+            aria-pressed="{{ 'true' if kind in post.mine else 'false' }}"
+            onclick="artistReact(this)"
+          >
+            <span class="react-emoji">{{ emoji }}</span>
+            <span class="react-count">{{ post.reaction_counts[kind] }}</span>
+          </button>
+          {% endfor %}
+        </div>
+
+        <div class="comments artist-comments" data-post-id="{{ post.id }}">
+          <button type="button" class="comment-toggle" onclick="toggleArtistComments(this)">
+            💬 <span class="comment-count">{{ post.comment_count }}</span>
+          </button>
+          <div class="comment-panel" hidden>
+            <ul class="comment-list"></ul>
+            <form class="comment-form" onsubmit="submitArtistComment(event, this)">
+              <input
+                type="text"
+                name="body"
+                placeholder="Add a comment…"
+                maxlength="2000"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" class="btn btn-spotify">Post</button>
+            </form>
+          </div>
+        </div>
+
+        {% if post.show_owner_engagement %}
+        <div class="artist-engagement-summary">
+          <p class="card-label">Artist-only engagement</p>
+          <p class="artist-engagement-line">
+            {{ post.comment_count }} comments ·
+            {{ post.reaction_counts["HEART"] }} hearts ·
+            {{ post.reaction_counts["FIRE"] }} fires ·
+            {{ post.reaction_counts["SPARKLE"] }} sparkles
+          </p>
+        </div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card empty">
+      <p>{{ p.display_name }} hasn't shared any artist posts yet. 🎤</p>
+    </div>
+  {% endif %}
+  {% endif %}
+
   <h2 class="section-title">Shared songs</h2>
   {% if p.posts %}
     <div class="stack">
@@ -141,4 +242,5 @@
 
 {# Makes the Follow/Unfollow button live (calls the T13 follow API). #}
 <script src="/static/follow.js"></script>
+{% if p.is_artist %}<script src="/static/artist-engagement.js"></script>{% endif %}
 {% endblock %}

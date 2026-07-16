@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 
 from app.db import get_session
 from app.deps import require_user
-from app.models import User
+from app.models import Follow, User
 from app.rate_limit import enforce_rate_limit
 from app.responses import fail, ok
 from app.schemas import UserSearchOut
@@ -31,7 +31,22 @@ USER_SEARCH_RATE_WINDOW_SECONDS = 60
 # (e.g. a single common letter) from dumping the whole user table (per the ticket: "cap 20").
 MAX_RESULTS = 20
 
+# T16 follower/following lists are intentionally capped rather than paginated for this v1. A profile
+# needs a small browseable list, not an unbounded dump of the social graph.
+FOLLOW_LIST_LIMIT = 50
+
 router = APIRouter(tags=["users"])
+
+
+def _user_search_out(user: User) -> dict:
+    # Shared allow-list for any endpoint that returns small public user cards. Keeps follower lists
+    # and search consistent, and prevents raw User rows from leaking email/supabase ids.
+    return UserSearchOut(
+        id=user.id,
+        handle=user.handle,
+        display_name=user.display_name,
+        is_artist=user.is_artist,
+    ).model_dump(by_alias=True, mode="json")
 
 
 @router.get("/api/users/search")
@@ -81,13 +96,49 @@ def search_users(
     ).all()
 
     # Shape each row into the small camelCase DTO (ADR-0012) — never the raw User row.
-    results = [
-        UserSearchOut(
-            id=u.id,
-            handle=u.handle,
-            display_name=u.display_name,
-            is_artist=u.is_artist,
-        ).model_dump(by_alias=True, mode="json")
-        for u in rows
-    ]
+    results = [_user_search_out(u) for u in rows]
     return ok(results)
+
+
+@router.get("/api/users/{user_id}/followers")
+def list_followers(
+    user_id: str,
+    user: User = Depends(require_user),   # login required; value unused except as the auth gate
+    session: Session = Depends(get_session),
+):
+    # The target user must exist so a typo in a profile/list URL is a clean 404, not an empty list
+    # that looks like a real user with no followers.
+    if session.get(User, user_id) is None:
+        return fail("user not found", 404)
+
+    # "Followers" are users where Follow.following_id points at the target and follower_id points at
+    # the person following them. Order by handle for a stable, easy-to-scan list.
+    rows = session.exec(
+        select(User)
+        .join(Follow, Follow.follower_id == User.id)
+        .where(Follow.following_id == user_id)
+        .order_by(User.handle)
+        .limit(FOLLOW_LIST_LIMIT)
+    ).all()
+    return ok([_user_search_out(u) for u in rows])
+
+
+@router.get("/api/users/{user_id}/following")
+def list_following(
+    user_id: str,
+    user: User = Depends(require_user),   # login required; value unused except as the auth gate
+    session: Session = Depends(get_session),
+):
+    if session.get(User, user_id) is None:
+        return fail("user not found", 404)
+
+    # "Following" is the inverse direction: rows where the target is the follower, joined to the
+    # users they follow.
+    rows = session.exec(
+        select(User)
+        .join(Follow, Follow.following_id == User.id)
+        .where(Follow.follower_id == user_id)
+        .order_by(User.handle)
+        .limit(FOLLOW_LIST_LIMIT)
+    ).all()
+    return ok([_user_search_out(u) for u in rows])

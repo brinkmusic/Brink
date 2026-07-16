@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -93,11 +93,15 @@ unauthenticated, so the existing user-id-keyed helper needs an IP/email subject)
 | `backend/tests/test_auth_email.py` | CREATE | signup/login/rate-limit/failure tests |
 
 ## Testing Checklist
-- [ ] signup creates a Supabase user + a handle `User` row (`spotify_id` NULL, unique handle)
-- [ ] login sets the encrypted session cookie; `/feed` accessible; logout works
-- [ ] wrong password → clean error, no cookie
-- [ ] signup/login rate limit fires per IP and per email
-- [ ] an email-only user can post / react / comment / follow / view profiles (no 500s anywhere)
+- [x] signup shows "check your inbox" (confirmations ON) and creates NO session; a login then
+      creates the handle `User` row (`spotify_id` NULL, unique derived handle)
+- [x] login sets the encrypted session cookie + 303 → `/feed` (logout unchanged from T09)
+- [x] wrong password / unconfirmed email → one generic, non-enumerating error, no cookie
+- [x] signup/login rate limit fires per IP **and** per email
+- [x] CSRF: a POST without a matching token is rejected before reaching Supabase
+- [~] an email-only user can post/react/comment/follow/view profiles — verified by the T79
+      investigation (every Spotify path degrades to empty) + the existing suite; a manual
+      end-to-end pass belongs to the deploy step below
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -110,3 +114,35 @@ unauthenticated, so the existing user-id-keyed helper needs an IP/email subject)
 Branch `feat/T03-auth-email`. Estimated ~1–1.5 days. Supabase dashboard config needed: enable
 email provider (it is ON by default) and decide the confirm-email setting; if confirmations are
 ON, add the deployed `/auth/confirm` URL to the redirect allow-list.
+
+## Outcome (2026-07-16)
+Shipped as specced (ADR-0015 written first, superseding ADR-0005's OTP choice):
+- **`security/supabase.py`** — `sign_up_email` / `sign_in_password` wrappers on a **fresh default
+  client** (`_password_client`, not the cached `admin()` client — a user session must not land on
+  the shared service-role client; and not the PKCE client, which is OAuth-only).
+- **`routers/auth.py`** — `GET`/`POST /auth/signup`, `GET`/`POST /auth/login-email`,
+  `GET /auth/confirm`. Success reuses the T09 machinery verbatim (`get_or_create_user` +
+  `login_session.set_cookie`). Confirmations ON, so signup shows "check your inbox" and does **not**
+  set a session; login 303 → `/feed`. Errors are generic + **non-enumerating**.
+- **First IP-keyed rate limiting** — `_client_ip` trusts Render's `X-Forwarded-For` first hop;
+  `enforce_rate_limit` called with `ip:<addr>` **and** `email:<addr>` subjects (no change to
+  `rate_limit.py`). Signup 5/hr, login 10/5min, each per IP and per email.
+- **CSRF** — `brink_csrf` encrypted cookie + hidden form token (same pattern as the OAuth `state`).
+- **Password min 6** enforced in-form (friendly 400) as well as by Supabase.
+- **Templates** `signup.html` + `login_email.html` (+ minimal auth CSS); entry links added to
+  `home.html` and `base.html`. New dep: **`python-multipart`** (FastAPI `Form` parsing).
+- **Tests** `backend/tests/test_auth_email.py` (14): form render + CSRF, signup validation /
+  inbox-state / rate-limit, login cookie + handle-user provisioning / generic-error / rate-limit.
+  Full suite **210 passed**.
+
+### Deploy step for Andrea (Supabase dashboard, not code)
+Keep **Email provider ON** + **Confirm email ON** (already the defaults), and add the deployed +
+localhost **`/auth/confirm`** URLs to Auth → URL Configuration → Redirect URLs (same allow-list the
+T09 `/auth/callback` uses). Without this, confirmation links won't return to the app. Then do one
+real signup → confirm → login to verify (the one path tests can't cover).
+
+### Deliberate follow-ups (out of scope, not built)
+- Password reset (`reset_password_for_email` + `/auth/reset`).
+- Link Spotify to an existing email account (the ADR-0005 identity-linking edge case).
+- Auto-login on `/auth/confirm` (needs client JS to read the URL-fragment tokens; today confirm
+  lands on the sign-in page with a "you're confirmed" banner).
