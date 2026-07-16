@@ -213,7 +213,7 @@ PR that it went in without a second review).
   **`brinkmusic/Brink`** (public). The 2026-07-02 review's remaining remediation
   tickets T75/T76 were **obsoleted by T60** (they targeted the retired SPA's `apps/web/` files);
   the one surviving idea — retiring the legacy `POST /api/auth/capture-spotify` endpoint — is now
-  tracked as T63. **T90–T93 (developer tooling) done** —
+  completed as T63. **T90–T93 (developer tooling) done** —
   the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
   (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
   pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
@@ -393,6 +393,10 @@ PR that it went in without a second review).
   `/api/artist/posts/{id}/...` endpoints, plus owner-only engagement totals on the artist's own
   profile. `/artist` remains the upload studio; no artist API behavior changed. Satisfies MEDIA-4's
   visible engagement surface; view count remains deferred.
+  **T63 (retire capture-spotify) done** — removed the dead browser `POST
+  /api/auth/capture-spotify` endpoint, its legacy request model, and its endpoint tests. Server-side
+  `/auth/callback` still captures Spotify tokens through `_store_spotify_token`; no login/session/
+  crypto behavior changed.
   **T47 + T15 + T53 released to production (`develop → main` #117, back-merged #118).**
   **T03 (email + password auth) done** — the front door for people **without** Spotify
   ([ADR-0015](docs/decisions/adr/0015-email-password-auth.md), which supersedes ADR-0005's
@@ -409,7 +413,7 @@ PR that it went in without a second review).
   deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
   signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
   auto-login-on-confirm. **Next:
-  T63 (retire capture-spotify); T32 (Jonah)
+  T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)

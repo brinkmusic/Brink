@@ -29,7 +29,7 @@ class CamelModel(BaseModel):
 
 # Track metadata supplied when creating a post. Required fields (no default) mean a missing
 # title/artist/id is rejected as a 400 by the global validation handler — the strict-schema
-# rule from ADR-0007 / ADR-0012 (do NOT make everything Optional like capture-spotify did).
+# rule from ADR-0007 / ADR-0012 (required fields stay required; validation errors get envelopes).
 class TrackIn(CamelModel):
     spotify_id: str
     title: str

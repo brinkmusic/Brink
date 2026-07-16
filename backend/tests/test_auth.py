@@ -1,8 +1,6 @@
 # WHAT THIS FILE IS
-# Checks the login gatekeeper (app/deps.py) and the capture-spotify endpoint. The
-# require_user unit tests call it directly with a fake (MagicMock) session; the endpoint
-# tests use the shared `client` + `as_user` fixtures from conftest.py, which fake both
-# the logged-in user and the database session so the tests are fast and network-free.
+# Checks the login gatekeeper (app/deps.py). These tests call require_user directly with a fake
+# request and session so auth behavior stays fast and network-free.
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -11,10 +9,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from app import deps
-from app.db import get_session
 from app.deps import AuthError, require_user
-from app.main import app
-from app.models import SpotifyToken, User
+from app.models import User
 from app.security import session as login_session
 
 
@@ -254,88 +250,3 @@ def test_misconfiguration_propagates_not_401(monkeypatch):
     monkeypatch.setattr(deps.supabase, "get_user_from_token", raise_config_error)
     with pytest.raises(ValueError):
         require_user(_request("Bearer any"), session=MagicMock())
-
-
-# --- POST /api/auth/capture-spotify (endpoint tests, via the shared fixtures) -----
-
-
-def _fake_logged_in_user():
-    return User(id="user-1", handle="h", display_name="d", created_at=datetime.now(timezone.utc))
-
-
-# Missing a token -> 400 with the exact legacy message.
-def test_capture_missing_tokens_returns_400(client, as_user):
-    as_user(_fake_logged_in_user())
-    res = client.post("/api/auth/capture-spotify", json={"access_token": "only-one"})
-    assert res.status_code == 400
-    assert res.json() == {"error": "missing spotify tokens"}
-
-
-# Success (no existing row) -> CREATE: adds an ENCRYPTED token row, returns captured:true.
-def test_capture_success_upserts_encrypted_token(client, as_user, monkeypatch):
-    from app.routers import auth as auth_router
-
-    # Replace real encryption with a visible stand-in so we can assert it was applied.
-    monkeypatch.setattr(auth_router, "encrypt", lambda s: f"enc({s})")
-    session = MagicMock()
-    session.get.return_value = None  # no existing token row -> create one
-    as_user(_fake_logged_in_user(), session=session)
-
-    res = client.post(
-        "/api/auth/capture-spotify",
-        json={"access_token": "AT", "refresh_token": "RT", "scopes": "user-read"},
-    )
-
-    assert res.status_code == 200
-    assert res.json() == {"data": {"captured": True}}
-    added = session.add.call_args[0][0]  # the SpotifyToken we saved
-    assert isinstance(added, SpotifyToken)
-    assert added.user_id == "user-1"
-    assert added.access_token == "enc(AT)"    # stored encrypted, never in the clear
-    assert added.refresh_token == "enc(RT)"
-    assert added.scopes == "user-read"
-    session.commit.assert_called_once()
-
-
-# Success (row already exists) -> UPDATE: overwrites fields in place, does NOT re-add.
-# This is the path every login after the first takes (finding MB5). It also pins the
-# expiry format: naive UTC (no tzinfo), ~1 hour ahead, matching legacy rows.
-def test_capture_update_branch_overwrites_without_add(client, as_user, monkeypatch):
-    from app.routers import auth as auth_router
-
-    monkeypatch.setattr(auth_router, "encrypt", lambda s: f"enc({s})")
-    existing = SpotifyToken(user_id="user-1", access_token="old", refresh_token="old", scopes="old")
-    session = MagicMock()
-    session.get.return_value = existing  # row already exists -> update path
-    as_user(_fake_logged_in_user(), session=session)
-
-    res = client.post(
-        "/api/auth/capture-spotify",
-        json={"access_token": "AT", "refresh_token": "RT", "scopes": "new-scope"},
-    )
-
-    assert res.status_code == 200
-    session.add.assert_not_called()          # updated in place, not re-added
-    session.commit.assert_called_once()
-    assert existing.access_token == "enc(AT)"
-    assert existing.refresh_token == "enc(RT)"
-    assert existing.scopes == "new-scope"
-    # Expiry stored naive (no timezone) and about an hour ahead — legacy-row parity.
-    assert existing.expires_at.tzinfo is None
-    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
-    delta = existing.expires_at - now_naive
-    assert timedelta(minutes=55) < delta < timedelta(minutes=65)
-
-
-# An unauthenticated request -> the AuthError handler returns our 401 { error } shape.
-def test_capture_unauthenticated_returns_401_envelope(client):
-    def raise_auth_error():
-        raise AuthError("invalid session")
-
-    app.dependency_overrides[require_user] = raise_auth_error
-    app.dependency_overrides[get_session] = lambda: MagicMock()
-    res = client.post(
-        "/api/auth/capture-spotify", json={"access_token": "a", "refresh_token": "b"}
-    )
-    assert res.status_code == 401
-    assert res.json() == {"error": "invalid session"}
