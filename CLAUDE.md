@@ -360,7 +360,11 @@ PR that it went in without a second review).
   free-tier service stops spinning down behind Render's ~50s "waking up" screen; like snapshot.yml
   it **only fires from `main`**, so it activates at the next release (owner: one manual
   `workflow_dispatch` run to verify, and the durable alternative if drift still bites is the paid
-  Starter plan). **Next: T47 →
+  Starter plan). **T47 (authenticated nav) done** — every page route passes the signed-in `viewer`
+  into its template (public `/` uses a new `_optional_viewer()` that returns `None` instead of
+  redirecting), and `base.html` renders a conditional nav: signed out → the landing nav; signed in
+  → Feed, My profile, Artist studio (artists only), Log out. Before this nothing linked to /feed,
+  /artist, your profile, or logout. Fills the audit's gap #2 (UI-2 app shell). **Next:
   T15/T46 (make follow usable), T53 (broken artist images), T03 (email login); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
