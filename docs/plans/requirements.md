@@ -20,7 +20,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (`/api/state`) + dead front-end stubs. *(satisfied by retiring the whole SPA — the entire `apps/web/` was deleted in T60, ADR-0013)* | T60 | ✅ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
-| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. *(T15 added `GET /api/users/search` — the user discoverability follow needs to be usable)* | T13, T15 | ✅ |
+| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. User search and follower/following lists make the graph discoverable. | T13, T15, T16 | ✅ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
 | BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ✅ |
@@ -58,7 +58,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-2 | Feed reads `/api/feed`; manually shared song cards. *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links)* | T41, T47 | ✅ |
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ✅ |
-| UI-5 | Follow/unfollow buttons + follower counts + searchable profiles, including artist profile content. | T43, T46, T54 | ✅ |
+| UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16 | ✅ |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |

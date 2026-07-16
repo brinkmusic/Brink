@@ -26,8 +26,12 @@
     </div>
 
     <div class="profile-counts">
-      <span><b class="follower-count">{{ p.follower_count }}</b> followers</span>
-      <span><b>{{ p.following_count }}</b> following</span>
+      <a class="profile-count-link" href="/u/{{ p.handle }}?list=followers">
+        <b class="follower-count">{{ p.follower_count }}</b> followers
+      </a>
+      <a class="profile-count-link" href="/u/{{ p.handle }}?list=following">
+        <b>{{ p.following_count }}</b> following
+      </a>
     </div>
 
     {# No Follow button on your own profile — you can't follow yourself (the server enforces
@@ -43,6 +47,33 @@
     >{{ 'Following' if p.is_following else 'Follow' }}</button>
     {% endif %}
   </div>
+
+  {% if p.follow_list %}
+  <section class="follow-list card">
+    <h2 class="section-title">{{ p.follow_list.title }}</h2>
+    {% if p.follow_list.users %}
+    <ul class="follow-list-users">
+      {% for u in p.follow_list.users %}
+      <li>
+        <a class="follow-list-user" href="/u/{{ u.handle }}">
+          <span
+            class="profile-avatar follow-list-avatar"
+            {% if u.avatar_url %}style="background-image: url('{{ u.avatar_url }}')"{% endif %}
+            aria-hidden="true"
+          ></span>
+          <span>
+            <span class="follow-list-name">{{ u.display_name }}</span>
+            <span class="follow-list-handle">@{{ u.handle }}{% if u.is_artist %} · artist{% endif %}</span>
+          </span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">{{ p.follow_list.empty }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
 
   {# Now-playing badge (T44/UI-10) — own profile only; hidden when nothing is playing. #}
   {% if now_playing %}

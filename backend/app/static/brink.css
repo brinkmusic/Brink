@@ -303,9 +303,23 @@ body {
 .profile-handle { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
 .profile-counts { display: flex; gap: 1.25rem; color: var(--mute); font-size: 0.9rem; }
 .profile-counts b { color: var(--text); font-variant-numeric: tabular-nums; }
+.profile-count-link { color: var(--mute); text-decoration: none; }
+.profile-count-link:hover { color: var(--text); }
 .follow-btn { justify-self: start; }
 .post-author { color: var(--text); text-decoration: none; font-weight: 500; }
 .post-author:hover { color: var(--accent); }
+.follow-list-users { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+.follow-list-user {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--text);
+  text-decoration: none;
+}
+.follow-list-user:hover .follow-list-name { color: var(--accent); }
+.follow-list-avatar { width: 2.25rem; height: 2.25rem; }
+.follow-list-name { display: block; font-size: 0.92rem; font-weight: 600; }
+.follow-list-handle { display: block; margin-top: 0.1rem; color: var(--mute); font-size: 0.78rem; }
 
 /* ---- Feed: post cards ---- */
 .post {

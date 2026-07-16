@@ -376,6 +376,10 @@ PR that it went in without a second review).
   the shared nav, loading `backend/app/static/user-search.js` to debounce calls to T15's
   `/api/users/search` and render safe text-only links to `/u/{handle}`. This completes the
   user-discovery path for follow/profile browsing and satisfies the UI-5 reachability gap.
+  **T16 (follower/following lists) done** — `GET /api/users/{userId}/followers` and
+  `/following` return capped, login-gated `UserSearchOut` DTOs, and profile follower/following
+  counts link to server-rendered list sections (`?list=followers|following`). This completes the
+  basic social-graph browse path after T15/T46.
   **T53 (artist image signed reads) done** — artist images finally display:
   `create_signed_read_url(bucket, path, expires_in=3600)` in `security/supabase.py` (the read
   sibling of T50's upload helper, service role, 1-hour expiry), and the `/artist` page signs each
@@ -405,7 +409,7 @@ PR that it went in without a second review).
   deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
   signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
   auto-login-on-confirm. **Next:
-  T16 (follower lists), T63 (retire capture-spotify); T32 (Jonah)
+  T63 (retire capture-spotify); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
