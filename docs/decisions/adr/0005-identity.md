@@ -1,6 +1,8 @@
 # ADR-0005: Identity via Supabase Auth
 
-**Status:** Accepted
+**Status:** Accepted — *magic-link/OTP mechanism for handle accounts superseded by
+[ADR-0015](0015-email-password-auth.md) (email + password); Spotify OAuth and the
+one-account/identity-linking model below remain in force.*
 **Date:** 2026-06-22
 **First captured as:** spec decision-log row D
 
