@@ -3,7 +3,7 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T30**, **T31**, **T37**, **T39**, **T40**, **T41**, **T42**, **T43**, **T44**, **T50**, **T51**, **T52**, **T60**, **T62**, **T64**, T70–T74, T77, T78, **T79**, **T90–T93**). **T64** keeps the free-tier Render service awake (10-min `keepalive.yml` health ping; activates from `main` at the next release). **T79** is the 2026-07-15 coherence sweep: four review reports landed (`docs/plans/reviews/2026-07-15-*.md`), easy doc drift fixed, T75/T76 obsoleted, and the **enablement wave** filed (T03 rewrite, T15, T16, T46, T47, T53, T54, T63 — see below). **T30** scaffolded the `analytics/` `uv` package + `db.py` Postgres access (AN-8/INFRA-4 stay partial pending T38's GitHub Actions workflow). **T31** joined a Kaggle audio-feature set onto `Track` (bronze → silver, ADR-0009); ran against a temporary ~114k dataset substitute rather than ADR-0004's ≈1M+ set (disclosed in its Outcome note, not an ADR change) — coverage 14/343 (4.1%) — unblocks **T32**. **T60 retired the React/Vite SPA** (`apps/web/` deleted, ADR-0013) — the frontend is now solely the Jinja/HTMX pages served by the FastAPI backend; two owner infra steps remain (drop the `web` branch-protection check + decommission Vercel). **T44 (profile listening summary)** ships the ADR-0014 listening surface (top tracks/artists, recent, streak, 30-day, own-profile now-playing, link-Spotify prompt); the analytics half (cluster/compat/genres) is deferred to the slimmed **T14**. The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
+- **Completed:** [`completed/`](completed/) — done (T00–T02, T04–T08, **T09**, **T10–T13**, **T20**, **T22**, **T23**, **T30**, **T31**, **T37**, **T39**, **T40**, **T41**, **T42**, **T43**, **T44**, **T47**, **T50**, **T51**, **T52**, **T60**, **T62**, **T64**, T70–T74, T77, T78, **T79**, **T90–T93**). **T47** is the authenticated nav — signed-in pages now link Feed / My profile / Artist studio (artists only) / Log out, so T46's search box has a shell to slot into. **T64** keeps the free-tier Render service awake (10-min `keepalive.yml` health ping; activates from `main` at the next release). **T79** is the 2026-07-15 coherence sweep: four review reports landed (`docs/plans/reviews/2026-07-15-*.md`), easy doc drift fixed, T75/T76 obsoleted, and the **enablement wave** filed (T03 rewrite, T15, T16, T46, T47, T53, T54, T63 — see below). **T30** scaffolded the `analytics/` `uv` package + `db.py` Postgres access (AN-8/INFRA-4 stay partial pending T38's GitHub Actions workflow). **T31** joined a Kaggle audio-feature set onto `Track` (bronze → silver, ADR-0009); ran against a temporary ~114k dataset substitute rather than ADR-0004's ≈1M+ set (disclosed in its Outcome note, not an ADR change) — coverage 14/343 (4.1%) — unblocks **T32**. **T60 retired the React/Vite SPA** (`apps/web/` deleted, ADR-0013) — the frontend is now solely the Jinja/HTMX pages served by the FastAPI backend; two owner infra steps remain (drop the `web` branch-protection check + decommission Vercel). **T44 (profile listening summary)** ships the ADR-0014 listening surface (top tracks/artists, recent, streak, 30-day, own-profile now-playing, link-Spotify prompt); the analytics half (cluster/compat/genres) is deferred to the slimmed **T14**. The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
 
 ## How these relate to the rest of the docs
 
@@ -62,9 +62,9 @@ no page reaches them) plus one broken surface (artist images). Filed in T79:
 
 | Ticket | What | Blocked by |
 |---|---|---|
-| `047` | authenticated nav + logout link | — |
+| ~~`047`~~ ✅ | authenticated nav + logout link | — |
 | `015` | user search API | — |
-| `046` | user search UI (the "find people" box) | `015`, `047` |
+| `046` | user search UI (the "find people" box) | `015`, ~~`047`~~ ✅ |
 | `016` | follower/following lists | — |
 | `053` | signed READ urls (artist images can't display today) | — |
 | `054` | audience view of artist posts + T52 engagement UI | `053` |
@@ -72,7 +72,10 @@ no page reaches them) plus one broken surface (artist images). Filed in T79:
 | `003` | (rewritten) email+password signup/login | — |
 
 **Ready to start now** (all `blocked_by` merged, as of T79):
-- `047`, `015`, `016`, `053`, `063`, `003` (enablement wave, above) — no blockers.
+- `015`, `016`, `053`, `063`, `003` (enablement wave, above) — no blockers.
+- **Done:** `047` — authenticated nav + logout link. Every page route passes `viewer`;
+  `base.html` renders the in-app nav (Feed / My profile / Artist studio / Log out) when signed
+  in. `046` (search UI) now waits only on `015`.
 - **Done:** `030` — analytics scaffold + DB access (Jonah).
 - **Done:** `031` — Kaggle ingest + Track join (Jonah). Ran against a temporary ~114k dataset
   substitute, disclosed in the ticket's Outcome note (ADR-0004 calls for ≈1M+; not an ADR change).

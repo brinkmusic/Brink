@@ -44,17 +44,34 @@ templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 router = APIRouter()
 
 
+# Figure out who (if anyone) is logged in, WITHOUT forcing a login. The gated pages call
+# require_user, which redirects anonymous visitors to Spotify — but the landing page ("/") is
+# public, so it must still render for a signed-out visitor. This helper reuses the SAME session
+# check (require_user) but swallows the "not logged in" error and returns None instead, so the
+# nav (T47) can show the logged-in links to a signed-in user who lands on "/" and the public nav
+# to everyone else. It never raises: any auth problem just means "treat as logged out".
+def _optional_viewer(request: Request, session: Session) -> User | None:
+    try:
+        # A scratch Response absorbs any refreshed-session cookie require_user might set; the
+        # landing page doesn't need to persist it (the next gated page will), so we discard it.
+        return require_user(request, session=session, response=Response())
+    except Exception:  # noqa: BLE001 — an unauthenticated / undecodable session is simply "logged out"
+        return None
+
+
 # When someone opens the site root ("/") in a browser, run this and return a web page.
 # response_class=HTMLResponse tells FastAPI "this returns HTML, not JSON".
 @router.get("/", response_class=HTMLResponse)
-def home(request: Request):
+def home(request: Request, session: Session = Depends(get_session)):
     # Render templates/home.html. Jinja2Templates needs the incoming `request`, and
     # we hand it a small dictionary of values the template can drop in (here, the
     # browser-tab title). The template itself decides where each value goes.
+    # `viewer` lets the shared nav (base.html, T47) show the in-app links to a signed-in
+    # visitor while staying public for everyone else.
     return templates.TemplateResponse(
         request,
         "home.html",
-        {"page_title": "Brink"},
+        {"page_title": "Brink", "viewer": _optional_viewer(request, session)},
     )
 
 
@@ -135,7 +152,7 @@ def feed(request: Request, session: Session = Depends(get_session)):
     page = templates.TemplateResponse(
         request,
         "feed.html",
-        {"page_title": "Feed · Brink", "posts": posts},
+        {"page_title": "Feed · Brink", "posts": posts, "viewer": user},
     )
     for key, value in refreshed.raw_headers:
         if key == b"set-cookie":
@@ -225,7 +242,10 @@ def profile(handle: str, request: Request, session: Session = Depends(get_sessio
     if data is None:
         # No such handle — render a friendly 404 page rather than a raw error.
         page = templates.TemplateResponse(
-            request, "profile_missing.html", {"page_title": "Not found · Brink"}, status_code=404
+            request,
+            "profile_missing.html",
+            {"page_title": "Not found · Brink", "viewer": viewer},
+            status_code=404,
         )
     else:
         # Now-playing badge (T44/UI-10): only on your OWN profile. The now-playing lookup (T20) is
@@ -240,7 +260,8 @@ def profile(handle: str, request: Request, session: Session = Depends(get_sessio
         page = templates.TemplateResponse(
             request,
             "profile.html",
-            {"page_title": f"{data['display_name']} · Brink", "p": data, "now_playing": now_playing},
+            {"page_title": f"{data['display_name']} · Brink", "p": data,
+             "now_playing": now_playing, "viewer": viewer},
         )
     for key, value in refreshed.raw_headers:
         if key == b"set-cookie":
@@ -279,7 +300,8 @@ def artist_page(request: Request, session: Session = Depends(get_session)):
     page = templates.TemplateResponse(
         request,
         "artist.html",
-        {"page_title": "Artist · Brink", "is_artist": user.is_artist, "posts": posts},
+        {"page_title": "Artist · Brink", "is_artist": user.is_artist, "posts": posts,
+         "viewer": user},
     )
     for key, value in refreshed.raw_headers:
         if key == b"set-cookie":
