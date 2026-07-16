@@ -34,6 +34,7 @@ from app.routers import (
     reactions,
     search,
     snapshot,
+    users,
 )
 
 
@@ -65,6 +66,7 @@ app.include_router(now_playing.router)  # GET /api/me/now-playing
 app.include_router(snapshot.router)     # POST /api/snapshot (cron-triggered)
 app.include_router(artist.router)       # POST /api/artist/sign-upload, POST /api/artist/posts
 app.include_router(search.router)       # GET /api/search?q= (Spotify catalog search, T40)
+app.include_router(users.router)        # GET /api/users/search?q= (Brink user search, T15)
 app.include_router(pages.router)   # GET /, GET /feed — the browser-facing web pages (ADR-0013)
 
 
