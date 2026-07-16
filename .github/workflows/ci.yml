@@ -28,6 +28,21 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest -q
 
+  # Analytics tests. T61 makes this explicit because analytics is a separate uv package,
+  # so a green backend suite alone does not prove the Python data code still imports/runs.
+  analytics:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analytics
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest -q
+
   # NOTE: the React/Vite SPA (apps/web) and its `web` lint/build job were retired in T60
   # (ADR-0013 — the frontend is the Jinja app served by the FastAPI backend). If you re-add a
   # separate JS frontend, restore a build job here AND re-add it to branch protection's required

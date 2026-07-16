@@ -397,6 +397,10 @@ PR that it went in without a second review).
   /api/auth/capture-spotify` endpoint, its legacy request model, and its endpoint tests. Server-side
   `/auth/callback` still captures Spotify tokens through `_store_spotify_token`; no login/session/
   crypto behavior changed.
+  **T61 (QA/load/E2E gate) done** — added a backend `/api/*` route inventory test, analytics pytest
+  in CI-safe mode, `load/k6-script.js` for 5-user load checks, and `docs/qa-checklist.md` for the
+  manual browser/load/success-metric release gates. Live browser/k6/OAuth/upload measurements remain
+  owner-run checks against Render/Supabase because they require real credentials and browsers.
   **T47 + T15 + T53 released to production (`develop → main` #117, back-merged #118).**
   **T03 (email + password auth) done** — the front door for people **without** Spotify
   ([ADR-0015](docs/decisions/adr/0015-email-password-auth.md), which supersedes ADR-0005's
