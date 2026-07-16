@@ -9,10 +9,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | AUTH-1 | Spotify login via Supabase provider; first login creates/links a `public.User`. | T02 (browser), T09 (server-side) | ✅ |
 | AUTH-2 | Capture + encrypt the Spotify refresh token server-side in `SpotifyToken`. | T02 (browser), T09 (server-side callback) | ✅ |
-| AUTH-3 † | Passwordless email magic-link/OTP signup (Supabase sends mail). | T03 | ◻ |
+| AUTH-3 † | Email signup for handle accounts — now **email + password** server-side (was magic-link/OTP), per [ADR-0015](../decisions/adr/0015-email-password-auth.md): `/auth/signup` + `/auth/login-email`, confirmations ON, IP+email rate-limited. | T03 | ✅ |
 | AUTH-4 | Every `/api/*` mutation verifies the Supabase JWT. | T02 + every API ticket (ADR-0007); T09 (session cookie) | ✅ base |
 | AUTH-5 | Server owns Spotify token refresh for the snapshot job. | T22 | ✅ |
-| AUTH-6 | Handle accounts work fully except Spotify-derived stats ("link Spotify"). | T03, T44 | ◻ |
+| AUTH-6 | Handle accounts work fully except Spotify-derived stats ("link Spotify"). | T03, T44 | ✅ (T03 gives the email/password front door; a handle user can post/react/comment/follow, and every Spotify surface degrades to empty states + a "link Spotify" prompt on the profile from T44. *Linking* Spotify to an existing email account is a stated follow-up.) |
 
 ## Layer 2 — Backend API + Data Model (BE)
 | ID | Acceptance | Ticket(s) | Status |
@@ -112,5 +112,5 @@ The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagge
 - **INFRA-1** — original spec assumed Vercel serverless (`api/`) as the backend. ADR-0010 moved the API to FastAPI on Render; then **T60 retired the Vercel SPA entirely** ([ADR-0013](../decisions/adr/0013-python-frontend.md)), so **Render now serves both the API and the Jinja frontend** — Vercel is no longer used ([ADR-0010](../decisions/adr/0010-fastapi-render-backend.md)).
 - **AN-2/4/5/7/9** — per-user analytics are computed **on read in the API** (written when the backend was TypeScript; since ADR-0010 that means the FastAPI/Python app), not materialized; `UserStats`/`TasteVector`/`Compatibility` tables and `User.clusterId` are dropped, `ModelArtifact` added ([ADR-0003](../decisions/adr/0003-analytics-runtime.md), [ADR-0009](../decisions/adr/0009-medallion-layering.md)).
 - **SP-2 / INFRA-3** — snapshot is triggered by **GitHub Actions**, not Vercel Cron ([ADR-0006](../decisions/adr/0006-scheduling.md)).
-- **AUTH-3** — handle is **auto-derived**; no signup form / custom-handle flow.
+- **AUTH-3** — the front door is **email + password** (not the spec's magic-link/OTP), server-side per [ADR-0015](../decisions/adr/0015-email-password-auth.md); the handle stays **auto-derived** (no custom-handle field on the signup form).
 - Storage is **Supabase Storage** (not Cloudinary); Kaggle set is a genuine ~1M-track source (not `maharshipandya`) ([ADR-0002](../decisions/adr/0002-api-and-persistence.md), [ADR-0004](../decisions/adr/0004-analytics-data-strategy.md)).
