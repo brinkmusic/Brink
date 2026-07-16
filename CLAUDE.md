@@ -355,7 +355,12 @@ PR that it went in without a second review).
   capture-spotify endpoint), and a rewritten **T03** (email+password signup/login server-side;
   needs a new ADR superseding ADR-0005's OTP choice + first IP-keyed rate limiting). Schema audit
   verdict: no orphaned tables, no drift (`alembic check` clean); bronze/silver/gold + Supabase
-  schemas all accounted for; only optional cleanup is dropping `_prisma_migrations`. **Next: T47 →
+  schemas all accounted for; only optional cleanup is dropping `_prisma_migrations`. **T64 (Render
+  keep-alive) done** — `.github/workflows/keepalive.yml` pings `/api/health` every 10 min so the
+  free-tier service stops spinning down behind Render's ~50s "waking up" screen; like snapshot.yml
+  it **only fires from `main`**, so it activates at the next release (owner: one manual
+  `workflow_dispatch` run to verify, and the durable alternative if drift still bites is the paid
+  Starter plan). **Next: T47 →
   T15/T46 (make follow usable), T53 (broken artist images), T03 (email login); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
@@ -369,7 +374,10 @@ PR that it went in without a second review).
   — build `uv sync`, start `uvicorn app.main:app`. It serves the `/api/*` JSON endpoints **and** the
   server-rendered Jinja/HTMX pages (`/`, `/feed`, `/u/{handle}`, `/artist`, `/auth/*`), same-origin,
   so there's no CORS and no rewrite layer. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
-  `SPOTIFY_*`, `TOKEN_ENC_KEY`, `CRON_SECRET`) live only in Render, never committed.
+  `SPOTIFY_*`, `TOKEN_ENC_KEY`, `CRON_SECRET`) live only in Render, never committed. The service
+  is on the **free plan**, which spins down after ~15 idle minutes (→ a ~50s "waking up" screen);
+  `.github/workflows/keepalive.yml` (T64) pings `/api/health` every 10 min from `main` to prevent
+  that.
 - **Release flow:** **Render deploys production from `main`**, so changes reach production only via a
   `develop → main` release PR, and each release must be followed by a back-merge of `main` into
   `develop` (or the next release PR is blocked as BEHIND, since `main` protection is `strict`).

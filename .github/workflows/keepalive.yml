@@ -1,0 +1,32 @@
+# WHAT THIS FILE IS
+# A tiny scheduled ping that keeps the Render free-tier service awake (T64). Render's free
+# plan spins a service down after ~15 minutes with no traffic, and the next visitor then
+# stares at Render's "waking up" screen for ~50 seconds before the app loads. Hitting the
+# health endpoint every 10 minutes means the service never sits idle long enough to sleep.
+#
+# KNOWN LIMITS (accepted in ticket T64):
+#   - GitHub runs `schedule` workflows only from the DEFAULT branch (main), so this starts
+#     working after the next develop -> main release PR — same as snapshot.yml.
+#   - GitHub cron can drift 3-15 minutes under load, so a rare cold start is still possible.
+#     The bulletproof fix is Render's paid Starter plan (no spin-down); this is the free one.
+#   - The URL is not a secret (it's the public site), so it's fine hardcoded here.
+
+name: Keep Render awake
+
+on:
+  # Every 10 minutes (cron is UTC; "*/10" = at every 10th minute).
+  schedule:
+    - cron: "*/10 * * * *"
+  # Manual run from the Actions tab, to test the ping without waiting for the cron.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the health endpoint
+        # -f -> non-zero exit on HTTP error (a down/unhealthy app shows red here);
+        # -s hides the progress bar; -S still prints errors; --max-time caps a hung
+        # cold start at 90s so the job can't run away.
+        run: |
+          curl -fsS --max-time 90 "https://brink-xg7p.onrender.com/api/health"
