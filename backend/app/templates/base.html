@@ -18,20 +18,41 @@
     <link rel="stylesheet" href="/static/brink.css" />
   </head>
   <body>
-    {# ---- Top navigation bar ----
-       On the public landing page this is intentionally simple: the brand, a couple
-       of in-page links, and the sign-in button. Once a visitor logs in, later steps
-       swap this for the in-app nav (Feed, Profile, ...) — those pages don't exist
-       yet, so we don't link to them here (a dead link would just error). #}
+    {# ---- Top navigation bar (T47) ----
+       Two versions of the nav, chosen by whether someone is signed in. Every page route
+       passes a `viewer` value into the template: the logged-in Brink user, or None for a
+       signed-out visitor. Jinja's `{% if %}` picks the matching nav below.
+         - Logged OUT: the public landing nav — the brand, in-page anchors, and the
+           "Log in with Spotify" button.
+         - Logged IN: the in-app nav — Feed, the user's own profile, Artist studio (only for
+           artist accounts, so a normal listener doesn't see a page that isn't theirs), and a
+           Log out link. Before T47 nothing linked to /feed, /artist, your profile, or logout,
+           so a signed-in user couldn't navigate or even sign out without typing the URL. #}
     <header class="nav">
       <div class="nav-inner">
         <a class="brand" href="/">brink</a>
-        <nav class="nav-links">
-          <a href="#features">Features</a>
-          <a href="#how">How it works</a>
-        </nav>
-        {# Starts the server-side Spotify OAuth login (T09): GET /auth/login. #}
-        <a class="btn btn-spotify" href="/auth/login">Log in with Spotify</a>
+        {% if viewer %}
+          {# In-app nav for a signed-in user. `viewer.handle` is their unique profile slug
+             (e.g. /u/andrea-ab12cd); `viewer.is_artist` is the account's artist flag. #}
+          <nav class="nav-links">
+            <a href="/feed">Feed</a>
+            <a href="/u/{{ viewer.handle }}">My profile</a>
+            {% if viewer.is_artist %}
+            <a href="/artist">Artist studio</a>
+            {% endif %}
+          </nav>
+          {# Logout is a plain GET link to /auth/logout (T09), which clears the session cookie
+             and returns to the landing page. #}
+          <a class="btn btn-ghost" href="/auth/logout">Log out</a>
+        {% else %}
+          {# Public landing nav for a signed-out visitor. #}
+          <nav class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#how">How it works</a>
+          </nav>
+          {# Starts the server-side Spotify OAuth login (T09): GET /auth/login. #}
+          <a class="btn btn-spotify" href="/auth/login">Log in with Spotify</a>
+        {% endif %}
       </div>
     </header>
 
