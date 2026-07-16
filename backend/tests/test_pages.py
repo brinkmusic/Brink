@@ -397,7 +397,40 @@ def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):
                               caption="new EP out now"))
     db_session.commit()
     app.dependency_overrides[get_session] = lambda: db_session
+    # The bucket is private, so the page must sign a READ url for each stored path (T53). Stub the
+    # helper so no test hits Supabase — it just wraps the raw path into a recognisable signed URL.
+    monkeypatch.setattr(
+        "app.routers.pages.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
     _login(client, monkeypatch)
 
     body = client.get("/artist").text
     assert "new EP out now" in body
+
+
+# The private artist bucket rejects unauthenticated GETs, so the page must render a SIGNED read URL
+# for each post's stored path — never the raw path (which would show a broken image). T53.
+def test_artist_page_signs_image_read_urls(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    artist = _seed_artist(db_session)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url="the-artist/x.jpg",
+                              caption="cover art"))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    captured = {}
+
+    def fake_sign(bucket, path):
+        captured["bucket"] = bucket
+        captured["path"] = path
+        return "https://signed/read-url?token=readtok"
+
+    monkeypatch.setattr("app.routers.pages.create_signed_read_url", fake_sign)
+    _login(client, monkeypatch)
+
+    body = client.get("/artist").text
+    # the helper was asked to sign the private bucket + the stored raw path
+    assert captured == {"bucket": "artist-images", "path": "the-artist/x.jpg"}
+    # the rendered <img> uses the signed URL, and the raw path is NOT emitted as an src
+    assert 'src="https://signed/read-url?token=readtok"' in body
+    assert 'src="the-artist/x.jpg"' not in body

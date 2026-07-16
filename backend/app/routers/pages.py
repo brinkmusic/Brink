@@ -26,7 +26,9 @@ from app import spotify
 from app.db import get_session
 from app.deps import AuthError, require_user
 from app.models import ArtistPost, Follow, Post, Track, User
+from app.routers.artist import UPLOAD_BUCKET
 from app.routers.feed import build_feed
+from app.security.supabase import create_signed_read_url
 from app.stats import listening_summary
 
 logger = logging.getLogger(__name__)
@@ -267,9 +269,12 @@ def artist_page(request: Request, session: Session = Depends(get_session)):
         .where(ArtistPost.artist_user_id == user.id)
         .order_by(ArtistPost.created_at.desc())
     ).all()
+    # T50 stores each post's image as a bare storage PATH (e.g. "user-id/pic.jpg") in the PRIVATE
+    # artist-images bucket, which the browser cannot fetch directly. Sign a short-lived read URL
+    # for each one here (T53), so the template gets an <img src> that actually displays.
     posts = [
         {
-            "image_url": post.image_url,
+            "image_url": create_signed_read_url(UPLOAD_BUCKET, post.image_url),
             "caption": post.caption,
             "when": _ago(post.created_at),
         }
