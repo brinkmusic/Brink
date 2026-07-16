@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -50,10 +50,10 @@ Load the Kaggle audio-features CSV, join to `Track` on `spotifyId` (= Kaggle `tr
 | `analytics/tests/test_ingest_kaggle.py` | CREATE | join + coverage tests |
 
 ## Testing Checklist
-- [ ] join sets audio features on matching `Track` rows
-- [ ] non-matching tracks remain `kaggleMatched=false`
-- [ ] coverage % computed and logged
-- [ ] idempotent: re-running doesn't duplicate or corrupt feature data
+- [x] join sets audio features on matching `Track` rows
+- [x] non-matching tracks remain `kaggleMatched=false`
+- [x] coverage % computed and logged
+- [x] idempotent: re-running doesn't duplicate or corrupt feature data
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -61,6 +61,24 @@ Load the Kaggle audio-features CSV, join to `Track` on `spotifyId` (= Kaggle `tr
 - [x] Testing Checklist has items
 - [x] Dependencies identified (T30 → blocked_by 030)
 - [x] Scope boundaries defined
+
+## Outcome
+`analytics/ingest_kaggle.py` lands the CSV raw into `bronze.kaggle_tracks_raw` (delete-then-insert
+each run, so it never accumulates duplicates) and joins onto `silver.Track` by `spotifyId` ==
+Kaggle `track_id`, filling in `danceability/energy/valence/tempo/loudness/popularity` +
+`kaggleMatched` on matches; non-matches are left alone. Coverage is computed and logged
+(ADR-0004: reported, never hidden). Tests (`analytics/tests/test_ingest_kaggle.py`) use a
+disposable Track row + an on-the-fly fixture CSV, not the real dataset, so they don't depend on a
+gitignored local file and don't touch real listening data.
+
+**Scope deviation (disclosed):** the "Manual (user)" step above called for a genuinely ≈1M+-track
+Kaggle set per ADR-0004. That set wasn't available in time, so this ticket ran against a **~114k
+interim substitute** (`SpotifyAudioFeaturesApril2019.csv`, gitignored under `analytics/data/`,
+sourced manually — not committed). This is a **temporary stand-in, not a scope decision** — no ADR
+change was made. Coverage against brink-dev's real `Track` rows was **14/343 matched (4.1%)**,
+honestly logged rather than hidden. Swapping in the real ~1M+ set later just means re-running
+`ingest_kaggle.py` against the new file — no code change needed. Downstream tickets (T33's K-means
+training in particular) should be aware coverage is currently low until the dataset is upgraded.
 
 ## Notes
 Branch off `develop` as `feat/T31-kaggle-join`; one PR back into `develop` (never `main`). Owner: Jonah (analytics).

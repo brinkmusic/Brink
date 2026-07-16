@@ -41,13 +41,13 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 4 — Analytics & Data Science (AN)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| AN-1 | Ingest Kaggle audio features into a `Track`-joinable form; record coverage. | T31 | ◻ |
+| AN-1 | Ingest Kaggle audio features into a `Track`-joinable form; record coverage. | T31 | ✅ interim dataset |
 | AN-2 † | Per-user taste vector (standardized) + C4 genre fallback. *(now computed on read, no table)* | T33 | ◻ |
 | AN-3 | K-means on Kaggle tracks; k via elbow+silhouette; persist `Cluster` + metrics. | T34 | ◻ |
-| AN-4 † | Assign each user to nearest cluster. *(on-read TS; `User.clusterId` dropped)* | T33, T14 | ◻ |
-| AN-5 † | Compatibility = cosine of full taste vectors. *(on-read TS; no pairwise table)* | T35 | ◻ |
+| AN-4 † | Assign each user to nearest cluster. *(computed on read in the Python API; `User.clusterId` dropped)* | T33, T14 | ◻ |
+| AN-5 † | Compatibility = cosine of full taste vectors. *(computed on read in the Python API; no pairwise table)* | T35 | ◻ |
 | AN-6 | Popularity regression; persist R²/RMSE/feature-importances. | T36 | ◻ |
-| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(live TS, no `UserStats` table)* | T44, T14 | ◧ (T44: top **tracks/artists**, streak, 30-day totals done live over `Play` in `app/stats.py`; top **genres** deferred to T14, needs the T31 Kaggle genre join) |
+| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(computed live in the Python API, no `UserStats` table)* | T44, T14 | ◧ (T44: top **tracks/artists**, streak, 30-day totals done live over `Play` in `app/stats.py`; top **genres** deferred to T14, needs the T31 Kaggle genre join) |
 | AN-8 | Pipeline idempotent + re-runnable; logs coverage/k/silhouette/R²/RMSE. | T30, T38 | ◻ |
 | AN-9 † | Analytics UI on real model data; no hardcoded constants. *(reads metrics/clusters + on-read values)* | T45 | ◻ |
 
@@ -86,7 +86,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 8 — Data Sources & Seeding (DATA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| DATA-1 | Load Kaggle audio-feature set; document source; join on `track_id`. | T31 | ◻ |
+| DATA-1 | Load Kaggle audio-feature set; document source; join on `track_id`. | T31 | ✅ interim dataset |
 | DATA-2 | Seed ~100–200 synthetic users (genre-coherent personas). | T32 | ◻ |
 | DATA-3 | Synthetic users disclosed; never inflate real-user metrics. | T32 | ◻ |
 | DATA-4 | Retire `mocks/*` from production paths once live. *(the whole SPA — mocks included — was deleted in T60)* | T60 | ✅ |
@@ -109,8 +109,8 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 
 ## Superseded spec text
 The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagged † above) evolved after it was written — defer to the ADRs:
-- **INFRA-1** — original spec assumed Vercel serverless (`api/`) as the backend. ADR-0010 moved the API to FastAPI on Render; Vercel now serves only the SPA and rewrites `/api/*` to the Render URL ([ADR-0010](../decisions/adr/0010-fastapi-render-backend.md)).
-- **AN-2/4/5/7/9** — per-user analytics are computed **on read in TS**, not materialized; `UserStats`/`TasteVector`/`Compatibility` tables and `User.clusterId` are dropped, `ModelArtifact` added ([ADR-0003](../decisions/adr/0003-analytics-runtime.md), [ADR-0009](../decisions/adr/0009-medallion-layering.md)).
+- **INFRA-1** — original spec assumed Vercel serverless (`api/`) as the backend. ADR-0010 moved the API to FastAPI on Render; then **T60 retired the Vercel SPA entirely** ([ADR-0013](../decisions/adr/0013-python-frontend.md)), so **Render now serves both the API and the Jinja frontend** — Vercel is no longer used ([ADR-0010](../decisions/adr/0010-fastapi-render-backend.md)).
+- **AN-2/4/5/7/9** — per-user analytics are computed **on read in the API** (written when the backend was TypeScript; since ADR-0010 that means the FastAPI/Python app), not materialized; `UserStats`/`TasteVector`/`Compatibility` tables and `User.clusterId` are dropped, `ModelArtifact` added ([ADR-0003](../decisions/adr/0003-analytics-runtime.md), [ADR-0009](../decisions/adr/0009-medallion-layering.md)).
 - **SP-2 / INFRA-3** — snapshot is triggered by **GitHub Actions**, not Vercel Cron ([ADR-0006](../decisions/adr/0006-scheduling.md)).
 - **AUTH-3** — handle is **auto-derived**; no signup form / custom-handle flow.
 - Storage is **Supabase Storage** (not Cloudinary); Kaggle set is a genuine ~1M-track source (not `maharshipandya`) ([ADR-0002](../decisions/adr/0002-api-and-persistence.md), [ADR-0004](../decisions/adr/0004-analytics-data-strategy.md)).

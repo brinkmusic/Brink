@@ -64,8 +64,8 @@ cd backend && uv run uvicorn app.main:app --reload --port 3001
 4. **TDD (expected practice).** Write a failing test first, then minimal code to pass,
    with frequent small commits. Claude Code agents should use the `test-driven-development`
    skill; everyone else follows the same loop by hand. This is the expected workflow, not an
-   automated guarantee — CI (`.github/workflows/ci.yml`) runs the backend tests (`uv run pytest`),
-   the frontend build, and a secret scan on every PR, and is what actually blocks untested code.
+   automated guarantee — CI (`.github/workflows/ci.yml`) runs the backend tests (`uv run pytest`)
+   and a secret scan on every PR, and is what actually blocks untested code.
    Don't execute multiple tickets at once.
 5. **Don't widen scope.** Build exactly what the ticket/requirement specifies — no extra
    features, abstractions, or error handling beyond what's asked.
@@ -141,7 +141,8 @@ The work cycle:
   done and tests are green. Deferring to a follow-up PR is still allowed but only as a **stated**
   exception (e.g. a very large PR). Say "close out T<NN>".
 - **`close-session` — end of a *session* (final validation).** The "am I safe to stop?" gate and
-  bookend to `get-me-started`: runs the full backend suite + frontend build/lint, confirms the tree
+  bookend to `get-me-started`: runs the full backend suite (no frontend build step — the frontend
+  is server-rendered Jinja), confirms the tree
   is clean and pushed and open PRs are green, prunes already-merged branches, and writes the
   handoff. Use it when wrapping up ("sign off", "I'm done", "final validation").
 
@@ -209,8 +210,10 @@ PR that it went in without a second review).
   create is rate-limited + trims/length-validates `body`, list returns newest-first with nested
   author DTO), satisfies BE-6. The app (API + Jinja frontend) runs on **Render**
   (`brink-xg7p.onrender.com`, `/api/health` → `db: true`), Spotify login works end-to-end. Repo:
-  **`brinkmusic/Brink`** (public). Remaining remediation: T75, T76 (see
-  `docs/plans/reviews/2026-07-02-code-review-t00-t08.md`). **T90–T93 (developer tooling) done** —
+  **`brinkmusic/Brink`** (public). The 2026-07-02 review's remaining remediation
+  tickets T75/T76 were **obsoleted by T60** (they targeted the retired SPA's `apps/web/` files);
+  the one surviving idea — retiring the legacy `POST /api/auth/capture-spotify` endpoint — is now
+  tracked as T63. **T90–T93 (developer tooling) done** —
   the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
   (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
   pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
@@ -218,7 +221,8 @@ PR that it went in without a second review).
   validate + branch-cleanup + handoff). Plus the **`docs-sync` CI gate**
   (`.github/workflows/docs-sync.yml`) that fails any PR changing source without touching docs
   (`no-docs` label = escape hatch). `develop` and `main` are now branch-protected: PR required, up
-  to date, checks `api/web/secrets/docs-sync` green, admins included. **T13 (follow + feed) done**
+  to date, checks `api/secrets/docs-sync` green, admins included (the `web` check was retired with
+  the SPA in T60). **T13 (follow + feed) done**
   — `POST`/`DELETE /api/follow/{userId}` (idempotent follow / own-only unfollow, rate-limited) +
   `GET /api/feed` (followees + self, newest-first, each with track, author, per-type reaction
   counts, comment count, and the viewer's own reactions; fixed 4 queries, no N+1), satisfying BE-4
@@ -320,8 +324,45 @@ PR that it went in without a second review).
   prompt, and empty states. T44 was **re-scoped** (ADR-0014): the feed stays manual-only, and the
   analytics half — cluster/compatibility (UI-6) + top genres (AN-7) + feed/other-user now-playing
   (UI-10) — is deferred to the slimmed **T14**, still blocked on the analytics spine (T33/T35) and the
-  Kaggle genre join (T31); UI-6/UI-10/AN-7 are marked **◧ partial**. **Next backend feature: the
-  analytics spine (031/033/034, Jonah) is unblocked; T14 (profile analytics) still gated on T33/T35.**
+  Kaggle genre join (T31); UI-6/UI-10/AN-7 are marked **◧ partial**. **T30 (analytics scaffold) done**
+  — `uv init` an `analytics/` package (scikit-learn, pandas, SQLAlchemy, psycopg) with `analytics/db.py`
+  (SQLAlchemy engine off the root `.env`'s `DATABASE_URL`, normalizing the Supabase pooler URL like
+  `backend/app/db.py` does) and a passing smoke test reading a `silver."Track"` row count
+  (schema-qualified after T39 moved `Track` into `silver`); `uv.lock` committed. AN-8/INFRA-4 stay
+  **◧ partial** — both also need T38's GitHub Actions pipeline workflow, out of scope here. Its merge
+  unblocks **T31** (Kaggle genre join). **T31 (Kaggle ingest + Track join) done** —
+  `analytics/ingest_kaggle.py` lands the CSV raw into `bronze.kaggle_tracks_raw` (replaced each
+  run, so re-running never duplicates) and joins onto `silver.Track` by `spotifyId`/`track_id`,
+  filling in `danceability/energy/valence/tempo/loudness/popularity` + `kaggleMatched` on matches;
+  non-matches are left alone (the fallback is T33). Coverage is logged, not hidden (ADR-0004).
+  **Scope note (disclosed, not an ADR change):** ran against a **temporary ~114k substitute**
+  (`SpotifyAudioFeaturesApril2019.csv`, gitignored under `analytics/data/`) instead of the ≈1M+ set
+  ADR-0004 calls for, since that set wasn't available — coverage against brink-dev is currently
+  **14/343 (4.1%)**. Swapping in the real set later is just re-running the script against the new
+  file. AN-1/DATA-1 marked **✅ interim dataset**. Its merge unblocks **T32**. **T79 (2026-07-15
+  coherence sweep) done** — four parallel reviews (docs↔code coherence, email-auth investigation,
+  frontend-enablement gap audit, Supabase schema audit; reports in
+  `docs/plans/reviews/2026-07-15-*.md`) landed in one chore PR with every easy drift fix (CI/
+  branch-check claims, `render.yaml` branch + `CRON_SECRET` record, stale React-era comments,
+  ADR-0003 language note, `home.html` copy aligned with ADR-0014's manual-posting feed); T75/T76
+  marked **Obsolete** (their target files died with the SPA in T60). The reviews also filed the
+  **enablement wave**: the backend is ahead of the frontend, so **T47** (authenticated nav +
+  logout link — today no page links to /feed, /artist, your profile, or logout), **T15/T46**
+  (user search API/UI — today you can't find a user to follow without hand-typing their URL),
+  **T53** (signed READ urls — artist images upload into a private bucket and currently cannot
+  render at all), **T54** (audience view of artist posts — the whole T52 engagement API is dead
+  code until a page renders it), **T16** (follower/following lists), **T63** (retire the dead
+  capture-spotify endpoint), and a rewritten **T03** (email+password signup/login server-side;
+  needs a new ADR superseding ADR-0005's OTP choice + first IP-keyed rate limiting). Schema audit
+  verdict: no orphaned tables, no drift (`alembic check` clean); bronze/silver/gold + Supabase
+  schemas all accounted for; only optional cleanup is dropping `_prisma_migrations`. **T64 (Render
+  keep-alive) done** — `.github/workflows/keepalive.yml` pings `/api/health` every 10 min so the
+  free-tier service stops spinning down behind Render's ~50s "waking up" screen; like snapshot.yml
+  it **only fires from `main`**, so it activates at the next release (owner: one manual
+  `workflow_dispatch` run to verify, and the durable alternative if drift still bites is the paid
+  Starter plan). **Next: T47 →
+  T15/T46 (make follow usable), T53 (broken artist images), T03 (email login); T32 (Jonah)
+  unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
 
@@ -333,7 +374,10 @@ PR that it went in without a second review).
   — build `uv sync`, start `uvicorn app.main:app`. It serves the `/api/*` JSON endpoints **and** the
   server-rendered Jinja/HTMX pages (`/`, `/feed`, `/u/{handle}`, `/artist`, `/auth/*`), same-origin,
   so there's no CORS and no rewrite layer. Env vars (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`,
-  `SPOTIFY_*`, `TOKEN_ENC_KEY`, `CRON_SECRET`) live only in Render, never committed.
+  `SPOTIFY_*`, `TOKEN_ENC_KEY`, `CRON_SECRET`) live only in Render, never committed. The service
+  is on the **free plan**, which spins down after ~15 idle minutes (→ a ~50s "waking up" screen);
+  `.github/workflows/keepalive.yml` (T64) pings `/api/health` every 10 min from `main` to prevent
+  that.
 - **Release flow:** **Render deploys production from `main`**, so changes reach production only via a
   `develop → main` release PR, and each release must be followed by a back-merge of `main` into
   `develop` (or the next release PR is blocked as BEHIND, since `main` protection is `strict`).

@@ -1,10 +1,10 @@
 # WHAT THIS FILE IS
-# Two small helpers that shape every API response the same way, so the React
-# frontend always knows what to expect:
+# Two small helpers that shape every API response the same way, so any caller
+# (the browser JavaScript in app/static/, the tests, or a future client) always
+# knows what to expect:
 #   - success looks like:  { "data": ... }
 #   - failure looks like:  { "error": "some message" }
-# WHY: a consistent "envelope" means the frontend has one rule for reading results,
-# and it matches the format the old backend used (was api/_lib/respond.ts).
+# WHY: a consistent "envelope" means callers have one rule for reading results.
 
 from typing import Any
 

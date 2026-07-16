@@ -82,12 +82,13 @@ See CLAUDE.md for the env-var list and migration details (SQLModel + Alembic).
 ## 4. Branching & deploying
 
 - **`develop`** is the integration branch — every change goes through a PR into `develop`.
-- **`main`** is production — Vercel deploys the frontend; the ADR-0010 cutover is complete and the
-  FastAPI backend runs on Render. `develop` reaches `main` only via a release PR (and only once
-  env vars are set). **Never push to `main` or `develop` directly.**
+- **`main`** is production — **Render** deploys the whole app (API + Jinja frontend) from `main`.
+  `develop` reaches `main` only via a release PR (and only once env vars are set). **Never push to
+  `main` or `develop` directly.** (The old Vercel SPA host was retired in T60.)
 - Branch naming: `<type>/<ticket-id>-<slug>` (e.g. `feat/T10-posts-api`). One ticket = one PR.
 
-CI (`.github/workflows/ci.yml`) runs tests, the web build, and a secret scan on every PR.
+CI (`.github/workflows/ci.yml`) runs the backend tests and a secret scan on every PR (the frontend
+`web` build job was removed in T60 with the SPA).
 
 ---
 

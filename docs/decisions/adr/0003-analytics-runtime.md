@@ -1,6 +1,9 @@
 # ADR-0003: Analytics runtime — batch training, on-demand inference, live stats
 
-**Status:** Accepted
+**Status:** Accepted (language note 2026-07-15: the "TS API" this ADR describes for on-read
+inference became the FastAPI/**Python** API when the backend moved — [ADR-0010](0010-fastapi-render-backend.md),
+[ADR-0013](0013-python-frontend.md). The decision itself — batch training / on-read inference /
+live aggregation — is unchanged.)
 **Date:** 2026-06-22 · **Revised:** 2026-06-25 (split training from inference; UserStats made live)
 **First captured as:** spec decision-log row B
 

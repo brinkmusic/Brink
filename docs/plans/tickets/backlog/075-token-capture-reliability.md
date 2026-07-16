@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Obsolete
 priority: High
 complexity: Medium
 category: Fix
@@ -11,6 +11,11 @@ owner: Sebastian
 ---
 
 # Fix: Spotify token-capture reliability + Supabase client guard + `apiFetch` (T75)
+
+> **OBSOLETE (2026-07-15, coherence sweep T79).** Every file this ticket targets lived in the
+> `apps/web/` React SPA, which was retired in T60 (ADR-0013). Token capture now happens
+> server-side in `/auth/callback` (T09), so the browser capture path this ticket hardened no
+> longer exists. The legacy `POST /api/auth/capture-spotify` endpoint's removal is tracked as T63.
 
 ## Rationale
 Findings **H3**, **H4**, **MF4** of the [2026-07-02 code review](../../reviews/2026-07-02-code-review-t00-t08.md).
