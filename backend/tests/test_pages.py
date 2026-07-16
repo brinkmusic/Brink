@@ -282,6 +282,45 @@ def test_profile_shows_following_state_and_counts(client, db_session, monkeypatc
     assert 'class="follower-count">1<' in body
 
 
+def test_profile_counts_link_to_follow_lists(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    target = User(handle="with-graph", display_name="With Graph",
+                  created_at=datetime.now(timezone.utc))
+    follower = User(handle="follower-one", display_name="Follower One",
+                    created_at=datetime.now(timezone.utc))
+    followed = User(handle="followed-one", display_name="Followed One",
+                    created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.add(follower)
+    db_session.add(followed)
+    db_session.commit()
+    db_session.refresh(target)
+    db_session.refresh(follower)
+    db_session.refresh(followed)
+    db_session.add(Follow(follower_id=follower.id, following_id=target.id))
+    db_session.add(Follow(follower_id=target.id, following_id=followed.id))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/with-graph").text
+    assert 'href="/u/with-graph?list=followers"' in body
+    assert 'href="/u/with-graph?list=following"' in body
+    assert 'class="follower-count">1<' in body
+    assert ">1</b> following" in body
+
+    followers_body = client.get("/u/with-graph?list=followers").text
+    assert "Followers" in followers_body
+    assert "Follower One" in followers_body
+    assert "Followed One" not in followers_body
+
+    following_body = client.get("/u/with-graph?list=following").text
+    assert "Following" in following_body
+    assert "Followed One" in following_body
+    assert "Follower One" not in following_body
+
+
 def test_own_profile_has_no_follow_button(client, db_session, monkeypatch):
     _seed_viewer(db_session)  # the viewer's handle is "viewer"
     app.dependency_overrides[get_session] = lambda: db_session

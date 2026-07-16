@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Low
 category: Feature
@@ -39,8 +39,10 @@ expand/navigate to those lists.
 ## Validation & authz (ADR-0007)
 Login-gated, read-only, rate-limited.
 
-## Current State (on `develop`)
-- `Follow` table + counts queried in the profile route; no list endpoint exists.
+## Current State (as built)
+- `GET /api/users/{userId}/followers` and `GET /api/users/{userId}/following` return capped,
+  login-gated user DTO lists. Profile follower/following counts link to server-rendered list
+  sections with empty states.
 
 ## Files to Create/Modify
 | File | Action | Purpose |
@@ -50,9 +52,9 @@ Login-gated, read-only, rate-limited.
 | `backend/tests/test_users_follow_lists.py` | CREATE | list behavior + gating |
 
 ## Testing Checklist
-- [ ] lists return the right users after follow/unfollow; login required
-- [ ] counts on the profile match the list lengths
-- [ ] empty states render
+- [x] lists return the right users after follow/unfollow; login required
+- [x] counts on the profile match the list lengths
+- [x] empty states render
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -63,3 +65,10 @@ Login-gated, read-only, rate-limited.
 
 ## Notes
 Branch `feat/T16-follow-lists`. Lower priority than T15/T46/T47.
+
+## Outcome
+T16 added capped social-graph read endpoints in `backend/app/routers/users.py`, reusing the
+`UserSearchOut` allow-list DTO and a 50-row cap. `backend/app/templates/profile.html` now links
+the follower/following counts to `?list=followers` / `?list=following` and renders those users
+server-side with profile links and empty states. `backend/tests/test_users_follow_lists.py` covers
+endpoint auth, 404s, ordering, and caps; `backend/tests/test_pages.py` covers the profile UI.

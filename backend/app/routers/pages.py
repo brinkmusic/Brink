@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -37,6 +37,7 @@ from app.models import (
 )
 from app.routers.artist import UPLOAD_BUCKET
 from app.routers.feed import build_feed
+from app.routers.users import FOLLOW_LIST_LIMIT
 from app.security.supabase import create_signed_read_url
 from app.stats import listening_summary
 
@@ -175,7 +176,55 @@ def feed(request: Request, session: Session = Depends(get_session)):
 # viewer already follows them, and their own posts (newest-first). This is the minimal profile that
 # gives the Follow button (T43) a home; the full "Wrapped"-style stats/cluster/compatibility come
 # with T44 (which needs the profile API, T14). Returns None if there's no user with that handle.
-def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
+def _follow_list_items(session: Session, person_id: str, list_kind: str | None) -> dict | None:
+    if list_kind not in {"followers", "following"}:
+        return None
+
+    if list_kind == "followers":
+        # People whose Follow.following_id points at this profile.
+        rows = session.exec(
+            select(User)
+            .join(Follow, Follow.follower_id == User.id)
+            .where(Follow.following_id == person_id)
+            .order_by(User.handle)
+            .limit(FOLLOW_LIST_LIMIT)
+        ).all()
+        title = "Followers"
+        empty = "No followers yet."
+    else:
+        # People this profile follows.
+        rows = session.exec(
+            select(User)
+            .join(Follow, Follow.following_id == User.id)
+            .where(Follow.follower_id == person_id)
+            .order_by(User.handle)
+            .limit(FOLLOW_LIST_LIMIT)
+        ).all()
+        title = "Following"
+        empty = "Not following anyone yet."
+
+    return {
+        "kind": list_kind,
+        "title": title,
+        "empty": empty,
+        "users": [
+            {
+                "handle": user.handle,
+                "display_name": user.display_name,
+                "is_artist": user.is_artist,
+                "avatar_url": user.avatar_url,
+            }
+            for user in rows
+        ],
+    }
+
+
+def _profile_data(
+    session: Session,
+    handle: str,
+    viewer_id: str,
+    list_kind: str | None = None,
+) -> dict | None:
     person = session.exec(select(User).where(User.handle == handle)).first()
     if person is None:
         return None
@@ -292,6 +341,7 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
         "avatar_url": person.avatar_url,
         "follower_count": follower_count,
         "following_count": following_count,
+        "follow_list": _follow_list_items(session, person.id, list_kind),
         "is_following": is_following,
         "is_self": person.id == viewer_id,  # hide the Follow button on your own profile
         # Does THIS person have a linked Spotify? Drives the "link Spotify" prompt on your own
@@ -311,14 +361,19 @@ def _profile_data(session: Session, handle: str, viewer_id: str) -> dict | None:
 # A user's profile page: their header, a Follow/Unfollow button + follower counts (T43), and their
 # posts. Login-gated like the rest of the app. `handle` comes from the URL, e.g. /u/andrea-ab12cd.
 @router.get("/u/{handle}", response_class=HTMLResponse)
-def profile(handle: str, request: Request, session: Session = Depends(get_session)):
+def profile(
+    handle: str,
+    request: Request,
+    list_kind: str | None = Query(default=None, alias="list"),
+    session: Session = Depends(get_session),
+):
     refreshed = Response()
     try:
         viewer = require_user(request, session=session, response=refreshed)
     except AuthError:
         return RedirectResponse("/auth/login", status_code=303)
 
-    data = _profile_data(session, handle, viewer_id=viewer.id)
+    data = _profile_data(session, handle, viewer_id=viewer.id, list_kind=list_kind)
     if data is None:
         # No such handle — render a friendly 404 page rather than a raw error.
         page = templates.TemplateResponse(
