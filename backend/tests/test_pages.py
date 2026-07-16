@@ -8,8 +8,15 @@
 # The `client` fixture (a fake HTTP client) comes from conftest.py.
 
 
+# Since T47 the home route asks for a database session (to resolve the optional signed-in
+# viewer for the nav), so like every other page test we hand it a stand-in — an anonymous
+# visitor never actually queries it (require_user rejects the request before any lookup).
+# The imports live lower in this file (module-level, so they're loaded before tests run).
+
+
 # The landing page loads and comes back as an HTML document.
 def test_home_page_renders_html(client):
+    app.dependency_overrides[get_session] = lambda: MagicMock()
     res = client.get("/")
     assert res.status_code == 200  # 200 = OK
     # It must be a web page, not the JSON envelope the API returns.
@@ -20,6 +27,7 @@ def test_home_page_renders_html(client):
 # check for the brand, the headline, and the sign-in call to action — the three
 # things a visitor must see.
 def test_home_page_shows_landing_content(client):
+    app.dependency_overrides[get_session] = lambda: MagicMock()
     body = client.get("/").text
     assert "brink" in body
     assert "Your listening, made social." in body
@@ -413,6 +421,7 @@ def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):
 def test_nav_logged_out_shows_landing_nav(client):
     # An anonymous visitor to the landing page sees the public nav: the "Log in with Spotify"
     # button and the in-page anchors — and NONE of the authenticated links.
+    app.dependency_overrides[get_session] = lambda: MagicMock()
     body = client.get("/").text
     assert "Log in with Spotify" in body
     assert 'href="#features"' in body
