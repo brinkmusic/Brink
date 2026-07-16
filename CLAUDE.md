@@ -364,8 +364,16 @@ PR that it went in without a second review).
   into its template (public `/` uses a new `_optional_viewer()` that returns `None` instead of
   redirecting), and `base.html` renders a conditional nav: signed out → the landing nav; signed in
   → Feed, My profile, Artist studio (artists only), Log out. Before this nothing linked to /feed,
-  /artist, your profile, or logout. Fills the audit's gap #2 (UI-2 app shell). **Next:
-  T15/T46 (make follow usable), T53 (broken artist images), T03 (email login); T32 (Jonah)
+  /artist, your profile, or logout. Fills the audit's gap #2 (UI-2 app shell).
+  **T15 (user search API) done** — `GET /api/users/search?q=` (new
+  `backend/app/routers/users.py`; T16's follower/following lists belong there too): login-gated +
+  rate-limited (ADR-0011), case-insensitive `ILIKE %q%` on handle + display name with SQL
+  wildcards escaped, `q` trimmed with a 2-char minimum, ordered by handle, capped at 20, returning
+  the `UserSearchOut` allow-list DTO (ADR-0012). Fixes the audit's top gap: follow (T13) shipped
+  with no way to *find* a user (`/api/search` is Spotify tracks, not people). Satisfies the
+  discoverability half of BE-4. **Next:
+  T46 (search UI: T15 + T47 both merged, unblocked), T53 (broken artist images), T03 (email
+  login); T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)

@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Low
 category: Feature
@@ -59,9 +59,9 @@ render as links to `/u/{handle}`.
 | `backend/tests/test_users_search.py` | CREATE | behavior + gating + rate-limit tests |
 
 ## Testing Checklist
-- [ ] finds by handle substring and display-name substring, case-insensitive
-- [ ] anonymous request → 401 envelope; rate limit fires on hammering
-- [ ] cap respected; short/empty `q` rejected with the standard error envelope
+- [x] finds by handle substring and display-name substring, case-insensitive
+- [x] anonymous request → 401 envelope; rate limit fires on hammering
+- [x] cap respected; short/empty `q` rejected with the standard error envelope
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -72,3 +72,17 @@ render as links to `/u/{handle}`.
 
 ## Notes
 Branch `feat/T15-user-search-api`. Small; pairs with T46 for the visible feature.
+
+## Outcome (2026-07-16)
+As specced, one decision the ticket left open now made:
+- **New `backend/app/routers/users.py`** (not folded into `routers/search.py` — that file is
+  Spotify *track* search, a different data source, and T16's follower/following lists will belong
+  next to this). `GET /api/users/search?q=` is login-gated, rate-limited (30/min per user,
+  ADR-0011), escapes SQL wildcards in `q`, matches `ILIKE %q%` on handle + display name, orders by
+  handle, caps at 20.
+- **`q` minimum is 2 chars** (ticket allowed 1–2): one char matches nearly everyone. Trimmed
+  first, so whitespace-only queries 400 like empty ones.
+- `UserSearchOut` DTO in `schemas.py` (id, handle, displayName, isArtist — an allow-list, never
+  the raw User row), camelCase per ADR-0012.
+- 9 tests in `backend/tests/test_users_search.py`. Full suite green (188 passed).
+Unblocks **T46** (search UI) together with T47's nav.
