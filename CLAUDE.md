@@ -360,17 +360,29 @@ PR that it went in without a second review).
   free-tier service stops spinning down behind Render's ~50s "waking up" screen; like snapshot.yml
   it **only fires from `main`**, so it activates at the next release (owner: one manual
   `workflow_dispatch` run to verify, and the durable alternative if drift still bites is the paid
-  Starter plan). **T53 (artist image signed reads) done** — artist images finally display:
+  Starter plan). **T47 (authenticated nav) done** — every page route passes the signed-in `viewer`
+  into its template (public `/` uses a new `_optional_viewer()` that returns `None` instead of
+  redirecting), and `base.html` renders a conditional nav: signed out → the landing nav; signed in
+  → Feed, My profile, Artist studio (artists only), Log out. Before this nothing linked to /feed,
+  /artist, your profile, or logout. Fills the audit's gap #2 (UI-2 app shell).
+  **T15 (user search API) done** — `GET /api/users/search?q=` (new
+  `backend/app/routers/users.py`; T16's follower/following lists belong there too): login-gated +
+  rate-limited (ADR-0011), case-insensitive `ILIKE %q%` on handle + display name with SQL
+  wildcards escaped, `q` trimmed with a 2-char minimum, ordered by handle, capped at 20, returning
+  the `UserSearchOut` allow-list DTO (ADR-0012). Fixes the audit's top gap: follow (T13) shipped
+  with no way to *find* a user (`/api/search` is Spotify tracks, not people). Satisfies the
+  discoverability half of BE-4.
+  **T53 (artist image signed reads) done** — artist images finally display:
   `create_signed_read_url(bucket, path, expires_in=3600)` in `security/supabase.py` (the read
   sibling of T50's upload helper, service role, 1-hour expiry), and the `/artist` page signs each
   post's stored path before rendering (the private `artist-images` bucket rejects raw paths, so
   every image was broken — the T51 caveat). Live-verified against brink-dev storage: upload →
   signed GET 200 byte-identical, unsigned GET 400. That verification also caught that the
   installed supabase-py returns an *absolute* signed URL (older releases returned a relative
-  path) — the helper handles both. Unblocks **T54** (audience page consumes this helper).
-  **Next: T47 →
-  T15/T46 (make follow usable), T03 (email login); T54 (audience artist page) unblocked;
-  T32 (Jonah) unblocked; T14 still gated on T33/T35.**
+  path) — the helper handles both. **Next:
+  T46 (search UI: T15 + T47 both merged, unblocked), T54 (audience artist page: unblocked by
+  T53), T03 (email login); T32 (Jonah)
+  unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
 

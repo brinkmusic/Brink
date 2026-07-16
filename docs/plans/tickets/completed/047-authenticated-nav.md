@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Low
 category: Feature
@@ -56,9 +56,10 @@ Rendering-only — gating stays in the routes. The artist link is convenience, n
 | `backend/tests/test_pages.py` | MODIFY | nav variants |
 
 ## Testing Checklist
-- [ ] logged out: landing nav unchanged
-- [ ] logged in: Feed / My profile / Log out present on every page; Artist studio only if artist
-- [ ] logout link actually ends the session and returns to `/`
+- [x] logged out: landing nav unchanged
+- [x] logged in: Feed / My profile / Log out present on every page; Artist studio only if artist
+- [x] logout link actually ends the session and returns to `/` (the link points at the existing
+      `GET /auth/logout` from T09, whose session-clearing behavior the T09 tests already cover)
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -69,3 +70,16 @@ Rendering-only — gating stays in the routes. The artist link is convenience, n
 
 ## Notes
 Branch `feat/T47-authenticated-nav`. Highest impact per line of code in the audit — do before T46.
+
+## Outcome (2026-07-16)
+As specced, no scope change:
+- `backend/app/routers/pages.py` — every page route now passes `viewer` into its template. Gated
+  pages pass the user `require_user` already resolved; the public landing page uses a new
+  `_optional_viewer()` helper that runs the same session check but returns `None` (instead of
+  redirecting) for a signed-out visitor, so `/` stays public.
+- `backend/app/templates/base.html` — the shared nav is now conditional: signed out → the original
+  landing nav (anchors + "Log in with Spotify"); signed in → Feed, My profile (`/u/{handle}`),
+  Artist studio (only when `viewer.is_artist`), and Log out (`GET /auth/logout`).
+- 4 new tests in `backend/tests/test_pages.py` cover both nav variants, the artist-only link, and
+  the signed-in nav on the public landing page. Full suite green (183 passed).
+Unblocks the T46 search box's slot in the nav (T46 also needs T15).
