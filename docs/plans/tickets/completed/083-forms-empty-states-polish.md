@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Small
 category: Fix
@@ -60,11 +60,11 @@ the next relevant action where one exists.
 | `backend/tests/test_pages.py` | MODIFY | preserve important empty-state/action markup |
 
 ## Testing Checklist
-- [ ] artist upload file input matches the dark UI
-- [ ] edit-profile file input and bio textarea are visually consistent
-- [ ] empty states remain truthful and offer an existing next action where appropriate
-- [ ] status/error text is readable on dark cards
-- [ ] no backend behavior changes
+- [x] artist upload file input matches the dark UI
+- [x] edit-profile file input and bio textarea are visually consistent
+- [x] empty states remain truthful and offer an existing next action where appropriate
+- [x] status/error text is readable on dark cards
+- [x] no backend behavior changes
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -76,3 +76,19 @@ the next relevant action where one exists.
 ## Notes
 Branch off `develop` as `fix/T83-forms-empty-states-polish`; one PR back into `develop`
 (never `main`).
+
+## Outcome
+T83 polished existing form controls and empty states without changing backend behavior.
+
+- **File inputs:** artist upload and edit-profile avatar file inputs now use dark-theme file selector
+  buttons instead of browser-default light controls.
+- **Edit profile:** the edit profile form, avatar input, bio textarea, status text, and save action
+  now have matching Brink CSS.
+- **Empty states:** feed, artist, and profile empty states keep their existing truthful copy and add
+  small next-action cues where an action already exists (`/feed`, `/artist`, `/auth/login`, or the
+  viewer's own profile).
+- **Tests:** `backend/tests/test_pages.py` asserts the new empty-state actions. Focused page suite:
+  **36 passed**.
+
+Deliberate scope: no new upload endpoints, onboarding flows, storage behavior, or backend data shape
+changes.

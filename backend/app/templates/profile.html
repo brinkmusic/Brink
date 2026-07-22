@@ -193,12 +193,17 @@
   {# Your own profile, no linked Spotify yet — prompt to connect so we can show your listening. #}
   <div class="card empty">
     <p>Connect Spotify to see your listening here.</p>
-    <p><a class="btn btn-spotify" href="/auth/login">Link Spotify 🎧</a></p>
+    <div class="empty-actions">
+      <a class="btn btn-spotify" href="/auth/login">Link Spotify 🎧</a>
+    </div>
   </div>
   {% elif p.is_self %}
   {# Linked, but the snapshot hasn't captured any plays yet. #}
   <div class="card empty">
     <p>No listening yet — play some music on Spotify and it'll show up here. 🎧</p>
+    <div class="empty-actions">
+      <a class="btn btn-ghost" href="/feed">Go to feed</a>
+    </div>
   </div>
   {% endif %}
 
@@ -274,6 +279,11 @@
   {% else %}
     <div class="card empty">
       <p>{{ p.display_name }} hasn't shared any artist posts yet. 🎤</p>
+      {% if p.is_self %}
+      <div class="empty-actions">
+        <a class="btn btn-ghost" href="/artist">Open artist studio</a>
+      </div>
+      {% endif %}
     </div>
   {% endif %}
   {% endif %}
@@ -298,6 +308,11 @@
   {% else %}
     <div class="card empty">
       <p>{{ p.display_name }} hasn't shared any songs yet. 🎧</p>
+      {% if p.is_self %}
+      <div class="empty-actions">
+        <a class="btn btn-ghost" href="/feed">Share a song</a>
+      </div>
+      {% endif %}
     </div>
   {% endif %}
 </section>

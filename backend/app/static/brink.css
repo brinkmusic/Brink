@@ -291,7 +291,30 @@ body {
 
 /* ---- Artist page (T51) ---- */
 .artist-upload { display: grid; gap: 0.6rem; }
-.artist-file { color: var(--mute); font-size: 0.85rem; font-family: inherit; }
+.artist-file,
+.edit-avatar-file {
+  width: 100%;
+  color: var(--mute);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.artist-file::file-selector-button,
+.edit-avatar-file::file-selector-button {
+  margin-right: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  background: var(--ink);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.45rem 0.8rem;
+}
+.artist-file::file-selector-button:hover,
+.edit-avatar-file::file-selector-button:hover {
+  border-color: var(--accent);
+  background: rgba(157, 141, 241, 0.1);
+}
 .artist-caption {
   width: 100%;
   padding: 0.55rem 0.8rem;
@@ -451,6 +474,44 @@ body {
 .comment-form .btn { padding: 0.45rem 0.9rem; font-size: 0.8rem; }
 .empty { color: var(--mute); font-size: 0.95rem; }
 .empty p { margin: 0; }
+.empty > * + * { margin-top: 0.75rem; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* ---- Edit profile (T48) ---- */
+.edit-profile { display: grid; gap: 0.6rem; }
+.edit-profile-form {
+  display: grid;
+  gap: 0.75rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+.edit-profile-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--mute);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.edit-bio {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--ink);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+.edit-bio:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.edit-profile-status {
+  min-height: 1rem;
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.82rem;
+}
+.edit-profile-save { justify-self: start; }
 
 /* ---- Footer ---- */
 .footer { border-top: 1px solid var(--line); margin-top: 2rem; }

@@ -134,6 +134,7 @@ def test_feed_empty_state(client, db_session, monkeypatch):
     res = client.get("/feed")
     assert res.status_code == 200
     assert "No songs shared yet" in res.text
+    assert "Search above to share the first one" in res.text
 
 
 # ---- T41: feed shows live reaction counts + highlights the viewer's own reactions ----
@@ -563,6 +564,7 @@ def test_own_profile_without_spotify_shows_link_prompt(client, db_session, monke
 
     body = client.get("/u/viewer").text
     assert "Link Spotify" in body
+    assert 'href="/auth/login"' in body
 
 
 def test_own_profile_shows_now_playing_badge(client, db_session, monkeypatch):
@@ -624,6 +626,7 @@ def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch
     body = client.get("/artist").text
     assert 'class="artist-file"' not in body        # no upload box for non-artists
     assert "Artist accounts only" in body
+    assert 'href="/u/viewer"' in body
 
 
 def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):

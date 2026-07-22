@@ -211,8 +211,8 @@ agents, not a changelog.
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
 - **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. For
-  analytics, `T32` is unblocked and `T14` is still gated. For non-analytics UI work, the remaining
-  2026-07-22 hardening ticket `T83` is ready and targets the Jinja frontend in `backend/app/`.
+  analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22 non-analytics UI hardening
+  wave (`T80`–`T83`) is complete.
 
 ## Watch-outs
 
