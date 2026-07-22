@@ -241,6 +241,58 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert "/static/composer.js" in body           # the script is loaded
 
 
+# ---- T049: followed artists' behind-the-scenes posts render in the feed page ----
+
+
+# A followed artist's ArtistPost renders on the feed page as an artist card, with its signed image,
+# the audience like/comment controls wired to the T52 API, and the artist-engagement script loaded.
+def test_feed_shows_followed_artist_post(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    artist = User(handle="the-band", display_name="The Band", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    db_session.add(Follow(follower_id=viewer.id, following_id=artist.id))
+    post = ArtistPost(artist_user_id=artist.id, image_url="the-band/soundcheck.jpg",
+                      caption="soundcheck vibes")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    # The feed builder signs the private image path; stub it so no test hits Supabase.
+    monkeypatch.setattr(
+        "app.routers.feed.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "soundcheck vibes" in body                                  # the caption
+    assert "behind the scenes" in body                                 # the artist card label
+    assert 'src="https://signed/artist-images/the-band/soundcheck.jpg?token=readtok"' in body
+    assert "artist-reactions" in body                                  # audience reaction bar
+    assert "artistReact(this)" in body
+    assert "toggleArtistComments(this)" in body
+    assert f'data-post-id="{post.id}"' in body
+    assert "/static/artist-engagement.js" in body                      # the engagement script
+
+
+# A feed with only song posts (no artist posts) does NOT load the artist-engagement script.
+def test_feed_without_artist_posts_omits_engagement_script(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t1", title="Song", artist_name="Someone"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t1", source=PostSource.MANUAL))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "Song" in body                                              # the song post rendered
+    assert "/static/artist-engagement.js" not in body                  # no artist script needed
+
+
 # ---- T43: profile page + follow button ----
 
 
@@ -548,6 +600,10 @@ def test_artist_page_shows_upload_for_artist(client, db_session, monkeypatch):
     body = client.get("/artist").text
     assert 'class="artist-file"' in body            # the file picker is shown
     assert "/static/artist-upload.js" in body       # the upload script is loaded
+    # T57: the caption starts hidden — a post needs an image, so the caption box only appears
+    # after a valid file is picked (revealed by artist-upload.js). It must render with `hidden`.
+    assert 'class="artist-caption"' in body
+    assert 'maxlength="2000" hidden' in body
 
 
 def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch):
