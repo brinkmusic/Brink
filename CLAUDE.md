@@ -422,7 +422,20 @@ PR that it went in without a second review).
   returning `ArtistStateOut`; a "Become an artist" button on your **own** profile
   (`profile.html` + `static/become-artist.js`) reloads to unlock the artist studio. Before this the
   `is_artist` flag could only be set by editing the Supabase DB by hand (T50 had deferred this
-  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**. **Next:
+  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**.
+  **T48 (editable profile) done** — an in-app "Edit profile" surface so any user can set a bio and
+  upload a profile picture (before this a bio didn't exist and email sign-ups had no avatar). New
+  `User.bio` column (nullable Text) + a hand-written migration (`a1c47f9e2b30`, off `3978f11ad4da`);
+  three login-gated `/api/me` endpoints on the authenticated caller (unspoofable, like become-artist):
+  `PATCH /api/me/profile` (trim + ≤ 300, empty clears to NULL), `POST /api/me/avatar/sign-upload`
+  (signed upload URL for a NEW **public** `avatars` bucket at `<callerUserId>/<uuid>.<ext>`, returns
+  `{ signedUrl, token, path, publicUrl }`), and `POST /api/me/avatar` (path must be in the caller's
+  own folder, else 400; stores the public object URL on `avatar_url`). New `public_object_url` helper
+  in `security/supabase.py` (public bucket needs no signed read URL, unlike artist-images). Own-profile
+  "Edit profile" form (`profile.html` + `static/edit-profile.js`: avatar 3-step upload → PATCH bio →
+  reload); bio renders under the header on every profile (autoescaped user text). Satisfies the new
+  **UI-11**. **Deploy steps for Andrea:** (1) create a **public** Supabase Storage bucket named
+  `avatars` in `brink-dev`; (2) apply the migration — `cd backend && uv run alembic upgrade head`. **Next:
   T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
