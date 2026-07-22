@@ -134,6 +134,12 @@ class UserSearchOut(CamelModel):
     is_artist: bool
 
 
+# What POST /api/me/become-artist returns: just the resulting artist state of the caller's own
+# account (T55). A single allow-listed field so the browser can confirm the flip succeeded.
+class ArtistStateOut(CamelModel):
+    is_artist: bool
+
+
 # The public bits of a comment's author (never the whole User row — no email, ids, etc.).
 class AuthorOut(CamelModel):
     display_name: str

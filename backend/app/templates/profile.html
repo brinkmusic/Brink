@@ -46,6 +46,18 @@
       onclick="toggleFollow(this)"
     >{{ 'Following' if p.is_following else 'Follow' }}</button>
     {% endif %}
+
+    {# On your OWN profile, if you're not already an artist, offer to become one (T55). Clicking it
+       calls POST /api/me/become-artist for the logged-in account and reloads so the artist studio
+       + upload unlock. Hidden once you're an artist. The server is the real gate; this just shows
+       the option to the account it applies to. #}
+    {% if p.is_self and not p.is_artist %}
+    <button
+      type="button"
+      class="btn btn-ghost become-artist-btn"
+      onclick="becomeArtist(this)"
+    >Become an artist</button>
+    {% endif %}
   </div>
 
   {% if p.follow_list %}
@@ -243,4 +255,6 @@
 {# Makes the Follow/Unfollow button live (calls the T13 follow API). #}
 <script src="/static/follow.js"></script>
 {% if p.is_artist %}<script src="/static/artist-engagement.js"></script>{% endif %}
+{# Makes the "Become an artist" button live (T55) — only loaded when it's shown. #}
+{% if p.is_self and not p.is_artist %}<script src="/static/become-artist.js"></script>{% endif %}
 {% endblock %}
