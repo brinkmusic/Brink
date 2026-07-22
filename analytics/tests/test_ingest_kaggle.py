@@ -1,10 +1,16 @@
 # WHAT THIS FILE IS
 # Tests for T31's Kaggle ingest (analytics/ingest_kaggle.py): the bronze landing of
 # the raw CSV + the silver join that fills in audio features on Track rows we
-# already know about. We use a tiny CSV built on the fly (not the real ~114k
+# already know about. We use a tiny CSV built on the fly (not the real ~1.2M-row
 # dataset, which is gitignored and won't exist on another machine or in CI) and
 # two disposable Track rows created just for this test, so the suite never
 # rewrites real listening data in brink-dev.
+#
+# NOTE: bronze only lands rows that actually matched a Track we already know
+# about — landing a raw copy of all ~1.2M Kaggle rows filled the database's
+# disk in production, since the overwhelming majority never match anything.
+# The full file remains the source of truth for training (T34 reads it
+# directly); bronze is just a raw-provenance record of the matches we used.
 
 import csv
 import uuid
@@ -15,23 +21,22 @@ from sqlalchemy import text
 from db import get_engine
 from ingest_kaggle import run_ingest
 
-# The exact columns of the real Kaggle CSV (SpotifyAudioFeaturesApril2019.csv) —
-# ingest_kaggle.py only reads the ones Track has columns for; the rest are
-# preserved as-is in the bronze raw landing.
-_CSV_FIELDS = [
-    "artist_name", "track_id", "track_name", "acousticness", "danceability",
-    "duration_ms", "energy", "instrumentalness", "key", "liveness", "loudness",
-    "mode", "speechiness", "tempo", "time_signature", "valence", "popularity",
-]
+# The columns of the real Kaggle CSV (tracks_features.csv) that ingest_kaggle.py
+# actually reads. The real file has many more (name, artists, year, ...); only
+# "id" + the five audio features matter for the join, so the fixture sticks to
+# those. Note: this dataset has no popularity column (unlike the earlier ~114k
+# one T31 shipped with) — Track.popularity comes from live Spotify data captured
+# at post/snapshot time instead, so the join must never touch it.
+_CSV_FIELDS = ["id", "name", "danceability", "energy", "valence", "tempo", "loudness"]
 
 
-def _insert_track(conn, spotify_id: str) -> None:
+def _insert_track(conn, spotify_id: str, popularity: int) -> None:
     conn.execute(
         text(
-            'INSERT INTO silver."Track" ("spotifyId", title, "artistName") '
-            "VALUES (:id, :title, :artist)"
+            'INSERT INTO silver."Track" ("spotifyId", title, "artistName", popularity) '
+            "VALUES (:id, :title, :artist, :popularity)"
         ),
-        {"id": spotify_id, "title": "Test Track", "artist": "Test Artist"},
+        {"id": spotify_id, "title": "Test Track", "artist": "Test Artist", "popularity": popularity},
     )
 
 
@@ -54,21 +59,14 @@ def _write_fixture_csv(path: Path, matched_id: str) -> None:
         writer = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
         writer.writeheader()
         writer.writerow({
-            "artist_name": "Test Artist", "track_id": matched_id, "track_name": "Test Track",
-            "acousticness": "0.5", "danceability": "0.7", "duration_ms": "200000",
-            "energy": "0.6", "instrumentalness": "0.0", "key": "1", "liveness": "0.1",
-            "loudness": "-6.5", "mode": "1", "speechiness": "0.05", "tempo": "120.0",
-            "time_signature": "4", "valence": "0.8", "popularity": "42",
+            "id": matched_id, "name": "Test Track", "danceability": "0.7",
+            "energy": "0.6", "loudness": "-6.5", "tempo": "120.0", "valence": "0.8",
         })
         # A Kaggle row with no corresponding Track row — should land in bronze
         # but have nothing to join against.
         writer.writerow({
-            "artist_name": "Nobody", "track_id": "kaggle_only_" + uuid.uuid4().hex,
-            "track_name": "Unheard", "acousticness": "0.1", "danceability": "0.1",
-            "duration_ms": "100000", "energy": "0.1", "instrumentalness": "0.9",
-            "key": "0", "liveness": "0.1", "loudness": "-20.0", "mode": "0",
-            "speechiness": "0.1", "tempo": "80.0", "time_signature": "4",
-            "valence": "0.1", "popularity": "0",
+            "id": "kaggle_only_" + uuid.uuid4().hex, "name": "Unheard", "danceability": "0.1",
+            "energy": "0.1", "loudness": "-20.0", "tempo": "80.0", "valence": "0.1",
         })
 
 
@@ -80,8 +78,8 @@ def test_join_sets_features_and_leaves_unmatched_alone(tmp_path):
     _write_fixture_csv(csv_path, matched_id)
 
     with engine.begin() as conn:
-        _insert_track(conn, matched_id)
-        _insert_track(conn, unmatched_id)
+        _insert_track(conn, matched_id, popularity=55)
+        _insert_track(conn, unmatched_id, popularity=10)
 
     try:
         summary = run_ingest(csv_path, engine=engine)
@@ -95,22 +93,74 @@ def test_join_sets_features_and_leaves_unmatched_alone(tmp_path):
         assert matched_row.valence == 0.8
         assert matched_row.tempo == 120.0
         assert matched_row.loudness == -6.5
-        assert matched_row.popularity == 42
         assert matched_row.kaggleMatched is True
+        # This dataset has no popularity column — the join must never touch it,
+        # since the real value already comes from live Spotify data.
+        assert matched_row.popularity == 55
 
         # A Track that exists but has no row in the Kaggle CSV must stay
         # unmatched — the genre-only fallback for these is a separate ticket (T33).
         assert unmatched_row.kaggleMatched is False
+        assert unmatched_row.popularity == 10
 
         assert summary["matched"] >= 1
         assert summary["coverage_pct"] > 0
 
         # Coverage % is reported, not silently dropped (ADR-0004).
         assert isinstance(summary["coverage_pct"], float)
+
+        # Bronze only keeps the rows that actually matched a Track we know
+        # about — the unmatched "kaggle_only_..." row must never land there.
+        with engine.connect() as conn:
+            bronze_ids = [
+                row[0]
+                for row in conn.execute(
+                    text("SELECT payload->>'id' FROM bronze.kaggle_tracks_raw")
+                ).fetchall()
+            ]
+        assert bronze_ids == [matched_id]
     finally:
         with engine.begin() as conn:
             _delete_track(conn, matched_id)
             _delete_track(conn, unmatched_id)
+
+
+def test_coverage_is_cumulative_across_runs(tmp_path):
+    # A track matched by an earlier ingest (e.g. against a since-replaced
+    # Kaggle file) keeps its kaggleMatched=true and real feature values even
+    # though it's absent from *this* run's CSV. Coverage must count it too —
+    # reporting only "matched by this run" would understate the database's
+    # true, cumulative state (ADR-0004: coverage reported honestly).
+    engine = get_engine()
+    already_matched_id = "test_already_matched_" + uuid.uuid4().hex
+    new_matched_id = "test_new_matched_" + uuid.uuid4().hex
+    csv_path = tmp_path / "kaggle_sample.csv"
+    _write_fixture_csv(csv_path, new_matched_id)
+
+    with engine.begin() as conn:
+        _insert_track(conn, already_matched_id, popularity=20)
+        conn.execute(
+            text(
+                'UPDATE silver."Track" SET danceability = 0.5, energy = 0.5, '
+                'valence = 0.5, tempo = 100.0, loudness = -10.0, '
+                '"kaggleMatched" = true WHERE "spotifyId" = :id'
+            ),
+            {"id": already_matched_id},
+        )
+        _insert_track(conn, new_matched_id, popularity=55)
+
+    try:
+        summary = run_ingest(csv_path, engine=engine)
+        assert summary["matched"] >= 2
+
+        with engine.connect() as conn:
+            still_matched = _fetch_track(conn, already_matched_id)
+        assert still_matched.kaggleMatched is True
+        assert still_matched.danceability == 0.5
+    finally:
+        with engine.begin() as conn:
+            _delete_track(conn, already_matched_id)
+            _delete_track(conn, new_matched_id)
 
 
 def test_ingest_is_idempotent(tmp_path):
@@ -120,7 +170,7 @@ def test_ingest_is_idempotent(tmp_path):
     _write_fixture_csv(csv_path, matched_id)
 
     with engine.begin() as conn:
-        _insert_track(conn, matched_id)
+        _insert_track(conn, matched_id, popularity=55)
 
     try:
         first = run_ingest(csv_path, engine=engine)
@@ -133,8 +183,10 @@ def test_ingest_is_idempotent(tmp_path):
                 text("SELECT COUNT(*) FROM bronze.kaggle_tracks_raw")
             ).scalar()
         # Re-running must not accumulate duplicate raw rows — the bronze
-        # landing table always mirrors just the latest ingest.
-        assert bronze_count == 2
+        # landing table always mirrors just the latest ingest's matches.
+        # Only 1, not 2: the unmatched "kaggle_only_..." row in the fixture
+        # never lands in bronze at all.
+        assert bronze_count == 1
     finally:
         with engine.begin() as conn:
             _delete_track(conn, matched_id)

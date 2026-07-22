@@ -41,7 +41,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 4 — Analytics & Data Science (AN)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| AN-1 | Ingest Kaggle audio features into a `Track`-joinable form; record coverage. | T31 | ✅ interim dataset |
+| AN-1 | Ingest Kaggle audio features into a `Track`-joinable form; record coverage. | T31 | ✅ |
 | AN-2 † | Per-user taste vector (standardized) + C4 genre fallback. *(now computed on read, no table)* | T33 | ◻ |
 | AN-3 | K-means on Kaggle tracks; k via elbow+silhouette; persist `Cluster` + metrics. | T34 | ◻ |
 | AN-4 † | Assign each user to nearest cluster. *(computed on read in the Python API; `User.clusterId` dropped)* | T33, T14 | ◻ |
@@ -86,7 +86,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 ## Layer 8 — Data Sources & Seeding (DATA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| DATA-1 | Load Kaggle audio-feature set; document source; join on `track_id`. | T31 | ✅ interim dataset |
+| DATA-1 | Load Kaggle audio-feature set; document source; join on `track_id`. | T31 | ✅ |
 | DATA-2 | Seed ~100–200 synthetic users (genre-coherent personas). | T32 | ◻ |
 | DATA-3 | Synthetic users disclosed; never inflate real-user metrics. | T32 | ◻ |
 | DATA-4 | Retire `mocks/*` from production paths once live. *(the whole SPA — mocks included — was deleted in T60)* | T60 | ✅ |

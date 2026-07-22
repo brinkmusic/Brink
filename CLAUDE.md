@@ -337,9 +337,18 @@ PR that it went in without a second review).
   non-matches are left alone (the fallback is T33). Coverage is logged, not hidden (ADR-0004).
   **Scope note (disclosed, not an ADR change):** ran against a **temporary ~114k substitute**
   (`SpotifyAudioFeaturesApril2019.csv`, gitignored under `analytics/data/`) instead of the ≈1M+ set
-  ADR-0004 calls for, since that set wasn't available — coverage against brink-dev is currently
-  **14/343 (4.1%)**. Swapping in the real set later is just re-running the script against the new
-  file. AN-1/DATA-1 marked **✅ interim dataset**. Its merge unblocks **T32**. **T79 (2026-07-15
+  ADR-0004 calls for, since that set wasn't available — coverage against brink-dev was
+  **14/343 (4.1%)**. **Resolved (2026-07-22):** swapped in a genuine ≈1M+ set
+  (`tracks_features.csv`, 1,204,025 unique tracks), satisfying ADR-0004 as originally written — no
+  further scope deviation. Cumulative coverage is now **67/551 (12.2%)**. AN-1/DATA-1 no longer
+  marked interim — plain **✅**. The swap also surfaced and fixed two real bugs: (1)
+  `ingest_kaggle.py` used to land every raw Kaggle row into `bronze.kaggle_tracks_raw`, which at
+  ~1.2M rows filled `brink-dev`'s disk and caused a multi-day outage — it now only lands rows that
+  actually matched a `Track` (the CSV file itself remains the full archive; T34 reads it directly
+  for training, so nothing is lost by not duplicating the rest into the database); (2) coverage
+  reporting was accidentally per-run instead of cumulative, which would understate true coverage
+  once more than one dataset has ever been ingested — it now always counts every
+  `kaggleMatched = true` row regardless of which run set it. Its merge unblocks **T32**. **T79 (2026-07-15
   coherence sweep) done** — four parallel reviews (docs↔code coherence, email-auth investigation,
   frontend-enablement gap audit, Supabase schema audit; reports in
   `docs/plans/reviews/2026-07-15-*.md`) landed in one chore PR with every easy drift fix (CI/
