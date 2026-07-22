@@ -1,5 +1,5 @@
 # WHAT THIS FILE IS
-# The auth routes for Brink's server-rendered frontend, in three parts:
+# The auth routes for Brink's server-rendered frontend, in two parts:
 #   1. Server-side Spotify LOGIN (T09, ADR-0013): GET /auth/login → /auth/callback →
 #      /auth/logout. We run the OAuth handshake ourselves (no browser Supabase client),
 #      set an encrypted session cookie, and capture the user's Spotify tokens on the way.
@@ -7,9 +7,6 @@
 #      GET/POST /auth/login-email, GET /auth/confirm. The "front door" for people WITHOUT a
 #      Spotify account — it reuses the same session cookie + get_or_create_user as the Spotify
 #      flow, so a handle-only account works everywhere the app already tolerates unlinked users.
-#   3. The LEGACY browser capture endpoint POST /api/auth/capture-spotify — how the old
-#      React SPA (retired in T60) forwarded its Spotify tokens. Nothing calls it anymore;
-#      removing it is tracked as ticket T63.
 # The Spotify paths store tokens ENCRYPTED so background jobs (the snapshot, T21) can later
 # fetch the user's listening history. The password path never sees or stores a password —
 # Supabase hashes it (ADR-0015).
@@ -24,7 +21,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.db import get_session
@@ -414,24 +410,12 @@ def _validate_credentials(email: str, password: str) -> Optional[str]:
     return None
 
 
-# The expected request body. All fields Optional so we can return our own clear 400
-# below when a token is missing, rather than a generic validation error.
-# LEGACY-PARITY EXCEPTION — do not copy this into new endpoints. The all-Optional shape
-# exists only to reproduce the old backend's exact 400 message. Per ADR-0007 (layer 1)
-# and T70's handlers, T10+ request schemas declare required, typed fields and let the
-# RequestValidationError handler return the clean 400.
-class CaptureBody(BaseModel):
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    scopes: Optional[str] = None
-
-
 def _store_spotify_token(
     session: Session, user_id: str, access_token: str, refresh_token: str, scopes: str
 ) -> None:
     # "Upsert" the user's Spotify tokens: update the row if it exists, else create it.
-    # Keyed by user id; both tokens are ENCRYPTED before saving. Shared by the login
-    # callback and the legacy capture endpoint so the encrypt-and-store logic lives once.
+    # Keyed by user id; both tokens are ENCRYPTED before saving. Used by the server-side Spotify
+    # callback, which is now the only live token-capture path.
     # NOTE: the caller commits — this only stages the change on the session.
     # Spotify access tokens last ~1 hour; store the expiry as a naive UTC timestamp to
     # match how the existing rows (written by the old backend) were saved.
@@ -444,19 +428,3 @@ def _store_spotify_token(
     row.refresh_token = encrypt(refresh_token)
     row.expires_at = expires_at
     row.scopes = scopes or ""
-
-
-@router.post("/api/auth/capture-spotify")
-def capture_spotify(
-    body: CaptureBody,
-    user: User = Depends(require_user),  # ensures the caller is logged in; gives us their record
-    session: Session = Depends(get_session),
-):
-    # Both tokens are required. WHY check here (not via the model): we want the exact
-    # same 400 + message the old backend returned.
-    if not body.refresh_token or not body.access_token:
-        return fail("missing spotify tokens", 400)
-
-    _store_spotify_token(session, user.id, body.access_token, body.refresh_token, body.scopes or "")
-    session.commit()
-    return ok({"captured": True})

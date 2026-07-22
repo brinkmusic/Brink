@@ -23,7 +23,10 @@
       accept="image/jpeg,image/png"
       onchange="artistFilePicked(this)"
     />
-    <input type="text" class="artist-caption" placeholder="Add a caption…" maxlength="2000" />
+    {# The caption starts HIDDEN and only appears once a valid image is picked (T57) — an artist
+       post always needs an image, so showing the caption up front wrongly implied you could post
+       with just text. artist-upload.js reveals it in artistFilePicked(). #}
+    <input type="text" class="artist-caption" placeholder="Add a caption…" maxlength="2000" hidden />
     <p class="artist-status" role="status"></p>
     <div class="composer-actions">
       <button type="button" class="btn btn-spotify artist-share" onclick="artistUpload(this)" disabled>

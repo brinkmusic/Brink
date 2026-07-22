@@ -7,10 +7,14 @@
 
 from datetime import datetime, timedelta, timezone
 
+import app.routers.feed as feed_module
 from app.db import get_session
 from app.deps import AuthError, require_user
 from app.main import app
 from app.models import (
+    ArtistComment,
+    ArtistPost,
+    ArtistReaction,
     Comment,
     Follow,
     Post,
@@ -128,3 +132,118 @@ def test_feed_drops_unfollowed(client, as_user, db_session):
 
     res = client.get("/api/feed")
     assert [p["id"] for p in res.json()["data"]] == ["p-me"]  # only self remains
+
+
+# Every song item now carries a "kind" discriminator so the template (and the frontend) can tell a
+# song post from an artist post (T049).
+def test_feed_song_items_tagged_kind_song(client, as_user, db_session):
+    _seed_world(db_session)
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    assert all(item["kind"] == "song" for item in res.json()["data"])
+
+
+# ---- T049: followed artists' ArtistPosts appear in the feed, interleaved newest-first ----
+
+
+# Stub the signed-read helper so build_feed never touches Supabase. Returns a recognisable URL that
+# embeds the raw path, so a test can prove the image was signed (mirrors how test_pages.py stubs it).
+def _stub_signed_read(monkeypatch):
+    monkeypatch.setattr(
+        feed_module,
+        "create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+
+
+# A followed artist's ArtistPost shows up in the feed, tagged kind == "artist", with its image
+# signed and its author fields present.
+def test_feed_includes_followed_artist_post(client, as_user, db_session, monkeypatch):
+    _stub_signed_read(monkeypatch)
+    db_session.add(_user("me", "me"))
+    db_session.add(User(id="artist", handle="artist", display_name="The Artist",
+                        is_artist=True, created_at=datetime.now(timezone.utc)))
+    db_session.commit()
+    db_session.add(Follow(follower_id="me", following_id="artist"))
+    db_session.add(ArtistPost(id="ap-1", artist_user_id="artist",
+                              image_url="artist/backstage.jpg", caption="backstage",
+                              created_at=NOW))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    assert res.status_code == 200
+    item = next(p for p in res.json()["data"] if p["id"] == "ap-1")
+    assert item["kind"] == "artist"
+    assert item["caption"] == "backstage"
+    assert item["imageUrl"] == "https://signed/artist-images/artist/backstage.jpg?token=readtok"
+    assert item["author"] == {"displayName": "The Artist", "handle": "artist", "avatarUrl": None}
+
+
+# An artist you do NOT follow does not appear in your feed.
+def test_feed_excludes_unfollowed_artist_post(client, as_user, db_session, monkeypatch):
+    _stub_signed_read(monkeypatch)
+    db_session.add(_user("me", "me"))
+    db_session.add(User(id="artist", handle="artist", display_name="The Artist",
+                        is_artist=True, created_at=datetime.now(timezone.utc)))
+    db_session.commit()
+    # No Follow edge me -> artist.
+    db_session.add(ArtistPost(id="ap-1", artist_user_id="artist",
+                              image_url="artist/x.jpg", caption="hidden", created_at=NOW))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    assert not any(p["id"] == "ap-1" for p in res.json()["data"])
+
+
+# Song posts and artist posts are merged into ONE list sorted by createdAt DESC (interleaved).
+def test_feed_interleaves_song_and_artist_by_created_at(client, as_user, db_session, monkeypatch):
+    _stub_signed_read(monkeypatch)
+    db_session.add(Track(spotify_id="spot-1", title="A", artist_name="X"))
+    db_session.add(_user("me", "me"))
+    db_session.add(User(id="artist", handle="artist", display_name="The Artist",
+                        is_artist=True, created_at=datetime.now(timezone.utc)))
+    db_session.commit()
+    db_session.add(Follow(follower_id="me", following_id="artist"))
+    # Song post oldest, artist post middle, song post newest.
+    db_session.add(Post(id="p-old", user_id="me", track_id="spot-1", source=PostSource.MANUAL,
+                        created_at=NOW - timedelta(minutes=10)))
+    db_session.add(ArtistPost(id="ap-mid", artist_user_id="artist", image_url="artist/m.jpg",
+                              caption="mid", created_at=NOW - timedelta(minutes=5)))
+    db_session.add(Post(id="p-new", user_id="me", track_id="spot-1", source=PostSource.MANUAL,
+                        created_at=NOW))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    order = [(p["id"], p["kind"]) for p in res.json()["data"]]
+    assert order == [("p-new", "song"), ("ap-mid", "artist"), ("p-old", "song")]
+
+
+# An artist feed item carries per-type reaction counts (zeros included), a comment count, and the
+# viewer's own reactions — reusing the T52 engagement tables.
+def test_feed_artist_item_carries_engagement(client, as_user, db_session, monkeypatch):
+    _stub_signed_read(monkeypatch)
+    db_session.add(_user("me", "me"))
+    db_session.add(User(id="artist", handle="artist", display_name="The Artist",
+                        is_artist=True, created_at=datetime.now(timezone.utc)))
+    db_session.commit()
+    db_session.add(Follow(follower_id="me", following_id="artist"))
+    db_session.add(ArtistPost(id="ap-1", artist_user_id="artist", image_url="artist/x.jpg",
+                              caption="clip", created_at=NOW))
+    db_session.commit()
+    # me leaves a HEART, artist leaves a FIRE; two comments exist.
+    db_session.add(ArtistReaction(artist_post_id="ap-1", user_id="me", type=ReactionType.HEART))
+    db_session.add(ArtistReaction(artist_post_id="ap-1", user_id="artist", type=ReactionType.FIRE))
+    db_session.add(ArtistComment(artist_post_id="ap-1", user_id="me", body="one", created_at=NOW))
+    db_session.add(ArtistComment(artist_post_id="ap-1", user_id="artist", body="two", created_at=NOW))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    item = next(p for p in res.json()["data"] if p["id"] == "ap-1")
+    assert item["reactionCounts"] == {"HEART": 1, "FIRE": 1, "SPARKLE": 0}
+    assert item["commentCount"] == 2
+    assert item["viewerReactions"] == {"HEART": True, "FIRE": False, "SPARKLE": False}

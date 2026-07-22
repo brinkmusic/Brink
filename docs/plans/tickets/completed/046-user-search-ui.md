@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Low
 category: Feature
@@ -41,8 +41,10 @@ A "Find people" search input in the logged-in nav (or on the feed page) that cal
 ## Validation & authz (ADR-0007)
 Client-side only; the API enforces login + rate limits.
 
-## Current State (on `develop`)
-- No user search anywhere. Feed author names link to profiles — the only discovery path.
+## Current State (as built)
+- The authenticated nav has a "Find people" search box on every signed-in page. It calls the T15
+  user-search API and renders profile links to `/u/{handle}`, where the existing follow button
+  lives.
 
 ## Files to Create/Modify
 | File | Action | Purpose |
@@ -52,9 +54,9 @@ Client-side only; the API enforces login + rate limits.
 | `backend/tests/test_pages.py` | MODIFY | search box present when logged in |
 
 ## Testing Checklist
-- [ ] typing a handle fragment shows matching users; clicking goes to their profile
-- [ ] works from every authed page (box lives in the shared nav)
-- [ ] no results / short query states render sensibly
+- [x] typing a handle fragment shows matching users; clicking goes to their profile
+- [x] works from every authed page (box lives in the shared nav)
+- [x] no results / short query states render sensibly
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -65,3 +67,11 @@ Client-side only; the API enforces login + rate limits.
 
 ## Notes
 Branch `feat/T46-user-search-ui`.
+
+## Outcome
+T46 added `backend/app/static/user-search.js`, a shared authenticated-nav search form in
+`backend/app/templates/base.html`, and matching styles in `backend/app/static/brink.css`. The UI
+debounces calls to `GET /api/users/search?q=`, shows a two-character hint, renders empty/error
+states, and inserts user display names/handles with `textContent` so API data cannot inject HTML.
+`backend/tests/test_pages.py` now asserts the signed-in nav renders and loads the user-search
+script. No API behavior changed.

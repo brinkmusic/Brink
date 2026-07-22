@@ -3,13 +3,17 @@
 One file per ticket. **Plain markdown — no tooling required** to read, review, or work them.
 
 - **Backlog:** [`backlog/`](backlog/) — not yet done.
-- **Completed:** [`completed/`](completed/) — done (T00–T02, **T03**, T04–T08, **T09**, **T10–T13**, **T15**, **T20**, **T22**, **T23**, **T30**, **T31**, **T37**, **T39**, **T40**, **T41**, **T42**, **T43**, **T44**, **T47**, **T50**, **T51**, **T52**, **T53**, **T60**, **T62**, **T64**, T70–T74, T77, T78, **T79**, **T90–T93**). **T03** is the email + password front door for non-Spotify accounts ([ADR-0015](../decisions/adr/0015-email-password-auth.md), superseding ADR-0005's OTP choice): `/auth/signup` + `/auth/login-email` + `/auth/confirm`, confirmations ON, first IP+email rate limiting, CSRF — satisfies AUTH-3/AUTH-6. **T15** is the user-search API (`GET /api/users/search?q=`) — the missing "find a person to follow" backend the T46 search box renders. **T47** is the authenticated nav — signed-in pages now link Feed / My profile / Artist studio (artists only) / Log out, so T46's search box has a shell to slot into. **T53** made artist images actually display: signed READ urls for the private bucket (`create_signed_read_url`), used by the `/artist` page and verified live on brink-dev — clears T51's display caveat and unblocks T54. **T64** keeps the free-tier Render service awake (10-min `keepalive.yml` health ping; activates from `main` at the next release). **T79** is the 2026-07-15 coherence sweep: four review reports landed (`docs/plans/reviews/2026-07-15-*.md`), easy doc drift fixed, T75/T76 obsoleted, and the **enablement wave** filed (T03 rewrite, T15, T16, T46, T47, T53, T54, T63 — see below). **T30** scaffolded the `analytics/` `uv` package + `db.py` Postgres access (AN-8/INFRA-4 stay partial pending T38's GitHub Actions workflow). **T31** joined a Kaggle audio-feature set onto `Track` (bronze → silver, ADR-0009); ran against a temporary ~114k dataset substitute rather than ADR-0004's ≈1M+ set (disclosed in its Outcome note, not an ADR change) — coverage 14/343 (4.1%) — unblocks **T32**. **T60 retired the React/Vite SPA** (`apps/web/` deleted, ADR-0013) — the frontend is now solely the Jinja/HTMX pages served by the FastAPI backend; two owner infra steps remain (drop the `web` branch-protection check + decommission Vercel). **T44 (profile listening summary)** ships the ADR-0014 listening surface (top tracks/artists, recent, streak, 30-day, own-profile now-playing, link-Spotify prompt); the analytics half (cluster/compat/genres) is deferred to the slimmed **T14**. The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
+- **Completed:** [`completed/`](completed/) — done (T00–T03, T04–T16, **T20**, **T22**, **T23**, **T30**, **T31**, **T37**, **T39**, **T40–T44**, **T46**, **T47**, **T048**, **T049**, **T50–T57**, **T60**, **T62–T64**, T70–T74, T77, T78, **T79**, **T90–T93**). **T03** is the email + password front door for non-Spotify accounts ([ADR-0015](../decisions/adr/0015-email-password-auth.md), superseding ADR-0005's OTP choice): `/auth/signup` + `/auth/login-email` + `/auth/confirm`, confirmations ON, first IP+email rate limiting, CSRF — satisfies AUTH-3/AUTH-6. **T15/T16/T46** are user discovery end-to-end: user search plus follower/following list endpoints and profile links, so follow no longer depends on hand-typing `/u/{handle}`. **T47** is the authenticated nav — signed-in pages now link Feed / My profile / Artist studio (artists only) / Log out. **T53 + T54** make artist posts visible to audiences: signed READ urls for the private bucket plus an "Artist posts" section on artist profiles with reactions/comments and owner-only engagement totals. **T55** adds the missing in-app path to *become* an artist — `POST /api/me/become-artist` + a "Become an artist" button on your own profile — so the `isArtist` flag no longer needs a hand-edit in the database (new **MEDIA-6**). **T56** polishes that button: readable ghost buttons (fixes light-on-light), top-right placement, and a "cannot be undone" confirmation before the one-way flip. **T57** hides the artist upload caption box until an image is picked (a post always needs an image, so a caption-first UI was misleading). **T049** puts the behind-the-scenes posts of the artists you follow into the feed, interleaved newest-first with song posts and with working like/comment controls (reuses the T52 engagement API + T54 artist card). **T048** makes the profile editable — a new `User.bio` column + three `/api/me` endpoints (`PATCH /profile`, `POST /avatar/sign-upload`, `POST /avatar`) behind an own-profile "Edit profile" form, so any user can set a bio and upload a profile picture to a public `avatars` bucket (new **UI-11**; owner must create the `avatars` bucket + run the migration). **T63** removed the dead browser `capture-spotify` token endpoint; server-side `/auth/callback` remains the only live Spotify-token capture path. **T64** keeps the free-tier Render service awake (10-min `keepalive.yml` health ping; activates from `main` at the next release). **T79** is the 2026-07-15 coherence sweep: four review reports landed (`docs/plans/reviews/2026-07-15-*.md`), easy doc drift fixed, T75/T76 obsoleted, and the **enablement wave** filed (T03 rewrite, T15, T16, T46, T47, T53, T54, T63 — see below). **T30** scaffolded the `analytics/` `uv` package + `db.py` Postgres access (AN-8/INFRA-4 stay partial pending T38's GitHub Actions workflow). **T31** joined a Kaggle audio-feature set onto `Track` (bronze → silver, ADR-0009); ran against a temporary ~114k dataset substitute rather than ADR-0004's ≈1M+ set (disclosed in its Outcome note, not an ADR change) — coverage 14/343 (4.1%) — unblocks **T32**. **T60 retired the React/Vite SPA** (`apps/web/` deleted, ADR-0013) — the frontend is now solely the Jinja/HTMX pages served by the FastAPI backend. **The Vercel project was decommissioned + disconnected from the repo on 2026-07-16** (its failing PR check is gone); the only leftover owner step is dropping the now-unused `web` branch-protection check. **T44 (profile listening summary)** ships the ADR-0014 listening surface (top tracks/artists, recent, streak, 30-day, own-profile now-playing, link-Spotify prompt); the analytics half (cluster/compat/genres) is deferred to the slimmed **T14**. The FastAPI/Render migration is complete; the legacy TS backend is removed. T70–T78 are the 2026-07-02 code-review remediation wave. **T10 (posts API) is the first social-API feature — its merge unblocks the frontend social UI and the rest of the backend social endpoints.** T90–T93 are the developer-tooling wave: the `get-me-started` session-warmup skill, the `docs-sync` CI gate that enforces "docs in the same PR," the `close-out` skill that runs the ticket close-out ritual **pre-merge** (folded into the feature PR, per T93), and the `close-session` end-of-session skill (final validation + branch cleanup + handoff).
 
 ## How these relate to the rest of the docs
 
 `docs/decisions/` (the ADRs) is the **source of truth**. These tickets are *derived from* the ADRs and the spec — when an ADR changes, the tickets follow. Each ticket cites its requirement IDs (`AUTH-*`, `BE-*`, …) and the ADRs it implements.
 
 This directory **supersedes** the old single-file `2026-06-22-brink-implementation-tickets.md`.
+
+**T61 is completed:** the release QA gate now includes backend API route inventory coverage,
+analytics pytest in CI-safe mode, a 5-user k6 script, and `docs/qa-checklist.md` for manual
+browser/load/success-metric evidence.
 
 ## Reading a ticket
 
@@ -53,7 +57,7 @@ Tickets in the same wave have no inter-dependencies and can run in parallel. A t
 | 5 | `014` |
 | 6 | ~~`044`~~ ✅ |
 | 7 | ~~`060`~~ ✅ |
-| 8 | `061` |
+| 8 | ~~`061`~~ ✅ |
 
 ### Enablement wave (2026-07-15) — frontend doors for shipped backend features
 
@@ -64,15 +68,15 @@ no page reaches them) plus one broken surface (artist images). Filed in T79:
 |---|---|---|
 | ~~`047`~~ ✅ | authenticated nav + logout link | — |
 | ~~`015`~~ ✅ | user search API | — |
-| `046` | user search UI (the "find people" box) | ~~`015`~~ ✅, ~~`047`~~ ✅ |
-| `016` | follower/following lists | — |
+| ~~`046`~~ ✅ | user search UI (the "find people" box) | ~~`015`~~ ✅, ~~`047`~~ ✅ |
+| ~~`016`~~ ✅ | follower/following lists | — |
 | ~~`053`~~ ✅ | signed READ urls (artist images can't display today) | — |
-| `054` | audience view of artist posts + T52 engagement UI | ~~`053`~~ ✅ |
-| `063` | retire the dead capture-spotify endpoint | — |
+| ~~`054`~~ ✅ | audience view of artist posts + T52 engagement UI | ~~`053`~~ ✅ |
+| ~~`063`~~ ✅ | retire the dead capture-spotify endpoint | — |
 | ~~`003`~~ ✅ | (rewritten) email+password signup/login | — |
 
 **Ready to start now** (all `blocked_by` merged, as of T79):
-- `016`, `063` (enablement wave, above) — no blockers. `046` and `054` are unblocked too (below).
+- No remaining enablement-wave blockers; `032` is ready for Jonah and analytics work, while T14 remains gated on T33/T35.
 - **Done:** `003` — email + password signup/login (ADR-0015). `/auth/signup` +
   `/auth/login-email` + `/auth/confirm`, confirmations ON, first IP+email rate limiting, CSRF;
   reuses the T09 session cookie + `get_or_create_user`. Non-Spotify accounts now have a front door.
@@ -80,10 +84,17 @@ no page reaches them) plus one broken surface (artist images). Filed in T79:
   ILIKE on handle/display name, cap 20).
 - **Done:** `047` — authenticated nav + logout link. Every page route passes `viewer`;
   `base.html` renders the in-app nav (Feed / My profile / Artist studio / Log out) when signed
-  in. With `015` and `047` both merged, `046` (search UI) is fully unblocked.
+  in.
+- **Done:** `046` — user search UI. The signed-in nav now has a "Find people" box that calls the
+  T15 API and renders `/u/{handle}` profile links, making follow discoverable without pasted URLs.
+- **Done:** `016` — follower/following lists. The users API returns capped follower/following DTOs,
+  and profile counts link to server-rendered social-graph lists.
 - **Done:** `053` — signed READ urls for artist images (`create_signed_read_url` +
-  the `/artist` page signs each stored path; verified live on brink-dev). `054`
-  (audience view of artist posts) is now unblocked.
+  the `/artist` page signs each stored path; verified live on brink-dev).
+- **Done:** `054` — audience artist posts. Artist profiles now render signed image posts with
+  public reaction/comment controls and owner-only engagement totals, using the existing T52 APIs.
+- **Done:** `063` — retired the dead browser Spotify-token capture endpoint. The server-side
+  callback path remains the only live Spotify-token capture path.
 - **Done:** `030` — analytics scaffold + DB access (Jonah).
 - **Done:** `031` — Kaggle ingest + Track join (Jonah). Ran against a temporary ~114k dataset
   substitute, disclosed in the ticket's Outcome note (ADR-0004 calls for ≈1M+; not an ADR change).

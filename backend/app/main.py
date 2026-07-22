@@ -28,6 +28,7 @@ from app.routers import (
     feed,
     follow,
     health,
+    me,
     now_playing,
     pages,
     posts,
@@ -56,13 +57,14 @@ _STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 app.include_router(health.router)  # GET /api/health
-app.include_router(auth.router)    # POST /api/auth/capture-spotify
+app.include_router(auth.router)    # /auth/* server-side login/signup routes
 app.include_router(posts.router)   # POST /api/posts, GET /api/posts?userId=
 app.include_router(reactions.router)  # POST/DELETE /api/posts/{id}/reactions
 app.include_router(comments.router)   # POST/GET /api/posts/{id}/comments
 app.include_router(follow.router)     # POST/DELETE /api/follow/{userId}
 app.include_router(feed.router)       # GET /api/feed
 app.include_router(now_playing.router)  # GET /api/me/now-playing
+app.include_router(me.router)           # POST /api/me/become-artist (T55)
 app.include_router(snapshot.router)     # POST /api/snapshot (cron-triggered)
 app.include_router(artist.router)       # POST /api/artist/sign-upload, POST /api/artist/posts
 app.include_router(search.router)       # GET /api/search?q= (Spotify catalog search, T40)
@@ -84,8 +86,8 @@ def _handle_rate_limit_error(request: Request, exc: RateLimitError):
 
 # Malformed or wrongly-typed request bodies → 400 { "error": ... }.
 # Without this, FastAPI returns 422 { "detail": [...] } which the frontend can't parse.
-# NOTE FOR T10+: declare required, typed fields in request schemas — don't copy
-# capture-spotify's all-Optional workaround. This handler gives those a clean 400.
+# NOTE FOR T10+: declare required, typed fields in request schemas. This handler gives malformed
+# requests a clean 400 envelope instead of FastAPI's default 422 detail shape.
 @app.exception_handler(RequestValidationError)
 def _handle_validation_error(request: Request, exc: RequestValidationError):
     return fail("invalid request", 400)

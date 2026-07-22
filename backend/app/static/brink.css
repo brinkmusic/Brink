@@ -66,6 +66,60 @@ body {
   transition: color 0.15s, background 0.15s;
 }
 .nav-links a:hover { color: var(--text); background: var(--panel); }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.user-search {
+  position: relative;
+  flex: 1 1 11rem;
+  max-width: 13rem;
+}
+.user-search-input {
+  width: 100%;
+  padding: 0.48rem 0.7rem;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.user-search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.user-search-results {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 20;
+  width: min(20rem, 80vw);
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--ink);
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
+}
+.user-search-result a,
+.user-search-empty {
+  display: block;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.6rem;
+  text-decoration: none;
+}
+.user-search-result a:hover,
+.user-search-result a:focus-visible { background: var(--panel); outline: none; }
+.user-search-name { display: block; color: var(--text); font-size: 0.88rem; font-weight: 600; }
+.user-search-meta { display: block; margin-top: 0.1rem; color: var(--mute); font-size: 0.78rem; }
+.user-search-badge { color: var(--accent); font-weight: 600; }
+.user-search-empty { color: var(--mute); font-size: 0.85rem; }
 .avatar {
   height: 2rem;
   width: 2rem;
@@ -126,8 +180,11 @@ body {
 /* Primary action, in Brink's lavender with dark text for strong contrast. */
 .btn-spotify { background: var(--accent); color: #0b0b12; }
 .btn-spotify:hover { background: #b1a4f5; }
-/* Secondary action, outlined and quiet so it sits behind the primary one. */
-.btn-ghost { border-color: var(--line); color: var(--text); }
+/* Secondary action, outlined and quiet so it sits behind the primary one.
+   background:transparent is REQUIRED: a <button> element defaults to the browser's light
+   button background, which would show light text on a light button ("white on white"). Making
+   it transparent lets the dark page/card show through, so the light text stays readable. */
+.btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
 .btn-ghost:hover { border-color: var(--accent); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -142,6 +199,11 @@ body {
 .feature h3 { margin: 0 0 0.4rem; font-size: 1.05rem; }
 .feature p { margin: 0; color: var(--mute); font-size: 0.92rem; line-height: 1.55; }
 @media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .nav-inner { flex-wrap: wrap; }
+  .user-search { order: 3; flex-basis: 100%; max-width: none; }
+  .user-search-results { left: 0; right: auto; width: 100%; }
+}
 
 /* ---- How it works ---- */
 .section-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.25rem; }
@@ -221,9 +283,17 @@ body {
 .artist-post { display: grid; gap: 0.5rem; }
 .artist-post-img { width: 100%; border-radius: 0.75rem; display: block; }
 .artist-post-caption { margin: 0; font-size: 0.95rem; }
+.artist-engagement-summary {
+  border-top: 1px solid var(--line);
+  padding-top: 0.65rem;
+  margin-top: 0.2rem;
+}
+.artist-engagement-line { margin: 0; color: var(--mute); font-size: 0.85rem; }
 
 /* ---- Profile page (T43) ---- */
-.profile-header { display: grid; gap: 0.75rem; }
+/* position:relative so the "Become an artist" button (T56) can be pinned to the top-right
+   corner of the card, out of the main action flow so it isn't tapped by accident. */
+.profile-header { position: relative; display: grid; gap: 0.75rem; }
 .profile-id { display: flex; align-items: center; gap: 0.75rem; }
 .profile-avatar {
   width: 3.5rem;
@@ -238,9 +308,32 @@ body {
 .profile-handle { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
 .profile-counts { display: flex; gap: 1.25rem; color: var(--mute); font-size: 0.9rem; }
 .profile-counts b { color: var(--text); font-variant-numeric: tabular-nums; }
+.profile-count-link { color: var(--mute); text-decoration: none; }
+.profile-count-link:hover { color: var(--text); }
 .follow-btn { justify-self: start; }
+/* T56: pin the one-way "Become an artist" action to the card's top-right corner, and make it
+   small/quiet so it reads as a secondary option, not the page's main call to action. */
+.become-artist-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+}
 .post-author { color: var(--text); text-decoration: none; font-weight: 500; }
 .post-author:hover { color: var(--accent); }
+.follow-list-users { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+.follow-list-user {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--text);
+  text-decoration: none;
+}
+.follow-list-user:hover .follow-list-name { color: var(--accent); }
+.follow-list-avatar { width: 2.25rem; height: 2.25rem; }
+.follow-list-name { display: block; font-size: 0.92rem; font-weight: 600; }
+.follow-list-handle { display: block; margin-top: 0.1rem; color: var(--mute); font-size: 0.78rem; }
 
 /* ---- Feed: post cards ---- */
 .post {

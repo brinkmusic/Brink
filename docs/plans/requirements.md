@@ -20,7 +20,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (`/api/state`) + dead front-end stubs. *(satisfied by retiring the whole SPA — the entire `apps/web/` was deleted in T60, ADR-0013)* | T60 | ✅ |
 | BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
-| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. *(T15 added `GET /api/users/search` — the user discoverability follow needs to be usable)* | T13, T15 | ✅ |
+| BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. User search and follower/following lists make the graph discoverable. | T13, T15, T16 | ✅ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
 | BE-7 | `POST/DELETE /api/follow/:userId` — feed respects the graph. | T13 | ✅ |
@@ -55,24 +55,26 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | UI-1 | Post composer with Spotify catalog search → publish. | T40 | ✅ |
-| UI-2 | Feed reads `/api/feed`; manually shared song cards. *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links)* | T41, T47 | ✅ |
+| UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts)* | T41, T47, T049 | ✅ |
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ✅ |
-| UI-5 | Follow/unfollow buttons + follower counts. | T43 | ✅ |
+| UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16 | ✅ |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
 | UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60) |
 | UI-10 | "Now playing" indicator on profile + feed. | T20, T44 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up) |
+| UI-11 | Editable profile: user bio + profile-picture upload. | T048 | ✅ |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ✅ |
-| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. *(T53 made the uploaded images actually display — signed read URLs for the private bucket)* | T51, T53 | ✅ |
+| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. *(T53 made the uploaded images actually display — signed read URLs for the private bucket; T57 hides the caption box until an image is picked, since a post always needs one)* | T51, T53, T57 | ✅ |
 | MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ✅ |
-| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52 | ✅ (reaction + comment counts, owner-only; view count deferred — no artist-post read path yet, T51) |
+| MEDIA-4 | Per-post engagement analytics shown to the artist. | T52, T54 | ✅ (reaction + comment counts, owner-only on artist profiles; view count deferred) |
 | MEDIA-5 | ≥98% upload success across 5 file types up to 10 MB. | T51, T53 | ◧ (T53 verified the storage round-trip live on brink-dev: service-role upload → signed read URL → 200 with matching bytes, unsigned GET 400; the browser-upload half + the 5-file-type success-rate measurement remain) |
+| MEDIA-6 | Self-serve artist designation in-app (no DB edit) — become an artist from your own profile. | T55, T56 | ✅ (`POST /api/me/become-artist` sets `isArtist` on the authenticated caller; own-profile "Become an artist" button; one-way, self-serve per ADR-0008. T56 polished the button: readable ghost buttons, top-right placement, "cannot be undone" confirmation) |
 
 ## Layer 7 — Infrastructure & Scheduling (INFRA)
 | ID | Acceptance | Ticket(s) | Status |
@@ -96,7 +98,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 - **T37** — Alembic schema reflection (`include_schemas` + guards) so autogenerate sees the medallion schemas. Tooling follow-up to T39 (ADR-0009), no spec req.
 - **T23** — snapshot-500 remediation: flush each upserted Track before its Play (FK insert-ordering) + guard token decryption so an unreadable token degrades to None. Production bug fix on T21/T22, no spec req.
 - **T62** — FK-ordering hardening: enforce foreign keys in the shared test fixture, fix the posts endpoint's parent-before-child insert, correct the Render deploy-branch doc. Follow-up to T23, no spec req.
-- **T61** — test sweep + k6 + cross-browser E2E. Maps to proposal §6/§11 below.
+- **T61** — test sweep + k6 + cross-browser E2E. Completed the repeatable QA gate: backend API surface inventory, analytics pytest in CI-safe mode, k6 script, and `docs/qa-checklist.md` for manual browser/load/success-metric evidence. Maps to proposal §6/§11 below.
 
 ## Success-metric traceability (proposal §11)
 | Proposal metric | Met by |
@@ -105,7 +107,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | Upload success ≥ 98% | MEDIA-5 (T51) |
 | 6/6 core features working | BE-3..8, UI-1..6 |
 | Real ML (clustering + regression) | AN-3, AN-5, AN-6 |
-| Load test 5 concurrent users | T61 |
+| Load test 5 concurrent users | T61 — k6 script and thresholds ready; live run is an owner-run release gate |
 
 ## Superseded spec text
 The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagged † above) evolved after it was written — defer to the ADRs:

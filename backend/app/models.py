@@ -150,6 +150,10 @@ class User(SQLModel, table=True):
     avatar_url: Optional[str] = Field(
         default=None, sa_column=Column("avatarUrl", Text, nullable=True)  # profile picture link
     )
+    # A short, Instagram-style "about me" the user writes about themselves (T48). Optional/nullable:
+    # a brand-new account has none until they fill it in on their profile's Edit form. Stored as
+    # free text; the API caps its length (300 chars) before it reaches here.
+    bio: Optional[str] = Field(default=None, sa_column=Column("bio", Text, nullable=True))
     spotify_id: Optional[str] = Field(
         default=None, sa_column=Column("spotifyId", Text, nullable=True)
     )

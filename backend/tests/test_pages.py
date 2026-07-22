@@ -51,7 +51,9 @@ from unittest.mock import MagicMock
 from app.db import get_session
 from app.main import app
 from app.models import (
+    ArtistComment,
     ArtistPost,
+    ArtistReaction,
     Comment,
     Follow,
     Play,
@@ -239,6 +241,58 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert "/static/composer.js" in body           # the script is loaded
 
 
+# ---- T049: followed artists' behind-the-scenes posts render in the feed page ----
+
+
+# A followed artist's ArtistPost renders on the feed page as an artist card, with its signed image,
+# the audience like/comment controls wired to the T52 API, and the artist-engagement script loaded.
+def test_feed_shows_followed_artist_post(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    artist = User(handle="the-band", display_name="The Band", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    db_session.add(Follow(follower_id=viewer.id, following_id=artist.id))
+    post = ArtistPost(artist_user_id=artist.id, image_url="the-band/soundcheck.jpg",
+                      caption="soundcheck vibes")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    # The feed builder signs the private image path; stub it so no test hits Supabase.
+    monkeypatch.setattr(
+        "app.routers.feed.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "soundcheck vibes" in body                                  # the caption
+    assert "behind the scenes" in body                                 # the artist card label
+    assert 'src="https://signed/artist-images/the-band/soundcheck.jpg?token=readtok"' in body
+    assert "artist-reactions" in body                                  # audience reaction bar
+    assert "artistReact(this)" in body
+    assert "toggleArtistComments(this)" in body
+    assert f'data-post-id="{post.id}"' in body
+    assert "/static/artist-engagement.js" in body                      # the engagement script
+
+
+# A feed with only song posts (no artist posts) does NOT load the artist-engagement script.
+def test_feed_without_artist_posts_omits_engagement_script(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t1", title="Song", artist_name="Someone"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t1", source=PostSource.MANUAL))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "Song" in body                                              # the song post rendered
+    assert "/static/artist-engagement.js" not in body                  # no artist script needed
+
+
 # ---- T43: profile page + follow button ----
 
 
@@ -280,12 +334,97 @@ def test_profile_shows_following_state_and_counts(client, db_session, monkeypatc
     assert 'class="follower-count">1<' in body
 
 
+def test_profile_counts_link_to_follow_lists(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    target = User(handle="with-graph", display_name="With Graph",
+                  created_at=datetime.now(timezone.utc))
+    follower = User(handle="follower-one", display_name="Follower One",
+                    created_at=datetime.now(timezone.utc))
+    followed = User(handle="followed-one", display_name="Followed One",
+                    created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.add(follower)
+    db_session.add(followed)
+    db_session.commit()
+    db_session.refresh(target)
+    db_session.refresh(follower)
+    db_session.refresh(followed)
+    db_session.add(Follow(follower_id=follower.id, following_id=target.id))
+    db_session.add(Follow(follower_id=target.id, following_id=followed.id))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/with-graph").text
+    assert 'href="/u/with-graph?list=followers"' in body
+    assert 'href="/u/with-graph?list=following"' in body
+    assert 'class="follower-count">1<' in body
+    assert ">1</b> following" in body
+
+    followers_body = client.get("/u/with-graph?list=followers").text
+    assert "Followers" in followers_body
+    assert "Follower One" in followers_body
+    assert "Followed One" not in followers_body
+
+    following_body = client.get("/u/with-graph?list=following").text
+    assert "Following" in following_body
+    assert "Followed One" in following_body
+    assert "Follower One" not in following_body
+
+
+# T48: a user's bio renders under their profile header (both own and others').
+def test_profile_shows_bio(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    target = User(handle="bio-haver", display_name="Bio Haver", bio="just here for the tunes",
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/bio-haver").text
+    assert "just here for the tunes" in body
+
+
+# T48: your OWN profile shows the "Edit profile" control that reveals the bio/avatar form.
+def test_own_profile_shows_edit_profile(client, db_session, monkeypatch):
+    _seed_viewer(db_session)  # handle "viewer"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/viewer").text
+    assert "Edit profile" in body
+    assert "/static/edit-profile.js" in body
+
+
 def test_own_profile_has_no_follow_button(client, db_session, monkeypatch):
     _seed_viewer(db_session)  # the viewer's handle is "viewer"
     app.dependency_overrides[get_session] = lambda: db_session
     _login(client, monkeypatch)
     body = client.get("/u/viewer").text
     assert "toggleFollow(this)" not in body  # you can't follow yourself
+
+
+# T55: a non-artist viewing their OWN profile sees the "Become an artist" button (which calls
+# POST /api/me/become-artist). It must not appear on someone else's profile or for an artist.
+def test_own_profile_shows_become_artist_button(client, db_session, monkeypatch):
+    _seed_viewer(db_session)  # a normal listener (is_artist defaults to False), handle "viewer"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+    body = client.get("/u/viewer").text
+    assert "becomeArtist(this)" in body
+    assert "/static/become-artist.js" in body
+
+
+def test_own_profile_hides_become_artist_button_for_artist(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_artist(db_session)  # is_artist=True, keyed to the login id, handle "the-artist"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+    body = client.get("/u/the-artist").text
+    assert "becomeArtist(this)" not in body  # already an artist — nothing to become
 
 
 def test_profile_missing_handle_is_404(client, db_session, monkeypatch):
@@ -295,6 +434,82 @@ def test_profile_missing_handle_is_404(client, db_session, monkeypatch):
     res = client.get("/u/nobody-here")
     assert res.status_code == 404
     assert "couldn't find that profile" in res.text
+
+
+# ---- T54: artist posts are visible on artist profiles, with audience engagement UI ----
+
+
+def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)  # signed-in fan
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    post = ArtistPost(artist_user_id=artist.id, image_url="stage-name/backstage.jpg",
+                      caption="backstage warmup")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    monkeypatch.setattr(
+        "app.routers.pages.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/stage-name").text
+    assert "Artist posts" in body
+    assert "backstage warmup" in body
+    assert 'src="https://signed/artist-images/stage-name/backstage.jpg?token=readtok"' in body
+    assert "artist-reactions" in body
+    assert "artist-comments" in body
+    assert f'data-post-id="{post.id}"' in body
+    assert "artistReact(this)" in body
+    assert "toggleArtistComments(this)" in body
+    assert "/static/artist-engagement.js" in body
+    assert "Artist-only engagement" not in body
+
+
+def test_artist_profile_owner_sees_engagement_summary(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    artist = _seed_artist(db_session)
+    fan = User(handle="fan", display_name="Fan", created_at=datetime.now(timezone.utc))
+    db_session.add(fan)
+    db_session.commit()
+    db_session.refresh(fan)
+    post = ArtistPost(artist_user_id=artist.id, image_url="the-artist/x.jpg", caption="new clip")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    db_session.add(ArtistReaction(artist_post_id=post.id, user_id=fan.id, type=ReactionType.HEART))
+    db_session.add(ArtistComment(artist_post_id=post.id, user_id=fan.id, body="love this"))
+    db_session.commit()
+    monkeypatch.setattr(
+        "app.routers.pages.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/the-artist").text
+    assert "Artist-only engagement" in body
+    assert "1 comments" in body
+    assert ">1</span>" in body  # public reaction count and owner summary both reflect the heart
+
+
+def test_non_artist_profile_has_no_artist_posts_section(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    target = User(handle="listener", display_name="Listener", created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/listener").text
+    assert "Artist posts" not in body
+    assert "/static/artist-engagement.js" not in body
 
 
 # ---- T44: profile listening summary + now-playing badge ----
@@ -385,6 +600,10 @@ def test_artist_page_shows_upload_for_artist(client, db_session, monkeypatch):
     body = client.get("/artist").text
     assert 'class="artist-file"' in body            # the file picker is shown
     assert "/static/artist-upload.js" in body       # the upload script is loaded
+    # T57: the caption starts hidden — a post needs an image, so the caption box only appears
+    # after a valid file is picked (revealed by artist-upload.js). It must render with `hidden`.
+    assert 'class="artist-caption"' in body
+    assert 'maxlength="2000" hidden' in body
 
 
 def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch):
@@ -476,6 +695,21 @@ def test_nav_logged_in_shows_app_links(client, db_session, monkeypatch):
     assert "Artist studio" not in body            # not an artist
     # The logged-out call to action is gone once you're signed in.
     assert "Log in with Spotify" not in body
+
+
+def test_nav_logged_in_shows_user_search(client, db_session, monkeypatch):
+    # T46 puts "find people" in the shared authenticated nav, so every signed-in page can reach
+    # profiles without hand-typing /u/<handle>. The API does the real auth/rate-limit work; this
+    # page test only proves the shared nav renders and loads the browser script.
+    _seed_viewer(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'class="user-search"' in body
+    assert 'placeholder="Find people"' in body
+    assert "userSearch(this)" in body
+    assert "/static/user-search.js" in body
 
 
 def test_nav_logged_in_artist_shows_artist_studio(client, db_session, monkeypatch):

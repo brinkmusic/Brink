@@ -213,7 +213,7 @@ PR that it went in without a second review).
   **`brinkmusic/Brink`** (public). The 2026-07-02 review's remaining remediation
   tickets T75/T76 were **obsoleted by T60** (they targeted the retired SPA's `apps/web/` files);
   the one surviving idea — retiring the legacy `POST /api/auth/capture-spotify` endpoint — is now
-  tracked as T63. **T90–T93 (developer tooling) done** —
+  completed as T63. **T90–T93 (developer tooling) done** —
   the committed `get-me-started` session-warmup skill, the `close-out` ticket-close-out skill, and
   (T93) the `close-session` end-of-session skill (`.claude/skills/`); **close-out now runs
   pre-merge** — its ticket/traceability/status bookkeeping is folded into the same PR that
@@ -381,6 +381,14 @@ PR that it went in without a second review).
   the `UserSearchOut` allow-list DTO (ADR-0012). Fixes the audit's top gap: follow (T13) shipped
   with no way to *find* a user (`/api/search` is Spotify tracks, not people). Satisfies the
   discoverability half of BE-4.
+  **T46 (user search UI) done** — `base.html` now renders a signed-in "Find people" search box in
+  the shared nav, loading `backend/app/static/user-search.js` to debounce calls to T15's
+  `/api/users/search` and render safe text-only links to `/u/{handle}`. This completes the
+  user-discovery path for follow/profile browsing and satisfies the UI-5 reachability gap.
+  **T16 (follower/following lists) done** — `GET /api/users/{userId}/followers` and
+  `/following` return capped, login-gated `UserSearchOut` DTOs, and profile follower/following
+  counts link to server-rendered list sections (`?list=followers|following`). This completes the
+  basic social-graph browse path after T15/T46.
   **T53 (artist image signed reads) done** — artist images finally display:
   `create_signed_read_url(bucket, path, expires_in=3600)` in `security/supabase.py` (the read
   sibling of T50's upload helper, service role, 1-hour expiry), and the `/artist` page signs each
@@ -389,6 +397,19 @@ PR that it went in without a second review).
   signed GET 200 byte-identical, unsigned GET 400. That verification also caught that the
   installed supabase-py returns an *absolute* signed URL (older releases returned a relative
   path) — the helper handles both.
+  **T54 (artist audience page) done** — artist profiles (`/u/{handle}` for artist accounts) now
+  render signed artist-image posts with public reaction/comment controls wired to the T52
+  `/api/artist/posts/{id}/...` endpoints, plus owner-only engagement totals on the artist's own
+  profile. `/artist` remains the upload studio; no artist API behavior changed. Satisfies MEDIA-4's
+  visible engagement surface; view count remains deferred.
+  **T63 (retire capture-spotify) done** — removed the dead browser `POST
+  /api/auth/capture-spotify` endpoint, its legacy request model, and its endpoint tests. Server-side
+  `/auth/callback` still captures Spotify tokens through `_store_spotify_token`; no login/session/
+  crypto behavior changed.
+  **T61 (QA/load/E2E gate) done** — added a backend `/api/*` route inventory test, analytics pytest
+  in CI-safe mode, `load/k6-script.js` for 5-user load checks, and `docs/qa-checklist.md` for the
+  manual browser/load/success-metric release gates. Live browser/k6/OAuth/upload measurements remain
+  owner-run checks against Render/Supabase because they require real credentials and browsers.
   **T47 + T15 + T53 released to production (`develop → main` #117, back-merged #118).**
   **T03 (email + password auth) done** — the front door for people **without** Spotify
   ([ADR-0015](docs/decisions/adr/0015-email-password-auth.md), which supersedes ADR-0005's
@@ -404,9 +425,47 @@ PR that it went in without a second review).
   **Deploy step for Andrea:** keep Supabase Email + Confirm-email ON (defaults) and add the
   deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
   signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
-  auto-login-on-confirm. **Next:
-  T46 (search UI: T15 + T47 both merged, unblocked), T54 (audience artist page: unblocked by
-  T53), T16 (follower lists), T63 (retire capture-spotify); T32 (Jonah)
+  auto-login-on-confirm. **T55 (become an artist) done** — the missing in-app path to become an
+  artist: `POST /api/me/become-artist` (`backend/app/routers/me.py`) flips `is_artist` on the
+  authenticated caller (idempotent, one-way, unspoofable — resolved from the session, not the body),
+  returning `ArtistStateOut`; a "Become an artist" button on your **own** profile
+  (`profile.html` + `static/become-artist.js`) reloads to unlock the artist studio. Before this the
+  `is_artist` flag could only be set by editing the Supabase DB by hand (T50 had deferred this
+  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**.
+  **T56 (artist-button UI polish) done** — UI-only follow-up to T55: `.btn-ghost` now sets
+  `background: transparent` so ghost buttons aren't light-text-on-light-button ("white on white" —
+  a `<button>`'s default light background was showing through); the "Become an artist" button moved
+  to the profile card's top-right corner (small/quiet, `position:absolute`) so it isn't mis-tapped;
+  and `become-artist.js` now shows a "this cannot be undone" confirm before the one-way flip
+  (`brink.css` + `become-artist.js`). **T57 (caption-after-image) done** — the artist upload
+  caption box (`artist.html` + `artist-upload.js`) is now hidden until a valid image is picked; a
+  post always needs an image, so an always-visible caption wrongly implied you could post text
+  only. UI ordering only, no API change. **T049 (followed artists' posts in the feed) done** — the
+  feed now shows the behind-the-scenes `ArtistPost`s (T50/T51) of the artists you follow, interleaved
+  newest-first with the song `Post`s. `build_feed` (`backend/app/routers/feed.py`) was split into
+  `_build_song_items` + `_build_artist_items` (each returning `(created_at, item)` pairs, merged +
+  sorted by the raw datetime); the artist half batches reaction/comment counts + the viewer's own
+  reactions over the T52 `ArtistReaction`/`ArtistComment` tables (no N+1) and signs each image path
+  (T53). Every feed item now carries a `kind` discriminator (`"song"`/`"artist"`); `feed.html`
+  branches on it and reuses the T54 artist card + `artist-engagement.js` (loaded only when an artist
+  item is present), so likes/comments hit the existing T52 `/api/artist/posts/{id}/...` endpoints —
+  no new API. New `ArtistFeedPostOut` DTO; `FeedPostOut` gained `kind`. `GET /api/feed`'s route
+  signature is unchanged (still a list), so the T61 route inventory needs no change. Satisfies
+  UI-2/BE-7's followed-artist-in-feed gap. **T48 (editable profile) done** — an in-app "Edit
+  profile" surface so any user can set a bio and upload a profile picture (before this a bio didn't
+  exist and email sign-ups had no avatar). New `User.bio` column (nullable Text) + a hand-written
+  migration (`a1c47f9e2b30`, off `3978f11ad4da`); three login-gated `/api/me` endpoints on the
+  authenticated caller (unspoofable, like become-artist): `PATCH /api/me/profile` (trim + ≤ 300,
+  empty clears to NULL), `POST /api/me/avatar/sign-upload` (signed upload URL for a NEW **public**
+  `avatars` bucket at `<callerUserId>/<uuid>.<ext>`, returns `{ signedUrl, token, path, publicUrl }`),
+  and `POST /api/me/avatar` (path must be in the caller's own folder, else 400; stores the public
+  object URL on `avatar_url`). New `public_object_url` helper in `security/supabase.py` (public bucket
+  needs no signed read URL, unlike artist-images). Own-profile "Edit profile" form (`profile.html` +
+  `static/edit-profile.js`: avatar 3-step upload → PATCH bio → reload); bio renders under the header
+  on every profile (autoescaped user text). Satisfies the new **UI-11**. **Deploy steps for Andrea:**
+  (1) create a **public** Supabase Storage bucket named `avatars` in `brink-dev`; (2) apply the
+  migration — `cd backend && uv run alembic upgrade head`. **Next:
+  T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
