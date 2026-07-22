@@ -46,7 +46,7 @@ confirm the matching doc was touched **in the same PR's file list**:
 | If the PR changes… | The same PR must also… |
 |---|---|
 | Architecture / a past decision | Add a new ADR in `docs/decisions/adr/`, **and** set the superseded/amended ADR's `Status:` line to point forward to it (ADRs are append-only — never rewrite them). |
-| Commands, env vars, conventions, dev workflow, or project status | Update `AGENTS.md` (the Commands / Environment / Deployment-topology / Status sections). |
+| Commands, env vars, conventions, dev workflow, or project status | Update `CLAUDE.md` (the Commands / Environment / Deployment topology / Current Status / Watch-outs sections). |
 | Feature scope, or a ticket's shape | Update `docs/plans/` — the ticket file in `docs/plans/tickets/` and the requirement→ticket traceability in `docs/plans/requirements.md`. |
 | Behavior the requirements catalog tracks | Flip the relevant `AUTH-* / BE-* / SP-* / …` status in `docs/plans/requirements.md`. |
 
@@ -63,8 +63,9 @@ confirm the matching doc was touched **in the same PR's file list**:
 
 **Expect close-out folded into the feature PR (T93).** Brink now closes a ticket *in the same PR
 that implements it*: the feature PR should also move the ticket `backlog/ → completed/`, flip its
-traceability rows, and update the `AGENTS.md` status line (the `close-out` skill does this
-pre-merge). So for a PR that finishes a ticket, a code diff with **no** matching ticket/requirements
+traceability rows, and update `CLAUDE.md` only when the current status or watch-outs changed (the
+`close-out` skill does this pre-merge). So for a PR that finishes a ticket, a code diff with **no**
+matching ticket/requirements
 move is now a **flag** (a missing close-out), not on-pattern — the reverse of the old post-merge
 model. Two exceptions are still legitimate and should NOT be flagged: (1) a PR body that *explicitly*
 says close-out is a deliberate deferred follow-up (allowed for very large PRs or ones owned by
@@ -79,8 +80,8 @@ purpose, just track it).
 ### Pass 4 — Where am I / what's next
 
 - Current branch and working-tree state (`git status`).
-- **Next ticket:** read `docs/plans/tickets/README.md` for the dependency waves and the current
-  status line in `AGENTS.md`; name the next unblocked ticket and any that are gated.
+- **Next ticket:** read `docs/plans/tickets/README.md` for the dependency waves and the short
+  `## Current Status` section in `CLAUDE.md`; name the next unblocked ticket and any that are gated.
 - **CI / review state:** for open PRs, `gh pr checks <n>` — call out anything red or anything
   waiting on the developer's review (auth/crypto PRs are the highest-risk area, so a second review
   is encouraged where a reviewer is available — but it's not required and the owner may self-merge).

@@ -1,6 +1,6 @@
 ---
 name: close-out
-description: Close out a finished Brink ticket by folding its bookkeeping into the SAME PR that implements it — the pre-merge counterpart to close-session. Walks the fixed close-out ritual: move the ticket backlog→completed, flip its status and the matching requirements.md traceability rows, sync the AGENTS.md status line, and refresh the tickets/README wave table + completed list — all committed onto the feature branch so they ride the feature PR (no separate follow-up PR). Use when someone says "close out T<NN>", "close the ticket", "wrap up this ticket", "mark it done", or once a ticket's code is complete and green and you're about to open/finalize its PR.
+description: Close out a finished Brink ticket by folding its bookkeeping into the SAME PR that implements it — the pre-merge counterpart to close-session. Walks the fixed close-out ritual: move the ticket backlog→completed, flip its status and the matching requirements.md traceability rows, update CLAUDE.md only for current-status/watch-out changes, and refresh the tickets/README wave table + completed list — all committed onto the feature branch so they ride the feature PR (no separate follow-up PR). Use when someone says "close out T<NN>", "close the ticket", "wrap up this ticket", "mark it done", or once a ticket's code is complete and green and you're about to open/finalize its PR.
 ---
 
 # Close Out (Brink ticket close-out — pre-merge)
@@ -13,7 +13,7 @@ merge** means the PR that lands is already fully closed out: no second "docs fol
 `develop` never claims a merged feature is still open.
 
 **This is a guided checklist, not an auto-runner.** Several steps need judgement — which
-requirement rows to flip, whether the AGENTS.md status wording is right. Do each step against the
+requirement rows to flip, whether the CLAUDE.md current guidance is right. Do each step against the
 *actual* repo state, confirm before moving files, and stop to ask if something doesn't match.
 
 ## When to run it
@@ -48,11 +48,12 @@ the code:
    auto-flip. Add the `†` superseded marker where a row now points at replaced code. If the ticket
    is pure tooling/governance with no catalog requirement, there's nothing to flip — say so.
 
-4. **Sync the AGENTS.md status line.** Update the `## Watch-outs` **Status:** paragraph: add the
-   ticket to the done list and note what shipped (endpoints, files, precedents) in one or two
-   plain-English clauses, matching the existing voice. Move the **"Next feature work"** pointer to
-   whatever this unblocks. If the ticket changed commands, env, layout, or deployment, update those
-   sections too (the same doc-sync rule the CI gate enforces).
+4. **Sync CLAUDE.md only where it is current guidance.** Do **not** append a ticket-history
+   paragraph. Detailed completed-ticket history belongs in `docs/plans/tickets/README.md` and the
+   completed ticket file. Update `CLAUDE.md` only when this ticket changes the current map an agent
+   needs on day one: the short `## Current Status` bullets, `## Watch-outs`, commands, env, layout,
+   deployment, or conventions. Move the **"Next feature work"** pointer only if this ticket changes
+   what is now unblocked.
 
 5. **Refresh `tickets/README.md`.** Add the ticket to the **Completed** list line. If it was in a
    **dependency wave**, remove it and update the "Ready to start now" list for anything its merge
