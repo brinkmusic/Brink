@@ -464,9 +464,25 @@ PR that it went in without a second review).
   `static/edit-profile.js`: avatar 3-step upload → PATCH bio → reload); bio renders under the header
   on every profile (autoescaped user text). Satisfies the new **UI-11**. **Deploy steps for Andrea:**
   (1) create a **public** Supabase Storage bucket named `avatars` in `brink-dev`; (2) apply the
-  migration — `cd backend && uv run alembic upgrade head`. **Next:
-  T32 (Jonah)
-  unblocked; T14 still gated on T33/T35.**
+  migration — `cd backend && uv run alembic upgrade head`. **T34 (K-means training +
+  ModelArtifact export) done** — `analytics/cluster.py` trains on the full local Kaggle file
+  directly (not `Track` — ADR-0004 C2 wants the ~1M-track audio space, and the file is already the
+  complete archive per T31), standardizes features, fits K-means, and writes `gold.Cluster`/
+  `ModelMetrics("kmeans")`/`ModelArtifact("kmeans")` (ADR-0009); re-running replaces rather than
+  duplicates. **Feature set widened to 10** (added acousticness/instrumentalness/liveness/
+  speechiness/mode to the original 5) — **new prerequisite for T33:** real `Track` rows only carry
+  the original 5, so on-demand inference needs `Track`'s schema + `ingest_kaggle.py`'s join
+  extended with the other 5 first (flagged on T33's ticket). **k forced to 7, disclosed, not
+  hidden:** silhouette + elbow (k=2–10, full 1.2M-track corpus) consistently preferred **k=2**
+  (silhouette 0.240) — held across both the 5- and 10-feature sets, and a Gaussian Mixture Model
+  comparison did no better (BIC never plateaued; silhouette on GMM's hard assignments was lower
+  than K-means at every k tried). Since the persona feature needs ≥5 groups, k was deliberately
+  forced to 7 (silhouette 0.160) — `run_cluster()` still computes and records the honest
+  silhouette-preferred k rather than silently overriding it. Final: 7 interpretable clusters
+  (43,615–250,769 tracks each), e.g. "High Valence, High Danceability", "High Acousticness, Low
+  Energy". AN-3 marked **✅ k forced (disclosed)**. Its merge unblocks **T33** (Andrea, pairing with
+  Jonah — gated on the Track-schema prerequisite above before it can start for real). **Next:
+  T32 (Jonah, seed synthetic users) and T33 (Andrea) both unblocked; T14 still gated on T33/T35.**
 
 ## Deployment topology (ADR-0010, T07, ADR-0013, T60)
 
