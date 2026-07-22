@@ -317,6 +317,7 @@ body {
 /* ---- Profile page (T43) ---- */
 .profile-header { display: grid; gap: 0.75rem; }
 .profile-id { display: flex; align-items: center; gap: 0.75rem; }
+.profile-id > div { min-width: 0; }
 .profile-avatar {
   width: 3.5rem;
   height: 3.5rem;
@@ -326,9 +327,9 @@ body {
   background-size: cover;
   background-position: center;
 }
-.profile-name { margin: 0; font-size: 1.25rem; }
+.profile-name { margin: 0; font-size: 1.25rem; overflow-wrap: anywhere; }
 .profile-handle { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
-.profile-counts { display: flex; gap: 1.25rem; color: var(--mute); font-size: 0.9rem; }
+.profile-counts { display: flex; flex-wrap: wrap; gap: 0.45rem 1.25rem; color: var(--mute); font-size: 0.9rem; }
 .profile-counts b { color: var(--text); font-variant-numeric: tabular-nums; }
 .profile-count-link { color: var(--mute); text-decoration: none; }
 .profile-count-link:hover { color: var(--text); }
@@ -499,6 +500,7 @@ body {
 .now-playing {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   font-size: 0.9rem;
 }
@@ -511,10 +513,10 @@ body {
   flex: none;
 }
 .np-label { color: var(--mute); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.72rem; }
-.np-track { color: var(--text); font-weight: 600; }
+.np-track { color: var(--text); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 
 .listening { display: flex; flex-direction: column; gap: 1rem; }
-.listening-stats { display: flex; gap: 1.5rem; color: var(--mute); font-size: 0.9rem; }
+.listening-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; color: var(--mute); font-size: 0.9rem; }
 .listening-stats b { color: var(--hot); font-size: 1.1rem; }
 .listening-block h3 {
   font-size: 0.8rem;
@@ -527,28 +529,45 @@ body {
 .top-list li {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.3rem 0;
   border-bottom: 1px solid var(--line);
   font-size: 0.92rem;
 }
-.top-title { font-weight: 600; color: var(--text); }
-.top-artist { color: var(--mute); }
+.top-title { font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.top-artist { color: var(--mute); min-width: 0; overflow-wrap: anywhere; }
 /* Push the play count to the right edge of the row. */
-.top-plays { margin-left: auto; color: var(--mute); font-size: 0.85rem; }
+.top-plays { margin-left: auto; color: var(--mute); font-size: 0.85rem; white-space: nowrap; }
 
 .recent-list { list-style: none; padding: 0; margin: 0; }
 .recent-list li {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.6rem;
   padding: 0.35rem 0;
   font-size: 0.92rem;
 }
 .recent-art { width: 2rem; height: 2rem; border-radius: 0.35rem; object-fit: cover; flex: none; }
-.recent-title { font-weight: 600; color: var(--text); }
-.recent-artist { color: var(--mute); }
-.recent-when { margin-left: auto; color: var(--mute); font-size: 0.82rem; }
+.recent-title { font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.recent-artist { color: var(--mute); min-width: 0; overflow-wrap: anywhere; }
+.recent-when { margin-left: auto; color: var(--mute); font-size: 0.82rem; white-space: nowrap; }
+@media (max-width: 520px) {
+  .now-playing { align-items: flex-start; }
+  .np-label { flex-basis: calc(100% - 1.25rem); }
+  .np-track { flex-basis: 100%; padding-left: 1rem; }
+  .top-list li,
+  .recent-list li { align-items: flex-start; }
+  .top-title,
+  .top-artist,
+  .recent-title,
+  .recent-artist { flex-basis: 100%; }
+  .top-plays,
+  .recent-when { margin-left: 0; }
+  .comment-form { flex-wrap: wrap; }
+  .comment-form input { flex-basis: 100%; }
+}
 
 /* ---- Email signup / login forms (T03) ---- */
 /* A narrow centred card holding the auth form, reusing the palette + card look. */

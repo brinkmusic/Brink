@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Small
 category: Fix
@@ -55,11 +55,11 @@ cleanly on mobile without overlapping actions or hiding important content.
 | `backend/tests/test_pages.py` | MODIFY | preserve critical profile markup |
 
 ## Testing Checklist
-- [ ] profile header remains readable on narrow mobile widths
-- [ ] profile counts wrap without overlap
-- [ ] now-playing, top tracks, top artists, and recent rows handle long text
-- [ ] action rows and comment forms do not squeeze buttons or inputs
-- [ ] desktop layout remains compact and scannable
+- [x] profile header remains readable on narrow mobile widths
+- [x] profile counts wrap without overlap
+- [x] now-playing, top tracks, top artists, and recent rows handle long text
+- [x] action rows and comment forms do not squeeze buttons or inputs
+- [x] desktop layout remains compact and scannable
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -72,3 +72,20 @@ cleanly on mobile without overlapping actions or hiding important content.
 Branch off `develop` as `fix/T82-responsive-profile-listening-layouts`; one PR back into `develop`
 (never `main`). This pairs naturally after T80, but can be implemented independently if scoped to
 CSS-only responsive rules.
+
+## Outcome
+T82 added a CSS-only responsive hardening pass for profile and listening surfaces.
+
+- **Profile header:** profile names can wrap safely, the identity text has `min-width: 0`, and
+  follower/following counts wrap instead of squeezing.
+- **Profile actions:** the T80 `.profile-actions` row stays in normal flow and stretches buttons
+  sensibly on small screens.
+- **Now playing:** long now-playing track/artist text wraps under the label on narrow screens.
+- **Listening rows:** top tracks, top artists, recent listens, play counts, and timestamps now wrap
+  or stack without crushing titles.
+- **Comment forms:** comment inputs/buttons can wrap on mobile instead of squeezing into a single
+  unusable row.
+- **Tests:** focused page suite **36 passed**. Impeccable detector only reported the existing `Inter`
+  font advisory.
+
+Deliberate scope: no template or backend data-shape changes were needed.
