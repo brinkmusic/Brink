@@ -574,6 +574,10 @@ def test_artist_page_shows_upload_for_artist(client, db_session, monkeypatch):
     body = client.get("/artist").text
     assert 'class="artist-file"' in body            # the file picker is shown
     assert "/static/artist-upload.js" in body       # the upload script is loaded
+    # T57: the caption starts hidden — a post needs an image, so the caption box only appears
+    # after a valid file is picked (revealed by artist-upload.js). It must render with `hidden`.
+    assert 'class="artist-caption"' in body
+    assert 'maxlength="2000" hidden' in body
 
 
 def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch):

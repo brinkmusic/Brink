@@ -180,8 +180,11 @@ body {
 /* Primary action, in Brink's lavender with dark text for strong contrast. */
 .btn-spotify { background: var(--accent); color: #0b0b12; }
 .btn-spotify:hover { background: #b1a4f5; }
-/* Secondary action, outlined and quiet so it sits behind the primary one. */
-.btn-ghost { border-color: var(--line); color: var(--text); }
+/* Secondary action, outlined and quiet so it sits behind the primary one.
+   background:transparent is REQUIRED: a <button> element defaults to the browser's light
+   button background, which would show light text on a light button ("white on white"). Making
+   it transparent lets the dark page/card show through, so the light text stays readable. */
+.btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
 .btn-ghost:hover { border-color: var(--accent); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -288,7 +291,9 @@ body {
 .artist-engagement-line { margin: 0; color: var(--mute); font-size: 0.85rem; }
 
 /* ---- Profile page (T43) ---- */
-.profile-header { display: grid; gap: 0.75rem; }
+/* position:relative so the "Become an artist" button (T56) can be pinned to the top-right
+   corner of the card, out of the main action flow so it isn't tapped by accident. */
+.profile-header { position: relative; display: grid; gap: 0.75rem; }
 .profile-id { display: flex; align-items: center; gap: 0.75rem; }
 .profile-avatar {
   width: 3.5rem;
@@ -306,6 +311,15 @@ body {
 .profile-count-link { color: var(--mute); text-decoration: none; }
 .profile-count-link:hover { color: var(--text); }
 .follow-btn { justify-self: start; }
+/* T56: pin the one-way "Become an artist" action to the card's top-right corner, and make it
+   small/quiet so it reads as a secondary option, not the page's main call to action. */
+.become-artist-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+}
 .post-author { color: var(--text); text-decoration: none; font-weight: 500; }
 .post-author:hover { color: var(--accent); }
 .follow-list-users { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.6rem; }

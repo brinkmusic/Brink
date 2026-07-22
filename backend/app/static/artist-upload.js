@@ -17,10 +17,14 @@ function artistFilePicked(input) {
   const box = input.closest(".artist-upload");
   const status = box.querySelector(".artist-status");
   const shareBtn = box.querySelector(".artist-share");
+  const caption = box.querySelector(".artist-caption");
   const file = input.files[0];
 
   _artistFile = null;
   shareBtn.disabled = true;
+  // Keep the caption hidden until we have a VALID image (T57): a post always needs an image, so the
+  // caption box only makes sense once one is picked. Any early return below leaves it hidden.
+  caption.hidden = true;
 
   if (!file) {
     status.textContent = "";
@@ -36,6 +40,8 @@ function artistFilePicked(input) {
   }
   _artistFile = file;
   status.textContent = `Ready to share: ${file.name}`;
+  // Valid image chosen — now reveal the caption box so they can add words to it.
+  caption.hidden = false;
   shareBtn.disabled = false;
 }
 
