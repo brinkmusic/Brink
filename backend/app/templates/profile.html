@@ -229,13 +229,22 @@
         </div>
 
         <div class="comments artist-comments" data-post-id="{{ post.id }}">
-          <button type="button" class="comment-toggle" onclick="toggleArtistComments(this)">
+          <button
+            type="button"
+            class="comment-toggle"
+            aria-expanded="false"
+            aria-controls="artist-comment-panel-{{ post.id }}"
+            onclick="toggleArtistComments(this)"
+          >
             💬 <span class="comment-count">{{ post.comment_count }}</span>
           </button>
-          <div class="comment-panel" hidden>
+          <div id="artist-comment-panel-{{ post.id }}" class="comment-panel" hidden>
             <ul class="comment-list"></ul>
+            <p id="artist-comment-status-{{ post.id }}" class="comment-status" aria-live="polite"></p>
             <form class="comment-form" onsubmit="submitArtistComment(event, this)">
+              <label class="sr-only" for="artist-comment-input-{{ post.id }}">Add a comment</label>
               <input
+                id="artist-comment-input-{{ post.id }}"
                 type="text"
                 name="body"
                 placeholder="Add a comment…"

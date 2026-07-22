@@ -237,6 +237,8 @@ def test_feed_has_composer(client, db_session, monkeypatch):
 
     body = client.get("/feed").text
     assert 'class="composer' in body               # the composer block is present
+    assert 'for="composer-search-input"' in body   # search input has a real label
+    assert 'id="composer-status"' in body          # JS has a visible status/error target
     assert "composerSearch(this)" in body          # the search box is wired
     assert "/static/composer.js" in body           # the script is loaded
 
@@ -274,6 +276,8 @@ def test_feed_shows_followed_artist_post(client, db_session, monkeypatch):
     assert "artist-reactions" in body                                  # audience reaction bar
     assert "artistReact(this)" in body
     assert "toggleArtistComments(this)" in body
+    assert "aria-expanded=\"false\"" in body
+    assert f'aria-controls="artist-comment-panel-{post.id}"' in body
     assert f'data-post-id="{post.id}"' in body
     assert "/static/artist-engagement.js" in body                      # the engagement script
 
@@ -471,6 +475,8 @@ def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatc
     assert f'data-post-id="{post.id}"' in body
     assert "artistReact(this)" in body
     assert "toggleArtistComments(this)" in body
+    assert f'aria-controls="artist-comment-panel-{post.id}"' in body
+    assert f'id="artist-comment-status-{post.id}"' in body
     assert "/static/artist-engagement.js" in body
     assert "Artist-only engagement" not in body
 

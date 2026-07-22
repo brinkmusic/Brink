@@ -115,11 +115,11 @@ layouts need mobile hardening, and forms/empty states need consistent polish.
 | Ticket | What | Blocked by |
 |---|---|---|
 | ~~`080`~~ ✅ | button system + visible profile artist action | — |
-| `081` | interaction feedback + keyboard accessibility pass | — |
+| ~~`081`~~ ✅ | interaction feedback + keyboard accessibility pass | — |
 | `082` | responsive profile + listening layouts | — |
 | `083` | form controls + empty-state polish | — |
 
-T81–T83 remain startable now and target the server-rendered Jinja frontend under `backend/app/`.
+T82–T83 remain startable now and target the server-rendered Jinja frontend under `backend/app/`.
 
 The wave numbers below are *dependency depth*, not live status — a ticket is startable as soon as its `blocked_by` are merged, which is what the "Ready to start now" list above reflects. Update that list whenever a wave of blockers merges.
 

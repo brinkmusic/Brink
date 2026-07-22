@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Fix
@@ -58,11 +58,11 @@ results, accessible comment toggles, visible loading/error states, and consisten
 | `backend/tests/test_pages.py` | MODIFY | assert key ARIA/label markup where server-rendered |
 
 ## Testing Checklist
-- [ ] composer result can be selected with keyboard
-- [ ] comment toggles expose expanded/collapsed state
-- [ ] comment loading and submit failures show visible text
-- [ ] focus indicators are visible on nav, profile links, comment toggles, and buttons
-- [ ] no API behavior changes
+- [x] composer result can be selected with keyboard
+- [x] comment toggles expose expanded/collapsed state
+- [x] comment loading and submit failures show visible text
+- [x] focus indicators are visible on nav, profile links, comment toggles, and buttons
+- [x] no API behavior changes
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -74,3 +74,21 @@ results, accessible comment toggles, visible loading/error states, and consisten
 ## Notes
 Branch off `develop` as `fix/T81-interaction-feedback-a11y`; one PR back into `develop`
 (never `main`).
+
+## Outcome
+T81 hardened the existing feed/profile/artist interactions without changing API contracts.
+
+- **Composer:** the feed composer now has a real search label, a live status region, result-list
+  semantics, and JavaScript-rendered result buttons so keyboard users get native Enter/Space
+  activation.
+- **Comments:** feed song comments and artist-post comments now render `aria-expanded`,
+  `aria-controls`, controlled panel ids, input labels, and live status targets.
+- **Feedback:** comment loading, comment submit failure, composer search failure, and composer share
+  failure now write visible status text instead of relying on console warnings.
+- **Focus:** comment toggles and composer result buttons have visible focus/hover treatment in
+  `brink.css`.
+- **Tests:** `backend/tests/test_pages.py` asserts the key server-rendered label, status, and
+  controlled-panel hooks. Focused page suite: **36 passed**.
+
+Deliberate scope: no backend API behavior changed, and this did not attempt broader component
+extraction or the responsive layout work tracked by T82.

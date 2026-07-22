@@ -22,14 +22,18 @@
 
   {# Composer (T40): search a song, add a caption, share it. See static/composer.js. #}
   <section class="composer card">
+    <label class="sr-only" for="composer-search-input">Search a song to share</label>
     <input
+      id="composer-search-input"
       type="text"
       class="composer-search"
       placeholder="Search a song to share…"
       autocomplete="off"
+      aria-describedby="composer-status"
       oninput="composerSearch(this)"
     />
-    <ul class="composer-results" hidden></ul>
+    <ul class="composer-results" role="listbox" aria-label="Song search results" hidden></ul>
+    <p id="composer-status" class="composer-status" aria-live="polite"></p>
     <div class="composer-selected" hidden>
       <p class="composer-track">
         <span class="composer-track-title"></span>
@@ -80,13 +84,22 @@
         </div>
 
         <div class="comments artist-comments" data-post-id="{{ p.id }}">
-          <button type="button" class="comment-toggle" onclick="toggleArtistComments(this)">
+          <button
+            type="button"
+            class="comment-toggle"
+            aria-expanded="false"
+            aria-controls="artist-comment-panel-{{ p.id }}"
+            onclick="toggleArtistComments(this)"
+          >
             💬 <span class="comment-count">{{ p.comment_count }}</span>
           </button>
-          <div class="comment-panel" hidden>
+          <div id="artist-comment-panel-{{ p.id }}" class="comment-panel" hidden>
             <ul class="comment-list"></ul>
+            <p id="artist-comment-status-{{ p.id }}" class="comment-status" aria-live="polite"></p>
             <form class="comment-form" onsubmit="submitArtistComment(event, this)">
+              <label class="sr-only" for="artist-comment-input-{{ p.id }}">Add a comment</label>
               <input
+                id="artist-comment-input-{{ p.id }}"
                 type="text"
                 name="body"
                 placeholder="Add a comment…"
@@ -137,13 +150,22 @@
           {# Comments (T42). The button shows the count and opens a panel that lazily loads
              this post's comments and offers a box to add one (see static/comments.js). #}
           <div class="comments" data-post-id="{{ p.id }}">
-            <button type="button" class="comment-toggle" onclick="toggleComments(this)">
+            <button
+              type="button"
+              class="comment-toggle"
+              aria-expanded="false"
+              aria-controls="comment-panel-{{ p.id }}"
+              onclick="toggleComments(this)"
+            >
               💬 <span class="comment-count">{{ p.comment_count }}</span>
             </button>
-            <div class="comment-panel" hidden>
+            <div id="comment-panel-{{ p.id }}" class="comment-panel" hidden>
               <ul class="comment-list"></ul>
+              <p id="comment-status-{{ p.id }}" class="comment-status" aria-live="polite"></p>
               <form class="comment-form" onsubmit="submitComment(event, this)">
+                <label class="sr-only" for="comment-input-{{ p.id }}">Add a comment</label>
                 <input
+                  id="comment-input-{{ p.id }}"
                   type="text"
                   name="body"
                   placeholder="Add a comment…"
