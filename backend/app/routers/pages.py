@@ -339,6 +339,7 @@ def _profile_data(
         "display_name": person.display_name,
         "handle": person.handle,
         "avatar_url": person.avatar_url,
+        "bio": person.bio,  # shown under the header (both own + others'); autoescaped as user text
         "follower_count": follower_count,
         "following_count": following_count,
         "follow_list": _follow_list_items(session, person.id, list_kind),

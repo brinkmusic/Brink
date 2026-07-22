@@ -321,6 +321,32 @@ def test_profile_counts_link_to_follow_lists(client, db_session, monkeypatch):
     assert "Follower One" not in following_body
 
 
+# T48: a user's bio renders under their profile header (both own and others').
+def test_profile_shows_bio(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    target = User(handle="bio-haver", display_name="Bio Haver", bio="just here for the tunes",
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(target)
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/bio-haver").text
+    assert "just here for the tunes" in body
+
+
+# T48: your OWN profile shows the "Edit profile" control that reveals the bio/avatar form.
+def test_own_profile_shows_edit_profile(client, db_session, monkeypatch):
+    _seed_viewer(db_session)  # handle "viewer"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/viewer").text
+    assert "Edit profile" in body
+    assert "/static/edit-profile.js" in body
+
+
 def test_own_profile_has_no_follow_button(client, db_session, monkeypatch):
     _seed_viewer(db_session)  # the viewer's handle is "viewer"
     app.dependency_overrides[get_session] = lambda: db_session

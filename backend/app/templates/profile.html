@@ -25,6 +25,12 @@
       </div>
     </div>
 
+    {# The user's bio (T48), shown for everyone when set. Jinja autoescapes it — it's user-written
+       text, so it must NEVER be marked safe. #}
+    {% if p.bio %}
+    <p class="profile-bio">{{ p.bio }}</p>
+    {% endif %}
+
     <div class="profile-counts">
       <a class="profile-count-link" href="/u/{{ p.handle }}?list=followers">
         <b class="follower-count">{{ p.follower_count }}</b> followers
@@ -57,6 +63,35 @@
       class="btn btn-ghost become-artist-btn"
       onclick="becomeArtist(this)"
     >Become an artist</button>
+    {% endif %}
+
+    {# Edit profile (T48) — own profile only. The button reveals a small form: a profile-picture
+       file input (JPEG/PNG ≤ 10 MB, validated client-side) + a bio textarea prefilled with the
+       current bio. Save runs the avatar upload (if a new image was picked) then PATCHes the bio,
+       and reloads — all in static/edit-profile.js. The server is the real gate for every step. #}
+    {% if p.is_self %}
+    <div class="edit-profile">
+      <button type="button" class="btn btn-ghost edit-profile-btn" onclick="toggleEditProfile(this)">
+        Edit profile
+      </button>
+      <form class="edit-profile-form" hidden onsubmit="saveProfile(event, this)">
+        <label class="edit-profile-field">
+          <span>Profile picture (JPEG/PNG, ≤ 10 MB)</span>
+          <input type="file" class="edit-avatar-file" accept="image/jpeg,image/png" />
+        </label>
+        <label class="edit-profile-field">
+          <span>Bio</span>
+          <textarea
+            class="edit-bio"
+            maxlength="300"
+            rows="3"
+            placeholder="Say something about yourself…"
+          >{{ p.bio or '' }}</textarea>
+        </label>
+        <p class="edit-profile-status" aria-live="polite"></p>
+        <button type="submit" class="btn btn-spotify edit-profile-save">Save</button>
+      </form>
+    </div>
     {% endif %}
   </div>
 
@@ -257,4 +292,6 @@
 {% if p.is_artist %}<script src="/static/artist-engagement.js"></script>{% endif %}
 {# Makes the "Become an artist" button live (T55) — only loaded when it's shown. #}
 {% if p.is_self and not p.is_artist %}<script src="/static/become-artist.js"></script>{% endif %}
+{# Makes the "Edit profile" form live (T48) — own profile only. #}
+{% if p.is_self %}<script src="/static/edit-profile.js"></script>{% endif %}
 {% endblock %}
