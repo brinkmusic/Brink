@@ -80,5 +80,28 @@ honestly logged rather than hidden. Swapping in the real ~1M+ set later just mea
 `ingest_kaggle.py` against the new file — no code change needed. Downstream tickets (T33's K-means
 training in particular) should be aware coverage is currently low until the dataset is upgraded.
 
+## Update (2026-07-22) — real ≈1M+ dataset swapped in
+The interim substitute above has been replaced with `tracks_features.csv` (1,204,025 unique
+tracks, no duplicate ids) — a genuinely ≈1M+ set, satisfying ADR-0004 as originally written; no
+further scope deviation. Cumulative coverage against brink-dev's real `Track` rows is now
+**67/551 matched (12.2%)** (up from 4.1%), combining this dataset's 55 new matches with the 14
+already matched by the earlier interim file — `ingest_kaggle.py` never un-matches a track just
+because a newer file doesn't happen to contain it.
+
+This also surfaced and fixed two real issues, worth recording:
+- **Landing every raw Kaggle row into `bronze.kaggle_tracks_raw` doesn't scale.** At ~1.2M rows
+  this filled `brink-dev`'s disk and caused a multi-day outage. `ingest_kaggle.py` now only lands
+  the rows that actually matched a `Track` (currently 67, not 1.2M) — the CSV file itself remains
+  the full archive (T34 reads it directly for training), so nothing is lost by not duplicating the
+  other 99.99% of it into the database too.
+- **Coverage reporting was accidentally per-run, not cumulative.** The tool used to report only
+  the current run's match count, which would understate true coverage once more than one dataset
+  has ever been ingested (ADR-0004 requires honest reporting). It now always counts every
+  `kaggleMatched = true` row in the database, regardless of which run set it.
+
+New dataset's schema differs from the old one: id column is `id` (not `track_id`), and it has no
+`popularity` column (harmless — `Track.popularity` always came from live Spotify data, not
+Kaggle).
+
 ## Notes
 Branch off `develop` as `feat/T31-kaggle-join`; one PR back into `develop` (never `main`). Owner: Jonah (analytics).
