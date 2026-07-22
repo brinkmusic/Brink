@@ -170,12 +170,31 @@ class FollowStateOut(CamelModel):
 #   comment_count    -> how many comments the post has.
 class FeedPostOut(CamelModel):
     id: str
+    kind: Literal["song"] = "song"  # discriminator: a song-share post (vs an artist post below)
     user_id: str
     author: AuthorOut
     caption: Optional[str]
     source: PostSource
     created_at: datetime
     track: TrackOut
+    reaction_counts: dict[str, int]
+    comment_count: int
+    viewer_reactions: dict[str, bool]
+
+
+# An artist "behind-the-scenes" post as the feed returns it (T049): a followed artist's promo image
+# post, interleaved with the song posts above. It carries `kind == "artist"` so the template branches
+# on it, and the SAME engagement fields (reaction_counts / comment_count / viewer_reactions) as a song
+# post, computed over the ArtistReaction/ArtistComment tables (T52), so the artist card's like/comment
+# controls render from a stable shape. `image_url` is the SIGNED read URL (the artist-images bucket is
+# private), not the raw stored path. There's no track/source — an artist post is an image + caption.
+class ArtistFeedPostOut(CamelModel):
+    id: str
+    kind: Literal["artist"] = "artist"
+    author: AuthorOut
+    caption: str
+    image_url: str
+    created_at: datetime
     reaction_counts: dict[str, int]
     comment_count: int
     viewer_reactions: dict[str, bool]

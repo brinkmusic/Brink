@@ -107,12 +107,14 @@ def _ago(when: datetime) -> str:
     return f"{hours // 24}d ago"
 
 
-# Build the list of feed posts for the template. We REUSE the shared feed builder
+# Build the list of feed items for the template. We REUSE the shared feed builder
 # (app/routers/feed.build_feed) so the page shows EXACTLY the same feed as GET /api/feed
-# (posts from people you follow plus your own, with reaction counts and which reactions are
-# yours) — no duplicated query logic. Then we reshape each item for the template: flatten the
-# nested track fields, turn the ISO timestamp into a friendly "3m ago", and collect the
-# reaction types the viewer already tapped into a set the template can test with `in`.
+# (song posts from people you follow plus your own, AND the behind-the-scenes posts of the artists
+# you follow — T049, interleaved newest-first) — no duplicated query logic. Then we reshape each
+# item for the template. The feed mixes two "kinds": a "song" item flattens the nested track fields;
+# an "artist" item carries the (already signed) image URL and caption. Both turn the ISO timestamp
+# into a friendly "3m ago" and collect the reaction types the viewer already tapped into a set the
+# template can test with `in`. The "kind" is passed straight through so the template branches on it.
 def _feed_items(session: Session, user) -> list[dict]:
     try:
         raw = build_feed(session, user)
@@ -126,21 +128,28 @@ def _feed_items(session: Session, user) -> list[dict]:
     for it in raw:
         # viewerReactions is {type: True/False}; keep just the types set to True.
         mine = {kind for kind, on in it["viewerReactions"].items() if on}
-        items.append(
-            {
-                "id": it["id"],
-                "author": it["author"]["displayName"],
-                "author_handle": it["author"]["handle"],  # for linking to their profile (T43)
-                "title": it["track"]["title"],
-                "artist": it["track"]["artistName"],
-                "album_art": it["track"]["albumArtUrl"],
-                "caption": it["caption"],
-                "when": _ago(datetime.fromisoformat(it["createdAt"])),
-                "counts": it["reactionCounts"],
-                "mine": mine,
-                "comment_count": it["commentCount"],
-            }
-        )
+        # Fields common to both kinds (id, author, engagement, "kind", "when").
+        common = {
+            "kind": it["kind"],
+            "id": it["id"],
+            "author": it["author"]["displayName"],
+            "author_handle": it["author"]["handle"],  # for linking to their profile (T43)
+            "caption": it["caption"],
+            "when": _ago(datetime.fromisoformat(it["createdAt"])),
+            "counts": it["reactionCounts"],
+            "mine": mine,
+            "comment_count": it["commentCount"],
+        }
+        if it["kind"] == "artist":
+            # An artist behind-the-scenes post: an image + caption (imageUrl is already a signed
+            # read URL from build_feed, T53), no track.
+            common["image_url"] = it["imageUrl"]
+        else:
+            # A song-share post: flatten the nested track fields.
+            common["title"] = it["track"]["title"]
+            common["artist"] = it["track"]["artistName"]
+            common["album_art"] = it["track"]["albumArtUrl"]
+        items.append(common)
     return items
 
 
