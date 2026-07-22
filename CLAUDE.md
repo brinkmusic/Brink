@@ -416,7 +416,13 @@ PR that it went in without a second review).
   **Deploy step for Andrea:** keep Supabase Email + Confirm-email ON (defaults) and add the
   deployed + localhost `/auth/confirm` URLs to the Supabase redirect allow-list, then do one real
   signup→confirm→login. Follow-ups (not built): password reset, link-Spotify-to-an-email-account,
-  auto-login-on-confirm. **Next:
+  auto-login-on-confirm. **T55 (become an artist) done** — the missing in-app path to become an
+  artist: `POST /api/me/become-artist` (`backend/app/routers/me.py`) flips `is_artist` on the
+  authenticated caller (idempotent, one-way, unspoofable — resolved from the session, not the body),
+  returning `ArtistStateOut`; a "Become an artist" button on your **own** profile
+  (`profile.html` + `static/become-artist.js`) reloads to unlock the artist studio. Before this the
+  `is_artist` flag could only be set by editing the Supabase DB by hand (T50 had deferred this
+  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**. **Next:
   T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
