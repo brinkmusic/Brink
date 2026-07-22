@@ -212,7 +212,7 @@ agents, not a changelog.
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
 - **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. For
   analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22 non-analytics UI hardening
-  wave (`T80`–`T83`) is complete.
+  wave (`T80`–`T85`) is complete, including static-asset cache revalidation.
 
 ## Watch-outs
 

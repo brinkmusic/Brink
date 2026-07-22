@@ -42,6 +42,21 @@ def test_stylesheet_is_served(client):
     assert "text/css" in res.headers["content-type"]
 
 
+# T85: a release can update HTML and CSS at the same time. The version query forces browsers
+# holding the pre-T80/T83 stylesheet to fetch the corrected button and edit-profile styles.
+def test_home_page_uses_versioned_stylesheet(client):
+    app.dependency_overrides[get_session] = lambda: MagicMock()
+    body = client.get("/").text
+    assert 'href="/static/brink.css?v=85"' in body
+
+
+# After that one-time cache bust, every static response asks the browser to revalidate before
+# reuse. This prevents later releases from pairing fresh HTML with stale CSS or JavaScript.
+def test_static_assets_require_revalidation(client):
+    res = client.get("/static/brink.css")
+    assert res.headers["cache-control"] == "no-cache"
+
+
 # ---- Feed page (reuses build_feed: posts from people you follow + your own) ----
 
 from types import SimpleNamespace

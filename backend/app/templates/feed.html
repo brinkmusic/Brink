@@ -191,12 +191,12 @@
 </section>
 
 {# The small scripts that make the composer (T40), reactions (T11) and comments (T12) live. #}
-<script src="/static/composer.js"></script>
-<script src="/static/reactions.js"></script>
-<script src="/static/comments.js"></script>
+<script src="/static/composer.js?v=85"></script>
+<script src="/static/reactions.js?v=85"></script>
+<script src="/static/comments.js?v=85"></script>
 {# When any artist behind-the-scenes post is present (T049), load its engagement script — the SAME
    one the artist profile uses (T54), which drives artistReact/toggleArtistComments/submitArtistComment. #}
 {% if posts | selectattr("kind", "equalto", "artist") | list %}
-<script src="/static/artist-engagement.js"></script>
+<script src="/static/artist-engagement.js?v=85"></script>
 {% endif %}
 {% endblock %}

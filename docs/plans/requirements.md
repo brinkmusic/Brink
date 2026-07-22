@@ -62,9 +62,9 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14, T82 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics. T82 hardens responsive listening layouts.) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
-| UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60, T80, T81, T83, T84 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60. T80/T81/T83 are polish follow-ups for visible failure, loading, and empty-state quality. T84 keeps optional profile enrichments from turning `/u/{handle}` into a 500.) |
+| UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60, T80, T81, T83, T84, T85 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60. T80/T81/T83 are polish follow-ups for visible failure, loading, and empty-state quality. T84 keeps optional profile enrichments from turning `/u/{handle}` into a 500. T85 prevents stale static assets from hiding those shipped UI states.) |
 | UI-10 | "Now playing" indicator on profile + feed. | T20, T44, T82 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up. T82 hardens the existing profile layout.) |
-| UI-11 | Editable profile: user bio + profile-picture upload. | T048, T83 | ✅ (T83 follow-up polishes the existing edit-profile controls; no API behavior change.) |
+| UI-11 | Editable profile: user bio + profile-picture upload. | T048, T83, T85 | ✅ (T83 polishes the existing edit-profile controls; T85 ensures browsers load that shipped design instead of stale CSS. No API behavior change.) |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |

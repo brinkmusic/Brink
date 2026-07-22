@@ -51,10 +51,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Brink API", lifespan=lifespan)
 
+
+# Browsers may otherwise keep an older stylesheet or script while loading fresh HTML from a new
+# release. `no-cache` still permits local storage, but requires the browser to check the ETag before
+# reuse so the page and its assets stay on the same release.
+class RevalidatingStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # Serve static assets (the stylesheet, and later HTMX/images) from app/static/ at
 # the /static/* URL. ADR-0013: the Python-rendered pages load their CSS from here.
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
-app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+app.mount("/static", RevalidatingStaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 app.include_router(health.router)  # GET /api/health
 app.include_router(auth.router)    # /auth/* server-side login/signup routes
