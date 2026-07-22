@@ -422,7 +422,40 @@ PR that it went in without a second review).
   returning `ArtistStateOut`; a "Become an artist" button on your **own** profile
   (`profile.html` + `static/become-artist.js`) reloads to unlock the artist studio. Before this the
   `is_artist` flag could only be set by editing the Supabase DB by hand (T50 had deferred this
-  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**. **Next:
+  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**.
+  **T56 (artist-button UI polish) done** — UI-only follow-up to T55: `.btn-ghost` now sets
+  `background: transparent` so ghost buttons aren't light-text-on-light-button ("white on white" —
+  a `<button>`'s default light background was showing through); the "Become an artist" button moved
+  to the profile card's top-right corner (small/quiet, `position:absolute`) so it isn't mis-tapped;
+  and `become-artist.js` now shows a "this cannot be undone" confirm before the one-way flip
+  (`brink.css` + `become-artist.js`). **T57 (caption-after-image) done** — the artist upload
+  caption box (`artist.html` + `artist-upload.js`) is now hidden until a valid image is picked; a
+  post always needs an image, so an always-visible caption wrongly implied you could post text
+  only. UI ordering only, no API change. **T049 (followed artists' posts in the feed) done** — the
+  feed now shows the behind-the-scenes `ArtistPost`s (T50/T51) of the artists you follow, interleaved
+  newest-first with the song `Post`s. `build_feed` (`backend/app/routers/feed.py`) was split into
+  `_build_song_items` + `_build_artist_items` (each returning `(created_at, item)` pairs, merged +
+  sorted by the raw datetime); the artist half batches reaction/comment counts + the viewer's own
+  reactions over the T52 `ArtistReaction`/`ArtistComment` tables (no N+1) and signs each image path
+  (T53). Every feed item now carries a `kind` discriminator (`"song"`/`"artist"`); `feed.html`
+  branches on it and reuses the T54 artist card + `artist-engagement.js` (loaded only when an artist
+  item is present), so likes/comments hit the existing T52 `/api/artist/posts/{id}/...` endpoints —
+  no new API. New `ArtistFeedPostOut` DTO; `FeedPostOut` gained `kind`. `GET /api/feed`'s route
+  signature is unchanged (still a list), so the T61 route inventory needs no change. Satisfies
+  UI-2/BE-7's followed-artist-in-feed gap. **T48 (editable profile) done** — an in-app "Edit
+  profile" surface so any user can set a bio and upload a profile picture (before this a bio didn't
+  exist and email sign-ups had no avatar). New `User.bio` column (nullable Text) + a hand-written
+  migration (`a1c47f9e2b30`, off `3978f11ad4da`); three login-gated `/api/me` endpoints on the
+  authenticated caller (unspoofable, like become-artist): `PATCH /api/me/profile` (trim + ≤ 300,
+  empty clears to NULL), `POST /api/me/avatar/sign-upload` (signed upload URL for a NEW **public**
+  `avatars` bucket at `<callerUserId>/<uuid>.<ext>`, returns `{ signedUrl, token, path, publicUrl }`),
+  and `POST /api/me/avatar` (path must be in the caller's own folder, else 400; stores the public
+  object URL on `avatar_url`). New `public_object_url` helper in `security/supabase.py` (public bucket
+  needs no signed read URL, unlike artist-images). Own-profile "Edit profile" form (`profile.html` +
+  `static/edit-profile.js`: avatar 3-step upload → PATCH bio → reload); bio renders under the header
+  on every profile (autoescaped user text). Satisfies the new **UI-11**. **Deploy steps for Andrea:**
+  (1) create a **public** Supabase Storage bucket named `avatars` in `brink-dev`; (2) apply the
+  migration — `cd backend && uv run alembic upgrade head`. **Next:
   T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 

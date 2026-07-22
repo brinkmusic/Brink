@@ -55,7 +55,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | UI-1 | Post composer with Spotify catalog search → publish. | T40 | ✅ |
-| UI-2 | Feed reads `/api/feed`; manually shared song cards. *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links)* | T41, T47 | ✅ |
+| UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts)* | T41, T47, T049 | ✅ |
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
 | UI-4 | Comments become real input + list. | T42 | ✅ |
 | UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16 | ✅ |
@@ -64,16 +64,17 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
 | UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60) |
 | UI-10 | "Now playing" indicator on profile + feed. | T20, T44 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up) |
+| UI-11 | Editable profile: user bio + profile-picture upload. | T048 | ✅ |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ✅ |
-| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. *(T53 made the uploaded images actually display — signed read URLs for the private bucket)* | T51, T53 | ✅ |
+| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. *(T53 made the uploaded images actually display — signed read URLs for the private bucket; T57 hides the caption box until an image is picked, since a post always needs one)* | T51, T53, T57 | ✅ |
 | MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ✅ |
 | MEDIA-4 | Per-post engagement analytics shown to the artist. | T52, T54 | ✅ (reaction + comment counts, owner-only on artist profiles; view count deferred) |
 | MEDIA-5 | ≥98% upload success across 5 file types up to 10 MB. | T51, T53 | ◧ (T53 verified the storage round-trip live on brink-dev: service-role upload → signed read URL → 200 with matching bytes, unsigned GET 400; the browser-upload half + the 5-file-type success-rate measurement remain) |
-| MEDIA-6 | Self-serve artist designation in-app (no DB edit) — become an artist from your own profile. | T55 | ✅ (`POST /api/me/become-artist` sets `isArtist` on the authenticated caller; own-profile "Become an artist" button; one-way, self-serve per ADR-0008) |
+| MEDIA-6 | Self-serve artist designation in-app (no DB edit) — become an artist from your own profile. | T55, T56 | ✅ (`POST /api/me/become-artist` sets `isArtist` on the authenticated caller; own-profile "Become an artist" button; one-way, self-serve per ADR-0008. T56 polished the button: readable ghost buttons, top-right placement, "cannot be undone" confirmation) |
 
 ## Layer 7 — Infrastructure & Scheduling (INFRA)
 | ID | Acceptance | Ticket(s) | Status |

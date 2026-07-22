@@ -51,6 +51,55 @@
   {% if posts %}
     <div class="stack">
       {% for p in posts %}
+      {% if p.kind == "artist" %}
+      {# An artist behind-the-scenes post (T049): the image + caption of an artist you follow, with
+         the SAME like/comment controls as an artist profile (T54), wired to the T52 /api/artist
+         endpoints via static/artist-engagement.js. The image URL is already a signed read URL. #}
+      <article class="artist-post card">
+        <p class="post-meta">
+          <a class="post-author" href="/u/{{ p.author_handle }}">{{ p.author }}</a>
+          · behind the scenes · shared {{ p.when }}
+        </p>
+        <img class="artist-post-img" src="{{ p.image_url }}" alt="{{ p.caption }}" />
+        {% if p.caption %}<p class="artist-post-caption">{{ p.caption }}</p>{% endif %}
+
+        {# Audience reactions on artist posts, backed by T52's /api/artist endpoints. #}
+        <div class="reactions artist-reactions" data-post-id="{{ p.id }}">
+          {% for kind, emoji in reaction_kinds %}
+          <button
+            type="button"
+            class="react-btn{% if kind in p.mine %} reacted{% endif %}"
+            data-type="{{ kind }}"
+            aria-pressed="{{ 'true' if kind in p.mine else 'false' }}"
+            onclick="artistReact(this)"
+          >
+            <span class="react-emoji">{{ emoji }}</span>
+            <span class="react-count">{{ p.counts[kind] }}</span>
+          </button>
+          {% endfor %}
+        </div>
+
+        <div class="comments artist-comments" data-post-id="{{ p.id }}">
+          <button type="button" class="comment-toggle" onclick="toggleArtistComments(this)">
+            💬 <span class="comment-count">{{ p.comment_count }}</span>
+          </button>
+          <div class="comment-panel" hidden>
+            <ul class="comment-list"></ul>
+            <form class="comment-form" onsubmit="submitArtistComment(event, this)">
+              <input
+                type="text"
+                name="body"
+                placeholder="Add a comment…"
+                maxlength="2000"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" class="btn btn-spotify">Post</button>
+            </form>
+          </div>
+        </div>
+      </article>
+      {% else %}
       <article class="post">
         <div class="post-art">
           {% if p.album_art %}
@@ -108,6 +157,7 @@
           </div>
         </div>
       </article>
+      {% endif %}
       {% endfor %}
     </div>
   {% else %}
@@ -121,4 +171,9 @@
 <script src="/static/composer.js"></script>
 <script src="/static/reactions.js"></script>
 <script src="/static/comments.js"></script>
+{# When any artist behind-the-scenes post is present (T049), load its engagement script — the SAME
+   one the artist profile uses (T54), which drives artistReact/toggleArtistComments/submitArtistComment. #}
+{% if posts | selectattr("kind", "equalto", "artist") | list %}
+<script src="/static/artist-engagement.js"></script>
+{% endif %}
 {% endblock %}

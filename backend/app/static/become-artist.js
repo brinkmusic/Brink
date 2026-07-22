@@ -9,6 +9,14 @@
 // account to upgrade — we never send an id (it can't be spoofed).
 
 async function becomeArtist(btn) {
+  // Becoming an artist is a ONE-WAY action (T55) — there's no in-app way back to a listener
+  // account — and the button sits on your profile where a stray tap is easy, so confirm first.
+  // window.confirm returns false when the user cancels; we bail without touching the API.
+  const ok = window.confirm(
+    "Are you sure you want to create an artist profile?\n\nThis unlocks the artist studio and cannot be undone.",
+  );
+  if (!ok) return;
+
   btn.disabled = true;
   const original = btn.textContent;
   btn.textContent = "Switching…";
