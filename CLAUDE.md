@@ -422,7 +422,13 @@ PR that it went in without a second review).
   returning `ArtistStateOut`; a "Become an artist" button on your **own** profile
   (`profile.html` + `static/become-artist.js`) reloads to unlock the artist studio. Before this the
   `is_artist` flag could only be set by editing the Supabase DB by hand (T50 had deferred this
-  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**. **Next:
+  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**.
+  **T56 (artist-button UI polish) done** — UI-only follow-up to T55: `.btn-ghost` now sets
+  `background: transparent` so ghost buttons aren't light-text-on-light-button ("white on white" —
+  a `<button>`'s default light background was showing through); the "Become an artist" button moved
+  to the profile card's top-right corner (small/quiet, `position:absolute`) so it isn't mis-tapped;
+  and `become-artist.js` now shows a "this cannot be undone" confirm before the one-way flip
+  (`brink.css` + `become-artist.js`). **Next:
   T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
