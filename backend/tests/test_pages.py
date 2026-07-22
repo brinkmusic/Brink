@@ -134,6 +134,7 @@ def test_feed_empty_state(client, db_session, monkeypatch):
     res = client.get("/feed")
     assert res.status_code == 200
     assert "No songs shared yet" in res.text
+    assert "Search above to share the first one" in res.text
 
 
 # ---- T41: feed shows live reaction counts + highlights the viewer's own reactions ----
@@ -237,6 +238,8 @@ def test_feed_has_composer(client, db_session, monkeypatch):
 
     body = client.get("/feed").text
     assert 'class="composer' in body               # the composer block is present
+    assert 'for="composer-search-input"' in body   # search input has a real label
+    assert 'id="composer-status"' in body          # JS has a visible status/error target
     assert "composerSearch(this)" in body          # the search box is wired
     assert "/static/composer.js" in body           # the script is loaded
 
@@ -274,6 +277,8 @@ def test_feed_shows_followed_artist_post(client, db_session, monkeypatch):
     assert "artist-reactions" in body                                  # audience reaction bar
     assert "artistReact(this)" in body
     assert "toggleArtistComments(this)" in body
+    assert "aria-expanded=\"false\"" in body
+    assert f'aria-controls="artist-comment-panel-{post.id}"' in body
     assert f'data-post-id="{post.id}"' in body
     assert "/static/artist-engagement.js" in body                      # the engagement script
 
@@ -414,7 +419,10 @@ def test_own_profile_shows_become_artist_button(client, db_session, monkeypatch)
     app.dependency_overrides[get_session] = lambda: db_session
     _login(client, monkeypatch)
     body = client.get("/u/viewer").text
+    assert 'class="profile-actions"' in body
     assert "becomeArtist(this)" in body
+    assert 'aria-describedby="become-artist-status"' in body
+    assert 'id="become-artist-status"' in body
     assert "/static/become-artist.js" in body
 
 
@@ -468,6 +476,8 @@ def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatc
     assert f'data-post-id="{post.id}"' in body
     assert "artistReact(this)" in body
     assert "toggleArtistComments(this)" in body
+    assert f'aria-controls="artist-comment-panel-{post.id}"' in body
+    assert f'id="artist-comment-status-{post.id}"' in body
     assert "/static/artist-engagement.js" in body
     assert "Artist-only engagement" not in body
 
@@ -554,6 +564,7 @@ def test_own_profile_without_spotify_shows_link_prompt(client, db_session, monke
 
     body = client.get("/u/viewer").text
     assert "Link Spotify" in body
+    assert 'href="/auth/login"' in body
 
 
 def test_own_profile_shows_now_playing_badge(client, db_session, monkeypatch):
@@ -615,6 +626,7 @@ def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch
     body = client.get("/artist").text
     assert 'class="artist-file"' not in body        # no upload box for non-artists
     assert "Artist accounts only" in body
+    assert 'href="/u/viewer"' in body
 
 
 def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):

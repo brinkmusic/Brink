@@ -210,8 +210,9 @@ agents, not a changelog.
   avatars use a public `avatars` bucket; artist images use private `artist-images` signed reads.
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
-- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket; as of
-  this note, `T32` is unblocked and `T14` is still gated.
+- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. For
+  analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22 non-analytics UI hardening
+  wave (`T80`–`T83`) is complete.
 
 ## Watch-outs
 

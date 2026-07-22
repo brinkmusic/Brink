@@ -55,31 +55,40 @@ async function toggleArtistComments(btn) {
   const opening = panel.hasAttribute("hidden");
   if (!opening) {
     panel.setAttribute("hidden", "");
+    btn.setAttribute("aria-expanded", "false");
     return;
   }
   panel.removeAttribute("hidden");
+  btn.setAttribute("aria-expanded", "true");
   if (!box.dataset.loaded) {
-    await loadArtistComments(box);
-    box.dataset.loaded = "1";
+    const loaded = await loadArtistComments(box);
+    if (loaded) box.dataset.loaded = "1";
   }
 }
 
 async function loadArtistComments(box) {
   const list = box.querySelector(".comment-list");
+  const status = box.querySelector(".comment-status");
+  list.textContent = "";
+  if (status) status.textContent = "Loading comments...";
   try {
     const res = await fetch(`/api/artist/posts/${box.dataset.postId}/comments`);
     if (!res.ok) throw new Error(`artist comments GET failed: ${res.status}`);
     const comments = (await res.json()).data;
     list.textContent = "";
+    if (status) status.textContent = "";
     if (comments.length === 0) {
       list.appendChild(artistEmptyRow("No comments yet. Be the first."));
     } else {
       comments.forEach((c) => list.appendChild(renderArtistComment(c)));
     }
+    return true;
   } catch (err) {
     list.textContent = "";
     list.appendChild(artistEmptyRow("Couldn't load comments."));
+    if (status) status.textContent = "Couldn't load comments. Close and reopen to try again.";
     console.warn(err);
+    return false;
   }
 }
 
@@ -91,7 +100,9 @@ async function submitArtistComment(event, form) {
   if (!text) return;
 
   const submitBtn = form.querySelector('button[type="submit"]');
+  const status = box.querySelector(".comment-status");
   submitBtn.disabled = true;
+  if (status) status.textContent = "Posting comment...";
   try {
     const res = await fetch(`/api/artist/posts/${box.dataset.postId}/comments`, {
       method: "POST",
@@ -106,8 +117,10 @@ async function submitArtistComment(event, form) {
     if (empty) empty.remove();
     list.prepend(renderArtistComment(comment));
     input.value = "";
+    if (status) status.textContent = "";
     bumpArtistCommentCount(box, 1);
   } catch (err) {
+    if (status) status.textContent = "Couldn't post that comment. Please try again.";
     console.warn(err);
   } finally {
     submitBtn.disabled = false;
