@@ -37,6 +37,11 @@
   {% else %}
   <div class="card empty">
     <p>This is where artists post behind-the-scenes content. Artist accounts only. 🎧</p>
+    {% if viewer %}
+    <div class="empty-actions">
+      <a class="btn btn-ghost" href="/u/{{ viewer.handle }}">Go to your profile</a>
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -51,7 +56,9 @@
       {% endfor %}
     </div>
   {% elif is_artist %}
-    <div class="card empty"><p>No posts yet. Share your first one above. 🎤</p></div>
+    <div class="card empty">
+      <p>No posts yet. Share your first one above. 🎤</p>
+    </div>
   {% endif %}
 </section>
 

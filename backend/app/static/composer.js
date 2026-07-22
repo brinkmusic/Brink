@@ -28,6 +28,8 @@ function composerSearch(input) {
 // Fetch matching tracks and show them as a clickable list.
 async function runSearch(section, q) {
   const list = section.querySelector(".composer-results");
+  const status = section.querySelector(".composer-status");
+  if (status) status.textContent = "Searching...";
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     if (!res.ok) throw new Error(`search failed: ${res.status}`);
@@ -35,11 +37,16 @@ async function runSearch(section, q) {
     list.textContent = "";
     if (tracks.length === 0) {
       list.appendChild(resultRow("No matches", null));
+      if (status) status.textContent = "No matches found.";
     } else {
       tracks.forEach((t) => list.appendChild(resultRow(`${t.title} · ${t.artistName}`, t)));
+      if (status) status.textContent = `${tracks.length} result${tracks.length === 1 ? "" : "s"} found.`;
     }
     list.hidden = false;
   } catch (err) {
+    list.textContent = "";
+    list.hidden = true;
+    if (status) status.textContent = "Couldn't search right now. Please try again.";
     console.warn(err);
   }
 }
@@ -48,11 +55,15 @@ async function runSearch(section, q) {
 function resultRow(label, track) {
   const li = document.createElement("li");
   li.className = "composer-result";
-  li.textContent = label;
   if (track) {
-    li.tabIndex = 0;
-    li.onclick = () => selectTrack(li.closest(".composer"), track);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "composer-result-button";
+    btn.textContent = label;
+    btn.onclick = () => selectTrack(li.closest(".composer"), track);
+    li.appendChild(btn);
   } else {
+    li.textContent = label;
     li.classList.add("composer-result-empty");
   }
   return li;
@@ -64,6 +75,8 @@ function selectTrack(section, track) {
   section.querySelector(".composer-track-title").textContent = track.title;
   section.querySelector(".composer-track-artist").textContent = track.artistName;
   section.querySelector(".composer-results").hidden = true;
+  const status = section.querySelector(".composer-status");
+  if (status) status.textContent = `${track.title} selected. Add a caption or share it.`;
   section.querySelector(".composer-search").hidden = true;
   section.querySelector(".composer-selected").hidden = false;
   section.querySelector(".composer-caption").focus();
@@ -74,10 +87,12 @@ function composerReset(btn) {
   const section = btn.closest(".composer");
   section._track = null;
   const searchBox = section.querySelector(".composer-search");
+  const status = section.querySelector(".composer-status");
   searchBox.value = "";
   searchBox.hidden = false;
   section.querySelector(".composer-caption").value = "";
   section.querySelector(".composer-selected").hidden = true;
+  if (status) status.textContent = "";
   hideResults(section);
 }
 
@@ -87,8 +102,10 @@ async function composerPublish(btn) {
   const track = section._track;
   if (!track) return;
   const caption = section.querySelector(".composer-caption").value.trim();
+  const status = section.querySelector(".composer-status");
 
   btn.disabled = true;
+  if (status) status.textContent = "Sharing...";
   try {
     const res = await fetch("/api/posts", {
       method: "POST",
@@ -108,6 +125,7 @@ async function composerPublish(btn) {
     if (!res.ok) throw new Error(`publish failed: ${res.status}`);
     window.location.reload(); // simplest reliable way to show the new post at the top
   } catch (err) {
+    if (status) status.textContent = "Couldn't share that song. Please try again.";
     console.warn(err);
     btn.disabled = false;
   }
@@ -118,4 +136,6 @@ function hideResults(section) {
   const list = section.querySelector(".composer-results");
   list.hidden = true;
   list.textContent = "";
+  const status = section.querySelector(".composer-status");
+  if (status) status.textContent = "";
 }

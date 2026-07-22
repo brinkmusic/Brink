@@ -166,26 +166,35 @@ body {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
   padding: 0.6rem 1.1rem;
   border-radius: 9999px;
   font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s, transform 0.1s;
 }
 .btn:active { transform: translateY(1px); }
+.btn:disabled,
+.btn[aria-busy="true"] {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
 /* Primary action, in Brink's lavender with dark text for strong contrast. */
-.btn-spotify { background: var(--accent); color: #0b0b12; }
+.btn-spotify { background: var(--accent); border-color: var(--accent); color: #0b0b12; }
 .btn-spotify:hover { background: #b1a4f5; }
 /* Secondary action, outlined and quiet so it sits behind the primary one.
    background:transparent is REQUIRED: a <button> element defaults to the browser's light
    button background, which would show light text on a light button ("white on white"). Making
    it transparent lets the dark page/card show through, so the light text stays readable. */
 .btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
-.btn-ghost:hover { border-color: var(--accent); }
+.btn-ghost:hover { border-color: var(--accent); background: rgba(157, 141, 241, 0.1); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---- Feature cards ---- */
@@ -251,14 +260,29 @@ body {
   overflow-y: auto;
 }
 .composer-result {
-  padding: 0.5rem 0.6rem;
   border-radius: 0.5rem;
   font-size: 0.88rem;
-  cursor: pointer;
 }
-.composer-result:hover,
-.composer-result:focus-visible { background: var(--panel); outline: none; }
+.composer-result-button {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.composer-result-button:hover,
+.composer-result-button:focus-visible { background: var(--panel); outline: none; }
 .composer-result-empty { color: var(--mute); cursor: default; }
+.composer-status {
+  min-height: 1rem;
+  margin: 0.35rem 0 0;
+  color: var(--mute);
+  font-size: 0.82rem;
+}
 .composer-selected { display: grid; gap: 0.6rem; }
 .composer-track { margin: 0; display: flex; flex-direction: column; }
 .composer-track-title { font-weight: 600; font-size: 0.95rem; }
@@ -267,7 +291,30 @@ body {
 
 /* ---- Artist page (T51) ---- */
 .artist-upload { display: grid; gap: 0.6rem; }
-.artist-file { color: var(--mute); font-size: 0.85rem; font-family: inherit; }
+.artist-file,
+.edit-avatar-file {
+  width: 100%;
+  color: var(--mute);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.artist-file::file-selector-button,
+.edit-avatar-file::file-selector-button {
+  margin-right: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  background: var(--ink);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.45rem 0.8rem;
+}
+.artist-file::file-selector-button:hover,
+.edit-avatar-file::file-selector-button:hover {
+  border-color: var(--accent);
+  background: rgba(157, 141, 241, 0.1);
+}
 .artist-caption {
   width: 100%;
   padding: 0.55rem 0.8rem;
@@ -291,10 +338,9 @@ body {
 .artist-engagement-line { margin: 0; color: var(--mute); font-size: 0.85rem; }
 
 /* ---- Profile page (T43) ---- */
-/* position:relative so the "Become an artist" button (T56) can be pinned to the top-right
-   corner of the card, out of the main action flow so it isn't tapped by accident. */
-.profile-header { position: relative; display: grid; gap: 0.75rem; }
+.profile-header { display: grid; gap: 0.75rem; }
 .profile-id { display: flex; align-items: center; gap: 0.75rem; }
+.profile-id > div { min-width: 0; }
 .profile-avatar {
   width: 3.5rem;
   height: 3.5rem;
@@ -304,21 +350,24 @@ body {
   background-size: cover;
   background-position: center;
 }
-.profile-name { margin: 0; font-size: 1.25rem; }
+.profile-name { margin: 0; font-size: 1.25rem; overflow-wrap: anywhere; }
 .profile-handle { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
-.profile-counts { display: flex; gap: 1.25rem; color: var(--mute); font-size: 0.9rem; }
+.profile-counts { display: flex; flex-wrap: wrap; gap: 0.45rem 1.25rem; color: var(--mute); font-size: 0.9rem; }
 .profile-counts b { color: var(--text); font-variant-numeric: tabular-nums; }
 .profile-count-link { color: var(--mute); text-decoration: none; }
 .profile-count-link:hover { color: var(--text); }
-.follow-btn { justify-self: start; }
-/* T56: pin the one-way "Become an artist" action to the card's top-right corner, and make it
-   small/quiet so it reads as a secondary option, not the page's main call to action. */
-.become-artist-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 0.4rem 0.8rem;
-  font-size: 0.8rem;
+.profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.profile-action-status {
+  min-height: 1rem;
+  margin: -0.25rem 0 0;
+  color: var(--mute);
+  font-size: 0.82rem;
+}
+.become-artist-btn { border-color: rgba(157, 141, 241, 0.55); }
+@media (max-width: 520px) {
+  .profile-id { align-items: flex-start; }
+  .profile-actions { align-items: stretch; }
+  .profile-actions .btn { flex: 1 1 11rem; }
 }
 .post-author { color: var(--text); text-decoration: none; font-weight: 500; }
 .post-author:hover { color: var(--accent); }
@@ -398,7 +447,8 @@ body {
   cursor: pointer;
   border-radius: 9999px;
 }
-.comment-toggle:hover { color: var(--text); }
+.comment-toggle:hover { color: var(--text); background: rgba(157, 141, 241, 0.1); }
+.comment-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .comment-count { font-variant-numeric: tabular-nums; }
 .comment-panel { margin-top: 0.5rem; }
 .comment-list { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.4rem; }
@@ -407,6 +457,7 @@ body {
 .comment-body { color: var(--text); }
 .comment-when { color: var(--mute); font-size: 0.72rem; margin-left: 0.4rem; }
 .comment-empty { color: var(--mute); font-size: 0.85rem; }
+.comment-status { margin: 0 0 0.45rem; color: var(--mute); font-size: 0.82rem; min-height: 1rem; }
 .comment-form { display: flex; gap: 0.5rem; }
 .comment-form input {
   flex: 1;
@@ -423,6 +474,44 @@ body {
 .comment-form .btn { padding: 0.45rem 0.9rem; font-size: 0.8rem; }
 .empty { color: var(--mute); font-size: 0.95rem; }
 .empty p { margin: 0; }
+.empty > * + * { margin-top: 0.75rem; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* ---- Edit profile (T48) ---- */
+.edit-profile { display: grid; gap: 0.6rem; }
+.edit-profile-form {
+  display: grid;
+  gap: 0.75rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+.edit-profile-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--mute);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.edit-bio {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--ink);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+.edit-bio:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.edit-profile-status {
+  min-height: 1rem;
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.82rem;
+}
+.edit-profile-save { justify-self: start; }
 
 /* ---- Footer ---- */
 .footer { border-top: 1px solid var(--line); margin-top: 2rem; }
@@ -472,6 +561,7 @@ body {
 .now-playing {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   font-size: 0.9rem;
 }
@@ -484,10 +574,10 @@ body {
   flex: none;
 }
 .np-label { color: var(--mute); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.72rem; }
-.np-track { color: var(--text); font-weight: 600; }
+.np-track { color: var(--text); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 
 .listening { display: flex; flex-direction: column; gap: 1rem; }
-.listening-stats { display: flex; gap: 1.5rem; color: var(--mute); font-size: 0.9rem; }
+.listening-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; color: var(--mute); font-size: 0.9rem; }
 .listening-stats b { color: var(--hot); font-size: 1.1rem; }
 .listening-block h3 {
   font-size: 0.8rem;
@@ -500,28 +590,45 @@ body {
 .top-list li {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.3rem 0;
   border-bottom: 1px solid var(--line);
   font-size: 0.92rem;
 }
-.top-title { font-weight: 600; color: var(--text); }
-.top-artist { color: var(--mute); }
+.top-title { font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.top-artist { color: var(--mute); min-width: 0; overflow-wrap: anywhere; }
 /* Push the play count to the right edge of the row. */
-.top-plays { margin-left: auto; color: var(--mute); font-size: 0.85rem; }
+.top-plays { margin-left: auto; color: var(--mute); font-size: 0.85rem; white-space: nowrap; }
 
 .recent-list { list-style: none; padding: 0; margin: 0; }
 .recent-list li {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.6rem;
   padding: 0.35rem 0;
   font-size: 0.92rem;
 }
 .recent-art { width: 2rem; height: 2rem; border-radius: 0.35rem; object-fit: cover; flex: none; }
-.recent-title { font-weight: 600; color: var(--text); }
-.recent-artist { color: var(--mute); }
-.recent-when { margin-left: auto; color: var(--mute); font-size: 0.82rem; }
+.recent-title { font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.recent-artist { color: var(--mute); min-width: 0; overflow-wrap: anywhere; }
+.recent-when { margin-left: auto; color: var(--mute); font-size: 0.82rem; white-space: nowrap; }
+@media (max-width: 520px) {
+  .now-playing { align-items: flex-start; }
+  .np-label { flex-basis: calc(100% - 1.25rem); }
+  .np-track { flex-basis: 100%; padding-left: 1rem; }
+  .top-list li,
+  .recent-list li { align-items: flex-start; }
+  .top-title,
+  .top-artist,
+  .recent-title,
+  .recent-artist { flex-basis: 100%; }
+  .top-plays,
+  .recent-when { margin-left: 0; }
+  .comment-form { flex-wrap: wrap; }
+  .comment-form input { flex-basis: 100%; }
+}
 
 /* ---- Email signup / login forms (T03) ---- */
 /* A narrow centred card holding the auth form, reusing the palette + card look. */
