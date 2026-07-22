@@ -19,6 +19,7 @@ EXPECTED_API_ROUTES = {
     ("DELETE", "/api/follow/{user_id}"),
     ("GET", "/api/feed"),
     ("GET", "/api/me/now-playing"),
+    ("POST", "/api/me/become-artist"),
     ("POST", "/api/snapshot"),
     ("POST", "/api/artist/sign-upload"),
     ("POST", "/api/artist/posts"),

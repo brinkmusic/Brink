@@ -28,6 +28,7 @@ from app.routers import (
     feed,
     follow,
     health,
+    me,
     now_playing,
     pages,
     posts,
@@ -63,6 +64,7 @@ app.include_router(comments.router)   # POST/GET /api/posts/{id}/comments
 app.include_router(follow.router)     # POST/DELETE /api/follow/{userId}
 app.include_router(feed.router)       # GET /api/feed
 app.include_router(now_playing.router)  # GET /api/me/now-playing
+app.include_router(me.router)           # POST /api/me/become-artist (T55)
 app.include_router(snapshot.router)     # POST /api/snapshot (cron-triggered)
 app.include_router(artist.router)       # POST /api/artist/sign-upload, POST /api/artist/posts
 app.include_router(search.router)       # GET /api/search?q= (Spotify catalog search, T40)

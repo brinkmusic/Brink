@@ -329,6 +329,26 @@ def test_own_profile_has_no_follow_button(client, db_session, monkeypatch):
     assert "toggleFollow(this)" not in body  # you can't follow yourself
 
 
+# T55: a non-artist viewing their OWN profile sees the "Become an artist" button (which calls
+# POST /api/me/become-artist). It must not appear on someone else's profile or for an artist.
+def test_own_profile_shows_become_artist_button(client, db_session, monkeypatch):
+    _seed_viewer(db_session)  # a normal listener (is_artist defaults to False), handle "viewer"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+    body = client.get("/u/viewer").text
+    assert "becomeArtist(this)" in body
+    assert "/static/become-artist.js" in body
+
+
+def test_own_profile_hides_become_artist_button_for_artist(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_artist(db_session)  # is_artist=True, keyed to the login id, handle "the-artist"
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+    body = client.get("/u/the-artist").text
+    assert "becomeArtist(this)" not in body  # already an artist — nothing to become
+
+
 def test_profile_missing_handle_is_404(client, db_session, monkeypatch):
     _seed_viewer(db_session)
     app.dependency_overrides[get_session] = lambda: db_session
