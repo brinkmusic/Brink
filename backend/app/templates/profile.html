@@ -213,7 +213,9 @@
     <div class="stack">
       {% for post in p.artist_posts %}
       <article class="artist-post card">
+        {% if post.image_url %}
         <img class="artist-post-img" src="{{ post.image_url }}" alt="{{ post.caption }}" />
+        {% endif %}
         <p class="artist-post-caption">{{ post.caption }}</p>
         <p class="post-meta">shared {{ post.when }}</p>
 

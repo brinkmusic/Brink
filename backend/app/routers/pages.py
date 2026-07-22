@@ -272,11 +272,16 @@ def _profile_data(
     # private bucket paths, so each one gets a signed read URL before the browser sees it.
     artist_posts = []
     if person.is_artist:
-        artist_rows = session.exec(
-            select(ArtistPost)
-            .where(ArtistPost.artist_user_id == person.id)
-            .order_by(ArtistPost.created_at.desc())
-        ).all()
+        try:
+            artist_rows = session.exec(
+                select(ArtistPost)
+                .where(ArtistPost.artist_user_id == person.id)
+                .order_by(ArtistPost.created_at.desc())
+            ).all()
+        except Exception as e:  # noqa: BLE001 - optional artist content must not break profiles
+            logger.warning("artist posts unavailable for profile %s: %s", person.id, e)
+            session.rollback()
+            artist_rows = []
         artist_post_ids = [post.id for post in artist_rows]
 
         # Start every post with zeroes so templates can render a stable HEART/FIRE/SPARKLE set even
@@ -292,35 +297,39 @@ def _profile_data(
         }
 
         if artist_post_ids:
-            reaction_rows = session.exec(
-                select(ArtistReaction.artist_post_id, ArtistReaction.type, func.count())
-                .where(ArtistReaction.artist_post_id.in_(artist_post_ids))
-                .group_by(ArtistReaction.artist_post_id, ArtistReaction.type)
-            ).all()
-            for post_id, rtype, count in reaction_rows:
-                reaction_counts[post_id][ReactionType(rtype).value] = count
+            try:
+                reaction_rows = session.exec(
+                    select(ArtistReaction.artist_post_id, ArtistReaction.type, func.count())
+                    .where(ArtistReaction.artist_post_id.in_(artist_post_ids))
+                    .group_by(ArtistReaction.artist_post_id, ArtistReaction.type)
+                ).all()
+                for post_id, rtype, count in reaction_rows:
+                    reaction_counts[post_id][ReactionType(rtype).value] = count
 
-            comment_rows = session.exec(
-                select(ArtistComment.artist_post_id, func.count())
-                .where(ArtistComment.artist_post_id.in_(artist_post_ids))
-                .group_by(ArtistComment.artist_post_id)
-            ).all()
-            for post_id, count in comment_rows:
-                comment_counts[post_id] = count
+                comment_rows = session.exec(
+                    select(ArtistComment.artist_post_id, func.count())
+                    .where(ArtistComment.artist_post_id.in_(artist_post_ids))
+                    .group_by(ArtistComment.artist_post_id)
+                ).all()
+                for post_id, count in comment_rows:
+                    comment_counts[post_id] = count
 
-            mine_rows = session.exec(
-                select(ArtistReaction.artist_post_id, ArtistReaction.type).where(
-                    ArtistReaction.artist_post_id.in_(artist_post_ids),
-                    ArtistReaction.user_id == viewer_id,
-                )
-            ).all()
-            for post_id, rtype in mine_rows:
-                viewer_reactions[post_id][ReactionType(rtype).value] = True
+                mine_rows = session.exec(
+                    select(ArtistReaction.artist_post_id, ArtistReaction.type).where(
+                        ArtistReaction.artist_post_id.in_(artist_post_ids),
+                        ArtistReaction.user_id == viewer_id,
+                    )
+                ).all()
+                for post_id, rtype in mine_rows:
+                    viewer_reactions[post_id][ReactionType(rtype).value] = True
+            except Exception as e:  # noqa: BLE001 - engagement is an optional profile enrichment
+                logger.warning("artist engagement unavailable for profile %s: %s", person.id, e)
+                session.rollback()
 
         artist_posts = [
             {
                 "id": post.id,
-                "image_url": create_signed_read_url(UPLOAD_BUCKET, post.image_url),
+                "image_url": _signed_artist_image_url(post.image_url),
                 "caption": post.caption,
                 "when": _ago(post.created_at),
                 "reaction_counts": reaction_counts[post.id],
@@ -368,6 +377,14 @@ def _profile_data(
     }
 
 
+def _signed_artist_image_url(path: str) -> str:
+    try:
+        return create_signed_read_url(UPLOAD_BUCKET, path)
+    except Exception as e:  # noqa: BLE001 - a storage-signing issue should not 500 the profile
+        logger.warning("artist image signing failed for %s: %s", path, e)
+        return ""
+
+
 # A user's profile page: their header, a Follow/Unfollow button + follower counts (T43), and their
 # posts. Login-gated like the rest of the app. `handle` comes from the URL, e.g. /u/andrea-ab12cd.
 @router.get("/u/{handle}", response_class=HTMLResponse)
@@ -399,7 +416,11 @@ def profile(
         # raises) when nothing is playing / Spotify isn't linked, so the badge simply hides.
         now_playing = None
         if data["is_self"]:
-            playing = spotify.get_currently_playing(session, viewer.id)
+            try:
+                playing = spotify.get_currently_playing(session, viewer.id)
+            except Exception as e:  # noqa: BLE001 - Spotify is optional profile enrichment
+                logger.warning("now-playing unavailable for profile %s: %s", viewer.id, e)
+                playing = None
             if playing and playing.get("is_playing") and playing.get("track"):
                 now_playing = playing["track"]
         page = templates.TemplateResponse(
