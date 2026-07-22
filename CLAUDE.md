@@ -422,7 +422,18 @@ PR that it went in without a second review).
   returning `ArtistStateOut`; a "Become an artist" button on your **own** profile
   (`profile.html` + `static/become-artist.js`) reloads to unlock the artist studio. Before this the
   `is_artist` flag could only be set by editing the Supabase DB by hand (T50 had deferred this
-  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**. **Next:
+  provisioning path). Self-serve, no approval queue (ADR-0008). Satisfies the new **MEDIA-6**.
+  **T049 (followed artists' posts in the feed) done** — the feed now shows the behind-the-scenes
+  `ArtistPost`s (T50/T51) of the artists you follow, interleaved newest-first with the song `Post`s.
+  `build_feed` (`backend/app/routers/feed.py`) was split into `_build_song_items` + `_build_artist_items`
+  (each returning `(created_at, item)` pairs, merged + sorted by the raw datetime); the artist half
+  batches reaction/comment counts + the viewer's own reactions over the T52 `ArtistReaction`/`ArtistComment`
+  tables (no N+1) and signs each image path (T53). Every feed item now carries a `kind` discriminator
+  (`"song"`/`"artist"`); `feed.html` branches on it and reuses the T54 artist card + `artist-engagement.js`
+  (loaded only when an artist item is present), so likes/comments hit the existing T52
+  `/api/artist/posts/{id}/...` endpoints — no new API. New `ArtistFeedPostOut` DTO; `FeedPostOut` gained
+  `kind`. `GET /api/feed`'s route signature is unchanged (still a list), so the T61 route inventory needs
+  no change. Satisfies UI-2/BE-7's followed-artist-in-feed gap. **Next:
   T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
