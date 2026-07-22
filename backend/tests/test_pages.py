@@ -584,6 +584,83 @@ def test_own_profile_shows_now_playing_badge(client, db_session, monkeypatch):
     assert "Midnight" in body
 
 
+def test_own_profile_ignores_now_playing_failure(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+
+    def boom(session, user_id):
+        raise RuntimeError("spotify is having a bad day")
+
+    monkeypatch.setattr("app.spotify.get_currently_playing", boom)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    res = client.get("/u/viewer")
+    assert res.status_code == 200
+    assert "Viewer" in res.text
+    assert "Internal Server Error" not in res.text
+
+
+def test_artist_profile_ignores_artist_engagement_read_failure(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    post = ArtistPost(artist_user_id=artist.id, image_url="stage-name/backstage.jpg",
+                      caption="backstage warmup")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+
+    monkeypatch.setattr(
+        "app.routers.pages.create_signed_read_url",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    real_exec = db_session.exec
+
+    def flaky_exec(statement, *args, **kwargs):
+        if "ArtistReaction" in str(statement) or "ArtistComment" in str(statement):
+            raise RuntimeError("artist engagement tables unavailable")
+        return real_exec(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db_session, "exec", flaky_exec)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    res = client.get("/u/stage-name")
+    assert res.status_code == 200
+    assert "backstage warmup" in res.text
+    assert "Internal Server Error" not in res.text
+
+
+def test_artist_profile_omits_image_when_signing_fails(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url="stage-name/backstage.jpg",
+                              caption="backstage warmup"))
+    db_session.commit()
+
+    def boom(bucket, path):
+        raise RuntimeError("storage signing unavailable")
+
+    monkeypatch.setattr("app.routers.pages.create_signed_read_url", boom)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    res = client.get("/u/stage-name")
+    assert res.status_code == 200
+    assert "backstage warmup" in res.text
+    assert 'class="artist-post-img"' not in res.text
+    assert 'src=""' not in res.text
+
+
 # ---- T51: artist page + upload UI ----
 
 
