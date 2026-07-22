@@ -193,6 +193,19 @@ def test_create_signed_read_url_honours_custom_expiry(monkeypatch):
     assert fake.calls[1] == ("create_signed_url", "artist-1/pic.jpg", 60)
 
 
+# --- public_object_url (T48) -------------------------------------------------------
+
+# Builds the public object URL for a PUBLIC bucket (the avatars bucket, T48): no signing needed —
+# the object is world-readable, so the URL is a plain, stable path off SUPABASE_URL.
+def test_public_object_url_builds_public_path(monkeypatch):
+    monkeypatch.setattr(
+        supabase, "get_settings",
+        lambda: type("S", (), {"supabase_url": "https://proj.supabase.co"})(),
+    )
+    url = supabase.public_object_url("avatars", "user-1/pic.jpg")
+    assert url == "https://proj.supabase.co/storage/v1/object/public/avatars/user-1/pic.jpg"
+
+
 # --- POST /api/artist/posts --------------------------------------------------------
 
 # No login session -> 401 { error } envelope.
