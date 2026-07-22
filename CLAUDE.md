@@ -431,7 +431,18 @@ PR that it went in without a second review).
   (`brink.css` + `become-artist.js`). **T57 (caption-after-image) done** — the artist upload
   caption box (`artist.html` + `artist-upload.js`) is now hidden until a valid image is picked; a
   post always needs an image, so an always-visible caption wrongly implied you could post text
-  only. UI ordering only, no API change. **Next:
+  only. UI ordering only, no API change. **T049 (followed artists' posts in the feed) done** — the
+  feed now shows the behind-the-scenes `ArtistPost`s (T50/T51) of the artists you follow, interleaved
+  newest-first with the song `Post`s. `build_feed` (`backend/app/routers/feed.py`) was split into
+  `_build_song_items` + `_build_artist_items` (each returning `(created_at, item)` pairs, merged +
+  sorted by the raw datetime); the artist half batches reaction/comment counts + the viewer's own
+  reactions over the T52 `ArtistReaction`/`ArtistComment` tables (no N+1) and signs each image path
+  (T53). Every feed item now carries a `kind` discriminator (`"song"`/`"artist"`); `feed.html`
+  branches on it and reuses the T54 artist card + `artist-engagement.js` (loaded only when an artist
+  item is present), so likes/comments hit the existing T52 `/api/artist/posts/{id}/...` endpoints —
+  no new API. New `ArtistFeedPostOut` DTO; `FeedPostOut` gained `kind`. `GET /api/feed`'s route
+  signature is unchanged (still a list), so the T61 route inventory needs no change. Satisfies
+  UI-2/BE-7's followed-artist-in-feed gap. **Next:
   T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
