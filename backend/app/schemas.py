@@ -86,6 +86,23 @@ class CreateArtistPostBody(CamelModel):
     linked_track_id: Optional[str] = None
 
 
+# The body of PATCH /api/me/profile (T48). `bio` is the user's short profile blurb.
+# StringConstraints does the up-front ADR-0007 validation:
+#   strip_whitespace -> surrounding spaces are trimmed before length-checking AND when stored,
+#   max_length=300   -> an over-long bio is rejected as a 400.
+# There is no min_length: an empty string is allowed and means "clear my bio" (the endpoint turns a
+# now-empty value into NULL). No userId field — the profile edited is always the authenticated caller.
+class UpdateProfileBody(CamelModel):
+    bio: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]
+
+
+# The body of POST /api/me/avatar (T48): the storage `path` the browser just uploaded the new
+# profile picture to (via the signed URL from /api/me/avatar/sign-upload). The endpoint verifies the
+# path is inside the caller's own folder before turning it into the stored public avatar URL.
+class AvatarSaveBody(CamelModel):
+    path: str
+
+
 # --- Responses ---------------------------------------------------------------------
 
 # The linked-track part of a post response.
@@ -207,6 +224,28 @@ class SignUploadOut(CamelModel):
     path: str
     signed_url: str
     token: str
+
+
+# What PATCH /api/me/profile returns (T48): just the resulting bio (or null if cleared). A tiny
+# allow-listed shape so the browser can confirm the save; the page reloads to re-render.
+class ProfileBioOut(CamelModel):
+    bio: Optional[str] = None
+
+
+# What POST /api/me/avatar/sign-upload returns (T48): like SignUploadOut but for the PUBLIC avatars
+# bucket, so it also carries `public_url` — the permanent, world-readable URL the object will have
+# once uploaded, which POST /api/me/avatar stores on the user. `signed_url` + `token` are Supabase's
+# single-use upload credentials; `path` is where the object lands.
+class AvatarSignUploadOut(CamelModel):
+    path: str
+    signed_url: str
+    token: str
+    public_url: str
+
+
+# What POST /api/me/avatar returns (T48): the resulting stored avatar URL of the caller's account.
+class AvatarOut(CamelModel):
+    avatar_url: Optional[str] = None
 
 
 # An ArtistPost as the API returns it (T50): its own fields only, an explicit allow-list.

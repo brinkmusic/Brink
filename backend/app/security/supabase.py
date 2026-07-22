@@ -140,6 +140,14 @@ def create_signed_read_url(bucket: str, path: str, expires_in: int = 3600) -> st
     return f"{get_settings().supabase_url}/storage/v1{signed}"
 
 
+def public_object_url(bucket: str, path: str) -> str:
+    # Build the public read URL for an object in a PUBLIC Supabase Storage bucket (T48, the avatars
+    # bucket). WHY no signing (unlike create_signed_read_url): a public bucket serves its objects to
+    # anyone, so there's no token/expiry — the URL is just a fixed path off SUPABASE_URL. We store
+    # THIS on User.avatar_url so a profile picture renders directly in an <img src> forever.
+    return f"{get_settings().supabase_url}/storage/v1/object/public/{bucket}/{path}"
+
+
 def get_user_from_token(token: str) -> Optional[User]:
     # Ask Supabase "who does this login token belong to?" It checks the token against
     # Supabase's auth server and returns that user.
