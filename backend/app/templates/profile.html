@@ -320,10 +320,10 @@
 </section>
 
 {# Makes the Follow/Unfollow button live (calls the T13 follow API). #}
-<script src="/static/follow.js"></script>
-{% if p.is_artist %}<script src="/static/artist-engagement.js"></script>{% endif %}
+<script src="/static/follow.js?v=85"></script>
+{% if p.is_artist %}<script src="/static/artist-engagement.js?v=85"></script>{% endif %}
 {# Makes the "Become an artist" button live (T55) — only loaded when it's shown. #}
-{% if p.is_self and not p.is_artist %}<script src="/static/become-artist.js"></script>{% endif %}
+{% if p.is_self and not p.is_artist %}<script src="/static/become-artist.js?v=85"></script>{% endif %}
 {# Makes the "Edit profile" form live (T48) — own profile only. #}
-{% if p.is_self %}<script src="/static/edit-profile.js"></script>{% endif %}
+{% if p.is_self %}<script src="/static/edit-profile.js?v=85"></script>{% endif %}
 {% endblock %}
