@@ -414,7 +414,10 @@ def test_own_profile_shows_become_artist_button(client, db_session, monkeypatch)
     app.dependency_overrides[get_session] = lambda: db_session
     _login(client, monkeypatch)
     body = client.get("/u/viewer").text
+    assert 'class="profile-actions"' in body
     assert "becomeArtist(this)" in body
+    assert 'aria-describedby="become-artist-status"' in body
+    assert 'id="become-artist-status"' in body
     assert "/static/become-artist.js" in body
 
 

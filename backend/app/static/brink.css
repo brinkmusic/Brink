@@ -166,26 +166,35 @@ body {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
   padding: 0.6rem 1.1rem;
   border-radius: 9999px;
   font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s, transform 0.1s;
 }
 .btn:active { transform: translateY(1px); }
+.btn:disabled,
+.btn[aria-busy="true"] {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
 /* Primary action, in Brink's lavender with dark text for strong contrast. */
-.btn-spotify { background: var(--accent); color: #0b0b12; }
+.btn-spotify { background: var(--accent); border-color: var(--accent); color: #0b0b12; }
 .btn-spotify:hover { background: #b1a4f5; }
 /* Secondary action, outlined and quiet so it sits behind the primary one.
    background:transparent is REQUIRED: a <button> element defaults to the browser's light
    button background, which would show light text on a light button ("white on white"). Making
    it transparent lets the dark page/card show through, so the light text stays readable. */
 .btn-ghost { background: transparent; border-color: var(--line); color: var(--text); }
-.btn-ghost:hover { border-color: var(--accent); }
+.btn-ghost:hover { border-color: var(--accent); background: rgba(157, 141, 241, 0.1); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---- Feature cards ---- */
@@ -291,9 +300,7 @@ body {
 .artist-engagement-line { margin: 0; color: var(--mute); font-size: 0.85rem; }
 
 /* ---- Profile page (T43) ---- */
-/* position:relative so the "Become an artist" button (T56) can be pinned to the top-right
-   corner of the card, out of the main action flow so it isn't tapped by accident. */
-.profile-header { position: relative; display: grid; gap: 0.75rem; }
+.profile-header { display: grid; gap: 0.75rem; }
 .profile-id { display: flex; align-items: center; gap: 0.75rem; }
 .profile-avatar {
   width: 3.5rem;
@@ -310,15 +317,18 @@ body {
 .profile-counts b { color: var(--text); font-variant-numeric: tabular-nums; }
 .profile-count-link { color: var(--mute); text-decoration: none; }
 .profile-count-link:hover { color: var(--text); }
-.follow-btn { justify-self: start; }
-/* T56: pin the one-way "Become an artist" action to the card's top-right corner, and make it
-   small/quiet so it reads as a secondary option, not the page's main call to action. */
-.become-artist-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 0.4rem 0.8rem;
-  font-size: 0.8rem;
+.profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.profile-action-status {
+  min-height: 1rem;
+  margin: -0.25rem 0 0;
+  color: var(--mute);
+  font-size: 0.82rem;
+}
+.become-artist-btn { border-color: rgba(157, 141, 241, 0.55); }
+@media (max-width: 520px) {
+  .profile-id { align-items: flex-start; }
+  .profile-actions { align-items: stretch; }
+  .profile-actions .btn { flex: 1 1 11rem; }
 }
 .post-author { color: var(--text); text-decoration: none; font-weight: 500; }
 .post-author:hover { color: var(--accent); }

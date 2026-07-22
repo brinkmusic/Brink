@@ -43,26 +43,16 @@
     {# No Follow button on your own profile — you can't follow yourself (the server enforces
        this too, returning 400). #}
     {% if not p.is_self %}
-    <button
-      type="button"
-      class="btn follow-btn {{ 'btn-ghost' if p.is_following else 'btn-spotify' }}"
-      data-user-id="{{ p.id }}"
-      data-following="{{ 'true' if p.is_following else 'false' }}"
-      aria-pressed="{{ 'true' if p.is_following else 'false' }}"
-      onclick="toggleFollow(this)"
-    >{{ 'Following' if p.is_following else 'Follow' }}</button>
-    {% endif %}
-
-    {# On your OWN profile, if you're not already an artist, offer to become one (T55). Clicking it
-       calls POST /api/me/become-artist for the logged-in account and reloads so the artist studio
-       + upload unlock. Hidden once you're an artist. The server is the real gate; this just shows
-       the option to the account it applies to. #}
-    {% if p.is_self and not p.is_artist %}
-    <button
-      type="button"
-      class="btn btn-ghost become-artist-btn"
-      onclick="becomeArtist(this)"
-    >Become an artist</button>
+    <div class="profile-actions">
+      <button
+        type="button"
+        class="btn follow-btn {{ 'btn-ghost' if p.is_following else 'btn-spotify' }}"
+        data-user-id="{{ p.id }}"
+        data-following="{{ 'true' if p.is_following else 'false' }}"
+        aria-pressed="{{ 'true' if p.is_following else 'false' }}"
+        onclick="toggleFollow(this)"
+      >{{ 'Following' if p.is_following else 'Follow' }}</button>
+    </div>
     {% endif %}
 
     {# Edit profile (T48) — own profile only. The button reveals a small form: a profile-picture
@@ -71,9 +61,25 @@
        and reloads — all in static/edit-profile.js. The server is the real gate for every step. #}
     {% if p.is_self %}
     <div class="edit-profile">
-      <button type="button" class="btn btn-ghost edit-profile-btn" onclick="toggleEditProfile(this)">
-        Edit profile
-      </button>
+      <div class="profile-actions">
+        <button type="button" class="btn btn-ghost edit-profile-btn" onclick="toggleEditProfile(this)">
+          Edit profile
+        </button>
+        {# On your OWN profile, if you're not already an artist, offer to become one (T55). Clicking
+           it calls POST /api/me/become-artist and reloads so the artist studio + upload unlock.
+           Hidden once you're an artist. The status line below gives a visible failure path. #}
+        {% if not p.is_artist %}
+        <button
+          type="button"
+          class="btn btn-ghost become-artist-btn"
+          aria-describedby="become-artist-status"
+          onclick="becomeArtist(this)"
+        >Become an artist</button>
+        {% endif %}
+      </div>
+      {% if not p.is_artist %}
+      <p id="become-artist-status" class="profile-action-status" aria-live="polite"></p>
+      {% endif %}
       <form class="edit-profile-form" hidden onsubmit="saveProfile(event, this)">
         <label class="edit-profile-field">
           <span>Profile picture (JPEG/PNG, ≤ 10 MB)</span>
