@@ -428,7 +428,10 @@ PR that it went in without a second review).
   a `<button>`'s default light background was showing through); the "Become an artist" button moved
   to the profile card's top-right corner (small/quiet, `position:absolute`) so it isn't mis-tapped;
   and `become-artist.js` now shows a "this cannot be undone" confirm before the one-way flip
-  (`brink.css` + `become-artist.js`). **Next:
+  (`brink.css` + `become-artist.js`). **T57 (caption-after-image) done** — the artist upload
+  caption box (`artist.html` + `artist-upload.js`) is now hidden until a valid image is picked; a
+  post always needs an image, so an always-visible caption wrongly implied you could post text
+  only. UI ordering only, no API change. **Next:
   T32 (Jonah)
   unblocked; T14 still gated on T33/T35.**
 
