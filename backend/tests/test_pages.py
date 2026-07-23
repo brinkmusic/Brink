@@ -703,6 +703,28 @@ def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatc
     assert "Artist-only engagement" not in body
 
 
+# T104 regression: a TEXT-ONLY artist post (imageUrl None) on a profile renders as a note — NOT the
+# muted "image unavailable" placeholder, which only belongs to a real-but-unsignable image (T103).
+def test_artist_profile_text_only_post_has_no_image_box(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url=None, caption="just words"))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/stage-name").text
+    assert "just words" in body                    # the caption renders as the note body
+    assert "artist-post-note" in body              # the note styling is applied
+    assert "artist-post-img-missing" not in body   # no placeholder image box for a text-only post
+    assert "<img class=\"artist-post-img\"" not in body
+
+
 def test_artist_profile_owner_sees_engagement_summary(client, db_session, monkeypatch):
     _ensure_artist_table(db_session)
     artist = _seed_artist(db_session)

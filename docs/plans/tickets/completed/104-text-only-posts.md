@@ -117,6 +117,19 @@ art / play button / image). A server-side guard rejects a post that has neither 
 - [x] composer.js publishes text-only; artist-upload.js publishes image-less
 - [x] full backend suite passes (292 passed)
 
+## Post-merge fixes (2026-07-23, same day)
+Two visual regressions found on the deployed site right after release, fixed as a follow-up
+`fix/T104-*` PR:
+1. **Empty composer chip box.** The attached-song chip rendered as an empty box with an × even
+   with no song attached: its `hidden` attribute was being overridden by the new
+   `.composer-track-chip { display: flex }` rule (an explicit `display` beats `hidden`'s implied
+   `display: none`). Fixed at the root with a global `[hidden] { display: none !important; }` in
+   `brink.css`, which also covers `.composer-song` and any future display-styled hidden element.
+2. **Placeholder image box on profiles.** A text-only artist post showed the muted "image
+   unavailable" placeholder on the profile page — `profile.html` still had the pre-T104
+   `{% if image_url %}…{% else %}placeholder{% endif %}` logic. Brought it in line with the feed /
+   artist page tri-state (`None` → note, `""` → placeholder, URL → image). Regression test added.
+
 ## Outcome (as built)
 - **Migration** `fe4e66a13f08`: relaxes NOT NULL on `Post.trackId`, `ArtistPost.imageUrl`,
   `ArtistPost.caption` (additive/backward-compatible — no data moves). Applied to brink-dev
