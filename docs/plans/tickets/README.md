@@ -139,6 +139,20 @@ All four are independent and were built in parallel.
 | ~~`096`~~ ✅ | "Liked by X and N others" + reactors list | Instagram/Facebook |
 | ~~`097`~~ ✅ | double-tap album art to heart | Instagram |
 
+### Social quick-wins wave 2 (filed 2026-07-23) — `100`–`102`
+
+The music-native identity wave: fresher listening data, then the features that surface it.
+No hard `blocked_by` edges, but the suggested order is `100 → 101 → 102` — T100 makes the
+`Play` data fresh enough for the other two to feel truthful. One ticket = one PR, sequentially
+(see the T94–T97 retro note: parallel same-file waves cost more in merge conflicts than they
+save).
+
+| Ticket | What | Borrowed from |
+|---|---|---|
+| `100` | fresher listening history: 30-min cron + sync-on-own-profile-visit | — (enabler; also a data-loss fix: Spotify only returns the last 50 plays) |
+| `101` | one-tap "Share what you're hearing" via the composer | BeReal |
+| `102` | "played N times by {author}" on feed song cards | Last.fm |
+
 The wave numbers below are *dependency depth*, not live status — a ticket is startable as soon as its `blocked_by` are merged, which is what the "Ready to start now" list above reflects. Update that list whenever a wave of blockers merges.
 
 Critical path: `039 → 034 → 033 → 035 → 014 → 044` (the analytics-to-profile spine). **Note (2026-07-15):** T44's *listening* half was decoupled from this spine and shipped ahead of it (ADR-0014 + the T44/T14 re-scope) — it needs only `Play` data (T21) + now-playing (T20). What still runs down this spine is the T14 analytics layer (cluster/compatibility/genres) that later augments the profile.
