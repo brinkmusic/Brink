@@ -222,7 +222,10 @@ agents, not a changelog.
   /api/me/now-playing` and drops the current track into the existing composer selected state,
   publishing with `PostSource.SPOTIFY` (no new endpoint; reuses T20 + T10). `T102` added a
   "▶ played N times by {author}" endorsement line to feed song cards (shown from 2 plays up),
-  computed as one batched `(author, track)` count over `silver.Play` in `build_feed`.
+  computed as one batched `(author, track)` count over `silver.Play` in `build_feed`. `T103`
+  hardened artist-image signing: a single un-signable image now degrades to a placeholder via the
+  shared `create_signed_read_url_or_blank` wrapper, instead of blanking the whole feed or 500ing
+  `/artist` (fixes a 2026-07-22 production incident whose trigger was a bad Render Supabase key).
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
 - **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. The
