@@ -225,10 +225,11 @@ agents, not a changelog.
   `/auth/confirm` URLs must be configured, or login/signup flows cannot return cleanly.
 - Storage buckets are owner-managed infrastructure: `artist-images` is private and needs signed read
   URLs; `avatars` is public and must exist before profile-picture uploads work.
-- Schema changes still need manual care on `brink-dev`: run Alembic migrations from `backend/`, and
-  preserve medallion schemas (`bronze`, `silver`, `gold`) when autogenerating. The T96
-  `Reaction.createdAt` migration (`f4a2d81c96e0`) is applied on `brink-dev`; **production needs
-  `uv run alembic upgrade head` at the next release** or the liked-by line can't order reactions.
+- Schema changes still need manual care: run Alembic migrations from `backend/` against `brink-dev`
+  (and against production at each release — `uv run alembic -x dburl="<Render DIRECT_URL>" upgrade head`
+  accepts a dashboard URL as-is since T98), and preserve medallion schemas (`bronze`, `silver`,
+  `gold`) when autogenerating. The T96 `Reaction.createdAt` migration (`f4a2d81c96e0`) is applied
+  on both brink-dev and production (verified 2026-07-23).
 - The DB still has a `_prisma_migrations` table from the retired Prisma stack. Alembic ignores it
   (`backend/alembic/env.py`); it is harmless and can be dropped later.
 - Render deploys production from `main`, not `develop`. Scheduled GitHub workflows also only run
