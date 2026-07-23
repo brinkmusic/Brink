@@ -188,12 +188,43 @@ def test_feed_song_items_tagged_kind_song(client, as_user, db_session):
 
 # Stub the signed-read helper so build_feed never touches Supabase. Returns a recognisable URL that
 # embeds the raw path, so a test can prove the image was signed (mirrors how test_pages.py stubs it).
+# NB (T103): feed.py now signs via the resilient wrapper create_signed_read_url_or_blank, so that's
+# the name we stub here.
 def _stub_signed_read(monkeypatch):
     monkeypatch.setattr(
         feed_module,
-        "create_signed_read_url",
+        "create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
+
+
+# T103 resilience: if signing an artist image FAILS, the whole feed must NOT break. build_feed still
+# returns every item (song AND artist), the unsignable artist image just comes back as "" (the
+# template renders a placeholder). Before this fix the exception propagated and the feed page showed
+# an empty feed. We stub the UNDERLYING signer to raise and let the real wrapper handle it.
+def test_feed_survives_artist_image_signing_failure(client, as_user, db_session, monkeypatch):
+    import app.security.supabase as supa
+    monkeypatch.setattr(supa, "create_signed_read_url",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("sign failed")))
+    _seed_world(db_session)  # gives 'me' a song post (p-me) + follows 'friend'
+    db_session.add(User(id="artist", handle="artist", display_name="The Artist",
+                        is_artist=True, created_at=datetime.now(timezone.utc)))
+    db_session.commit()
+    db_session.add(Follow(follower_id="me", following_id="artist"))
+    db_session.add(ArtistPost(id="ap-1", artist_user_id="artist",
+                              image_url="artist/backstage.jpg", caption="backstage",
+                              created_at=NOW))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    assert res.status_code == 200
+    data = res.json()["data"]
+    # The song post is still there (the failure did NOT blank the feed)...
+    assert any(p["id"] == "p-me" for p in data)
+    # ...and the artist item is present with a blank image URL (placeholder territory), not missing.
+    artist_item = next(p for p in data if p["id"] == "ap-1")
+    assert artist_item["imageUrl"] == ""
 
 
 # A followed artist's ArtistPost shows up in the feed, tagged kind == "artist", with its image

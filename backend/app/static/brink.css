@@ -333,6 +333,13 @@ body {
 .artist-status { margin: 0; color: var(--mute); font-size: 0.8rem; min-height: 1rem; }
 .artist-post { display: grid; gap: 0.5rem; }
 .artist-post-img { width: 100%; border-radius: 0.75rem; display: block; }
+/* T103: placeholder shown when an artist image can't be signed (blank URL) — a muted box so the
+   card stays intact instead of showing a broken <img> or crashing the page. */
+.artist-post-img-missing {
+  aspect-ratio: 16 / 9;
+  background: var(--ink);
+  border: 1px dashed var(--line);
+}
 .artist-post-caption { margin: 0; font-size: 0.95rem; }
 .artist-engagement-summary {
   border-top: 1px solid var(--line);

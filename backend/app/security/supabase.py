@@ -4,6 +4,7 @@
 # verify a user's login token. WHY server-only: the service-role key can do anything,
 # so it must NEVER be sent to the browser.
 
+import logging
 from functools import lru_cache
 from typing import Optional
 
@@ -12,6 +13,8 @@ from supabase.client import ClientOptions
 from supabase_auth.types import Session, User
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 # Build the admin client once and reuse it (@lru_cache = build-once-then-reuse).
@@ -138,6 +141,21 @@ def create_signed_read_url(bucket: str, path: str, expires_in: int = 3600) -> st
     if signed.startswith("http"):
         return signed
     return f"{get_settings().supabase_url}/storage/v1{signed}"
+
+
+def create_signed_read_url_or_blank(bucket: str, path: str, expires_in: int = 3600) -> str:
+    # The RESILIENT sibling of create_signed_read_url (T103). WHY it exists: signing hits Supabase
+    # Storage over the network and RAISES on any failure — a missing object, a wrong/expired
+    # service-role key, or a Storage outage. On 2026-07-22 exactly that (a bad Render key ->
+    # StorageApiError 404) took down the WHOLE feed and 500'd the artist page, because the callers
+    # let the exception propagate. A single un-signable artist image must never do that. So any
+    # display surface that signs an artist image calls THIS: on failure we log it and return "" (an
+    # empty URL), and the template renders a muted placeholder instead of a broken <img> or a crash.
+    try:
+        return create_signed_read_url(bucket, path, expires_in)
+    except Exception as e:  # noqa: BLE001 - a storage-signing failure must degrade, never crash a page
+        logger.warning("signed read URL unavailable for %s/%s: %s", bucket, path, e)
+        return ""
 
 
 def public_object_url(bucket: str, path: str) -> str:

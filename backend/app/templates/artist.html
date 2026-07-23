@@ -49,7 +49,13 @@
     <div class="stack">
       {% for post in posts %}
       <article class="artist-post card">
+        {# T103: image_url is "" when signing failed — show a muted placeholder instead of a broken
+           <img>, so an un-signable image can't blank or 500 this page. #}
+        {% if post.image_url %}
         <img class="artist-post-img" src="{{ post.image_url }}" alt="{{ post.caption }}" />
+        {% else %}
+        <div class="artist-post-img artist-post-img-missing" role="img" aria-label="Image unavailable"></div>
+        {% endif %}
         <p class="artist-post-caption">{{ post.caption }}</p>
         <p class="post-meta">shared {{ post.when }}</p>
       </article>

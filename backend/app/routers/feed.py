@@ -37,7 +37,7 @@ from app.models import (
 )
 from app.responses import ok
 from app.schemas import ArtistFeedPostOut, AuthorOut, CommentOut, FeedPostOut, TrackOut
-from app.security.supabase import create_signed_read_url
+from app.security.supabase import create_signed_read_url_or_blank
 
 # The private Supabase Storage bucket that holds artist promo images (same one artist.py uploads
 # into). Its objects aren't publicly readable, so each stored image PATH must be turned into a
@@ -308,7 +308,9 @@ def _build_artist_items(session: Session, user: User, author_ids: set[str]) -> l
                 avatar_url=author.avatar_url,
             ),
             caption=post.caption,
-            image_url=create_signed_read_url(ARTIST_IMAGE_BUCKET, post.image_url),
+            # Resilient signing (T103): a failure here returns "" (logged), so one un-signable image
+            # can't throw and blank the whole feed — the artist card renders a placeholder instead.
+            image_url=create_signed_read_url_or_blank(ARTIST_IMAGE_BUCKET, post.image_url),
             created_at=post.created_at,
             reaction_counts=reaction_counts.get(post.id, _zero_counts()),
             comment_count=comment_counts.get(post.id, 0),
