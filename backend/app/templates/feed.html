@@ -190,10 +190,13 @@
   {% endif %}
 </section>
 
-{# The small scripts that make the composer (T40), reactions (T11) and comments (T12) live. #}
+{# The small scripts that make the composer (T40), reactions (T11), comments (T12) and the
+   double-tap-to-heart gesture (T97) live. double-tap.js must load AFTER reactions.js — it
+   reuses its react() function. #}
 <script src="/static/composer.js?v=85"></script>
 <script src="/static/reactions.js?v=85"></script>
 <script src="/static/comments.js?v=85"></script>
+<script src="/static/double-tap.js?v=97"></script>
 {# When any artist behind-the-scenes post is present (T049), load its engagement script — the SAME
    one the artist profile uses (T54), which drives artistReact/toggleArtistComments/submitArtistComment. #}
 {% if posts | selectattr("kind", "equalto", "artist") | list %}
