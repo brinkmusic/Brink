@@ -65,6 +65,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60, T80, T81, T83, T84, T85, T86 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60. T80/T81/T83 are polish follow-ups for visible failure, loading, and empty-state quality. T84 keeps optional profile enrichments from turning `/u/{handle}` into a 500. T85 prevents stale static assets from hiding those shipped UI states. T86 restores the edit form's collapsed initial state.) |
 | UI-10 | "Now playing" indicator on profile + feed. | T20, T44, T82 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up. T82 hardens the existing profile layout.) |
 | UI-11 | Editable profile: user bio + profile-picture upload. | T048, T83, T85, T86 | ✅ (T83 polishes the edit-profile controls, T85 ensures browsers load that design, and T86 keeps the form hidden until Edit profile is activated. No API behavior change.) |
+| UI-12 | Feed song cards are playable in place via the Spotify embed player (no auth needed; lazy-loaded on tap, one open player at a time). | T94 | ✅ |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |
