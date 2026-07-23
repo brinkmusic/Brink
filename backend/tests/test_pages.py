@@ -42,6 +42,19 @@ def test_stylesheet_is_served(client):
     assert "text/css" in res.headers["content-type"]
 
 
+# T86: the edit form uses grid when open, so the author stylesheet must explicitly preserve the
+# HTML `hidden` state. Otherwise `display: grid` overrides the browser default and shows it early.
+def test_stylesheet_keeps_edit_profile_form_hidden(client):
+    css = client.get("/static/brink.css").text
+    assert ".edit-profile-form[hidden] { display: none; }" in css
+
+
+# The disclosure script must announce the same open/closed state that it renders visually.
+def test_edit_profile_script_syncs_expanded_state(client):
+    script = client.get("/static/edit-profile.js").text
+    assert 'btn.setAttribute("aria-expanded", opening ? "true" : "false")' in script
+
+
 # T85: a release can update HTML and CSS at the same time. The version query forces browsers
 # holding the pre-T80/T83 stylesheet to fetch the corrected button and edit-profile styles.
 def test_home_page_uses_versioned_stylesheet(client):
@@ -416,6 +429,9 @@ def test_own_profile_shows_edit_profile(client, db_session, monkeypatch):
 
     body = client.get("/u/viewer").text
     assert "Edit profile" in body
+    assert 'aria-expanded="false"' in body
+    assert 'aria-controls="edit-profile-form"' in body
+    assert 'id="edit-profile-form" class="edit-profile-form" hidden' in body
     assert "/static/edit-profile.js" in body
 
 
