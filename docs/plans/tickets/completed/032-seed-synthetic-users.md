@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -101,14 +101,14 @@ describes).
 | `analytics/tests/test_seed_users.py` | CREATE | seeding tests |
 
 ## Testing Checklist
-- [ ] seeds ~50 users, all flagged `isSynthetic=true`
-- [ ] each user is assigned exactly one persona (one of T34's 7 clusters)
-- [ ] each persona's shared Track pool is seeded once (not duplicated per user) and reused across that persona's users
-- [ ] each user's plays are sampled only from their persona's track pool (genre/audio-profile coherent)
-- [ ] personas vary across users (roughly even spread across the 7 clusters)
-- [ ] `Play` rows respect the dedup constraint (`userId`, `playedAt`)
-- [ ] `Play.playedAt` values are spread across multiple distinct days per user, not clustered at one instant
-- [ ] idempotent: re-running doesn't duplicate synthetic users, Track pool rows, or Play rows
+- [x] seeds ~50 users, all flagged `isSynthetic=true`
+- [x] each user is assigned exactly one persona (one of T34's 7 clusters)
+- [x] each persona's shared Track pool is seeded once (not duplicated per user) and reused across that persona's users
+- [x] each user's plays are sampled only from their persona's track pool (genre/audio-profile coherent)
+- [x] personas vary across users (roughly even spread across the 7 clusters)
+- [x] `Play` rows respect the dedup constraint (`userId`, `playedAt`)
+- [x] `Play.playedAt` values are spread across multiple distinct days per user, not clustered at one instant
+- [x] idempotent: re-running doesn't duplicate synthetic users, Track pool rows, or Play rows
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
@@ -116,6 +116,35 @@ describes).
 - [x] Testing Checklist has items
 - [x] Dependencies identified (T30, T31 → blocked_by 030, 031)
 - [x] Scope boundaries defined
+
+## Outcome
+`analytics/seed_users.py` seeds synthetic personas by reusing T34's 7 trained `gold.Cluster`
+centroids (no genre column exists in either Kaggle CSV, so "genre-coherent" is operationalized as
+the same audio feature-space regions T34 already trained on — see the ticket's persona-definition
+note above). For each persona it builds one shared pool of new `silver.Track` rows (real Spotify
+ids from the local Kaggle CSV, nearest that persona's centroid — needed because `Play.trackId` FKs
+`Track` and the 67 pre-existing Kaggle-matched rows weren't enough to sample from) and every user
+in that persona draws their `Play` history from the same shared pool, so `Track` growth scales with
+persona count (7), not user count. No `User`/`Track` column records persona assignment — per
+ADR-0003 a user's cluster is computed on read (T33), so it's implicit in which pool a user's plays
+came from, same as it will be for real users. Idempotent by construction: pool selection is a pure
+function of `(csv, centroids, pool_size)` so a rerun computes the identical pool and handles are
+assigned in a fixed traversal order, so `ON CONFLICT DO NOTHING` (Track, User) makes reruns a
+no-op rather than piling up duplicates.
+
+Tests: pure-function coverage (standardization, nearest-neighbor selection, pool building, evenly
+splitting users across personas, timestamp spreading) with no DB, plus one live-DB idempotency test
+against `brink-dev` (gated behind `RUN_ANALYTICS_DB_TESTS=1`, snapshots/restores `gold.Cluster` and
+`gold.ModelArtifact` via `test_cluster.py`'s existing helpers, cleans up its own disposable rows).
+
+**Actually run against the real corpus (2026-07-23):** `uv run python seed_users.py
+data/tracks_features.csv` against live `brink-dev`. Seeded **50 synthetic users** across all 7
+personas, **175 new `Track` rows** (25 per persona, `kaggleMatched` went 67 → 242), and **1012
+`Play` rows** (every user landed in the intended 15–25 range, spread across 8–15 distinct days
+each). Verified post-run: 50/50 synthetic-flagged users, all with 15–25 plays, all 7 personas
+represented. Each seeded user's `bio` discloses it's synthetic demo data and names its persona
+(e.g. "Synthetic listener seeded for demo purposes (T32; disclosed per ADR-0004 C3). Persona: Low
+Loudness, Low Energy.") — disclosure is visible on the profile itself, not just in docs/report.
 
 ## Notes
 Branch off `develop` as `feat/T32-seed-users`; one PR back into `develop` (never `main`). Owner: Jonah (analytics).

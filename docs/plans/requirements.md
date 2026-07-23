@@ -90,8 +90,8 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | DATA-1 | Load Kaggle audio-feature set; document source; join on `track_id`. | T31 | ✅ |
-| DATA-2 | Seed ~100–200 synthetic users (genre-coherent personas). | T32 | ◻ |
-| DATA-3 | Synthetic users disclosed; never inflate real-user metrics. | T32 | ◻ |
+| DATA-2 † | Seed ~100–200 synthetic users (genre-coherent personas). *(scoped to ~50 — see T32's Outcome; personas are T34's 7 trained clusters, since neither Kaggle CSV has a genre column)* | T32 | ✅ 50 users across 7 personas |
+| DATA-3 | Synthetic users disclosed; never inflate real-user metrics. | T32 | ✅ every seeded user is `isSynthetic=true` and its `bio` names it as synthetic demo data + its persona |
 | DATA-4 | Retire `mocks/*` from production paths once live. *(the whole SPA — mocks included — was deleted in T60)* | T60 | ✅ |
 
 ## Tickets without a legacy requirement ID
@@ -117,3 +117,4 @@ The old `brink-spec-design.md` is **retired**; these acceptance criteria (flagge
 - **SP-2 / INFRA-3** — snapshot is triggered by **GitHub Actions**, not Vercel Cron ([ADR-0006](../decisions/adr/0006-scheduling.md)).
 - **AUTH-3** — the front door is **email + password** (not the spec's magic-link/OTP), server-side per [ADR-0015](../decisions/adr/0015-email-password-auth.md); the handle stays **auto-derived** (no custom-handle field on the signup form).
 - Storage is **Supabase Storage** (not Cloudinary); Kaggle set is a genuine ~1M-track source (not `maharshipandya`) ([ADR-0002](../decisions/adr/0002-api-and-persistence.md), [ADR-0004](../decisions/adr/0004-analytics-data-strategy.md)).
+- **DATA-2** — scoped to **~50** synthetic users, not the original ~100–200: population is now a demo/UX need rather than a modeling one (T34 already trains K-means on the full Kaggle corpus, independent of synthetic user count), and `Play.trackId`'s FK to `Track` meant genre-coherent sampling at 100–200 users wasn't achievable with the existing Kaggle-matched `Track` pool. Disclosed on T32's ticket, same as T31's dataset-size call — not an ADR change.

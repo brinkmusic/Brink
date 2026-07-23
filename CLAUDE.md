@@ -236,13 +236,16 @@ agents, not a changelog.
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; K-means is trained on
   the full local Kaggle file (10 features) and exported as `ModelArtifact("kmeans")` (`T34`) — k
   was deliberately forced to 7 for a usable persona system (silhouette preferred k=2; disclosed in
-  `T34`'s Outcome + `AN-3`). Synthetic seeding `T32` and on-demand inference `T33` are both ready;
-  `T14` remains gated on `T33`/`T35`.
+  `T34`'s Outcome + `AN-3`). `T32` seeded **50 synthetic `User` rows** as personas built from
+  `T34`'s 7 trained clusters (scoped down from ADR-0004 C3's ~100–200 — disclosed on the ticket,
+  not an ADR change), each with its own shared pool of 25 new Kaggle-sourced `Track` rows and
+  15–25 `Play` rows spread across 8–15 days; every seeded user's `bio` discloses it as synthetic
+  demo data. On-demand inference `T33` is next; `T14` remains gated on `T33`/`T35`.
 - **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. The
   Wave 2 music-identity trio (`T100`–`T102`), `T103` signing hardening, and `T104` text-only posts
   are **complete**, as is the 2026-07-22 non-analytics UI hardening wave (`T80`–`T86`) and the
-  social quick-wins wave (`T94`–`T97`). For analytics, `T32` and `T33` are both unblocked (`T33`
-  first needs `Track`'s schema extended with 5 more features — see its ticket); `T14` is still
+  social quick-wins wave (`T94`–`T97`). For analytics, `T32` is **complete**; `T33` is unblocked
+  but first needs `Track`'s schema extended with 5 more features — see its ticket; `T14` is still
   gated.
 
 ## Watch-outs
