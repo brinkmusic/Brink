@@ -256,6 +256,32 @@ def test_feed_shows_comment_section_and_count(client, db_session, monkeypatch):
     assert 'class="comment-count">1<' in body
 
 
+# ---- T95: the latest comments render inline on the card (Instagram-style) ----
+
+
+def test_feed_renders_latest_comments_inline(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_ic", title="Chatty Song", artist_name="Artist"))
+    db_session.commit()
+    post = Post(user_id=viewer.id, track_id="t_ic", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    db_session.add(Comment(post_id=post.id, user_id=viewer.id, body="so good live"))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    # The comment shows on the card itself — no click needed — with its author linked.
+    assert "so good live" in body
+    assert 'class="comment-inline-list"' in body
+    assert 'class="comment-inline-author" href="/u/viewer"' in body
+    # The existing toggle/panel machinery is still there for "view all + add a comment".
+    assert 'onclick="toggleComments(this)"' in body
+
+
 # ---- T40: the composer (search + share a song) renders on the feed ----
 
 
@@ -270,6 +296,48 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert 'id="composer-status"' in body          # JS has a visible status/error target
     assert "composerSearch(this)" in body          # the search box is wired
     assert "/static/composer.js" in body           # the script is loaded
+
+
+# ---- T94: feed song cards are playable in place via the Spotify embed player ----
+
+
+# A song card carries its Spotify track id and an accessible play control, and loads the
+# player script. The embed iframe itself must NOT be in the initial HTML — player.js only
+# builds it when the listener taps play (keeps the page light: no third-party frames on load).
+def test_feed_song_card_is_playable(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino",
+                         album_art_url="https://img.example/redbone.jpg"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_redbone", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'data-spotify-id="t_redbone"' in body   # the card knows which track it plays
+    assert 'aria-label="Play Redbone"' in body     # the art is a labelled play button
+    assert "togglePlayer(this)" in body            # wired to the player script
+    assert "/static/player.js" in body             # the script is loaded
+    assert "<iframe" not in body                   # lazy: no embed frame on initial load
+
+
+# A post whose track has no album art must still be playable — the play button renders
+# (with its gradient placeholder background) even without an <img> inside it.
+def test_feed_song_card_playable_without_art(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_noart", title="No Art Song", artist_name="Somebody"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_noart", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'data-spotify-id="t_noart"' in body
+    assert 'aria-label="Play No Art Song"' in body
 
 
 # ---- T97: double-tap a song card to heart it (Instagram's signature gesture) ----
@@ -888,3 +956,35 @@ def test_nav_logged_in_on_home_page(client, db_session, monkeypatch):
     body = client.get("/").text
     assert 'href="/feed"' in body
     assert 'href="/auth/logout"' in body
+
+
+# ---- T96: the "Liked by X and N others" line renders on song cards ----
+
+
+def test_feed_renders_liked_by_line(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    other = User(handle="fan", display_name="Fan One", created_at=datetime.now(timezone.utc))
+    db_session.add(other)
+    db_session.add(Track(spotify_id="t_lb", title="Popular Song", artist_name="Artist"))
+    db_session.commit()
+    db_session.refresh(other)
+    post = Post(user_id=viewer.id, track_id="t_lb", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    # Two reactions: the viewer's is older, Fan One's is the most recent.
+    db_session.add(Reaction(post_id=post.id, user_id=viewer.id, type=ReactionType.HEART,
+                            created_at=datetime(2026, 7, 22, 11, 0, 0)))
+    db_session.add(Reaction(post_id=post.id, user_id=other.id, type=ReactionType.FIRE,
+                            created_at=datetime(2026, 7, 22, 12, 0, 0)))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "Liked by" in body
+    assert "Fan One" in body            # the most recent reactor is named
+    assert "and 1 other" in body        # 2 total reactions -> "and 1 other"
+    assert "toggleReactors(this)" in body   # the line opens the reactors list
+    assert "/static/liked-by.js" in body    # the script is loaded

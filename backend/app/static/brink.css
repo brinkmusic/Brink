@@ -387,21 +387,55 @@ body {
 /* ---- Feed: post cards ---- */
 .post {
   display: flex;
+  /* wrap lets the full-width player row (T94, below) drop under the art + text */
+  flex-wrap: wrap;
   gap: 0.9rem;
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 1rem;
   padding: 0.9rem;
 }
+/* The art is a <button> since T94 (it opens the in-card player), so reset the browser's
+   default button chrome (border/padding) and make it obviously tappable. */
 .post-art {
   flex-shrink: 0;
   width: 3.5rem;
   height: 3.5rem;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  position: relative; /* anchors the ▶ overlay below */
   border-radius: 0.6rem;
   overflow: hidden;
   background: linear-gradient(to bottom right, var(--accent), var(--hot));
 }
 .post-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The small ▶ badge over the art that signals "this plays" (T94). Centered on the art;
+   brightens on hover/focus so the affordance is discoverable. */
+.post-art-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+}
+.post-art:hover .post-art-play,
+.post-art:focus-visible .post-art-play { opacity: 1; background: rgba(0, 0, 0, 0.5); }
+/* The row player.js inserts when a card is playing (T94): a full-width row under the card
+   content holding Spotify's compact 152px embed. flex-basis 100% + the card's flex-wrap
+   is what pushes it onto its own line. */
+.post-player { flex-basis: 100%; }
+.post-player iframe {
+  display: block;
+  width: 100%;
+  height: 152px;
+  border: 0;
+  border-radius: 0.8rem;
+}
 .post-body { min-width: 0; }
 .post-track { margin: 0; font-weight: 600; font-size: 0.95rem; }
 .post-artist { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
@@ -460,8 +494,56 @@ body {
 .react-emoji { line-height: 1; }
 .react-count { font-variant-numeric: tabular-nums; }
 
+/* ---- "Liked by X and N others" (feed, T96) ---- */
+.liked-by { margin-top: 0.45rem; }
+/* The line is a real <button> (it opens the reactors panel), styled as quiet text so it
+   reads as social proof, not a control — until you hover/focus it. */
+.liked-by-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--mute);
+  cursor: pointer;
+}
+.liked-by-btn b { color: var(--text); font-weight: 600; }
+.liked-by-btn:hover { text-decoration: underline; }
+.liked-by-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The panel listing everyone who reacted, opened by the line above. */
+.reactors-panel { margin-top: 0.4rem; }
+.reactor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.reactor { font-size: 0.85rem; display: flex; align-items: baseline; gap: 0.4rem; }
+.reactor-name { color: var(--text); font-weight: 600; text-decoration: none; }
+.reactor-name:hover { text-decoration: underline; }
+.reactors-status { margin: 0.2rem 0 0; color: var(--mute); font-size: 0.8rem; }
+
 /* ---- Comments (feed, T42) ---- */
 .comments { margin-top: 0.5rem; }
+/* The few newest comments shown right on the card (T95): a compact list above the 💬
+   toggle — author name (a profile link) then the comment text, one per line. */
+.comment-inline-list {
+  list-style: none;
+  margin: 0 0 0.35rem;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+.comment-inline { font-size: 0.85rem; line-height: 1.35; overflow-wrap: anywhere; }
+.comment-inline-author {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  margin-right: 0.35rem;
+}
+.comment-inline-author:hover { text-decoration: underline; }
+.comment-inline-body { color: var(--mute); }
 .comment-toggle {
   display: inline-flex;
   align-items: center;
