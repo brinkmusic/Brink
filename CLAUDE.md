@@ -208,11 +208,14 @@ agents, not a changelog.
 - **Recent app state:** user discovery, profile pages, feed reactions/comments, artist posts,
   editable profile, email/password auth, and self-serve artist designation are implemented. Profile
   avatars use a public `avatars` bucket; artist images use private `artist-images` signed reads.
+  The feed's social quick-wins wave (`T94`–`T97`) shipped: song cards play in place via the
+  Spotify embed, show their newest comments inline, carry a "Liked by X and N others" line with a
+  reactors list, and support double-tap-to-heart.
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
 - **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. For
   analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22 non-analytics UI hardening
-  wave (`T80`–`T86`) is complete, including static-asset cache revalidation and edit disclosure.
+  wave (`T80`–`T86`) and the social quick-wins wave (`T94`–`T97`) are complete.
 
 ## Watch-outs
 
@@ -223,7 +226,9 @@ agents, not a changelog.
 - Storage buckets are owner-managed infrastructure: `artist-images` is private and needs signed read
   URLs; `avatars` is public and must exist before profile-picture uploads work.
 - Schema changes still need manual care on `brink-dev`: run Alembic migrations from `backend/`, and
-  preserve medallion schemas (`bronze`, `silver`, `gold`) when autogenerating.
+  preserve medallion schemas (`bronze`, `silver`, `gold`) when autogenerating. The T96
+  `Reaction.createdAt` migration (`f4a2d81c96e0`) is applied on `brink-dev`; **production needs
+  `uv run alembic upgrade head` at the next release** or the liked-by line can't order reactions.
 - The DB still has a `_prisma_migrations` table from the retired Prisma stack. Alembic ignores it
   (`backend/alembic/env.py`); it is harmless and can be dropped later.
 - Render deploys production from `main`, not `develop`. Scheduled GitHub workflows also only run
