@@ -56,7 +56,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | UI-1 | Post composer with Spotify catalog search → publish. | T40, T81 | ✅ (T81 follow-up hardens keyboard interaction and labels; no API behavior change.) |
 | UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts)* | T41, T47, T049 | ✅ |
-| UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
+| UI-3 | Reactions call BE-5; counts reflect server truth. | T41, T96 | ✅ (T96 adds the "Liked by X and N others" line + a `GET /api/posts/{id}/reactions` reactors list, backed by a new additive `Reaction.createdAt` migration.) |
 | UI-4 | Comments become real input + list. | T42, T81 | ✅ (T81 follow-up hardens expanded/loading/error states; no API behavior change.) |
 | UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16, T80, T82 | ✅ (T80/T82 are UI hardening follow-ups for profile actions and responsive layout.) |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14, T82 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics. T82 hardens responsive listening layouts.) |
