@@ -261,10 +261,38 @@ def test_create_post_owner_cannot_be_spoofed(client, as_user, db_session):
     assert saved.artist_user_id == "real-artist"
 
 
-# A missing caption is rejected at the contract level -> 400.
-def test_create_post_missing_caption_returns_400(client, as_user):
-    as_user(_artist())
+# T104: a PHOTO-ONLY artist post (image, no caption) is now allowed — it persists with a null
+# caption (before T104 a missing caption was a 400).
+def test_create_post_photo_only_persists(client, as_user, db_session):
+    as_user(_artist(), session=db_session)
     body = _post_body()
     del body["caption"]
     res = client.post("/api/artist/posts", json=body)
+    assert res.status_code == 201
+    assert res.json()["data"]["caption"] is None
+    saved = db_session.exec(select(ArtistPost)).all()
+    assert len(saved) == 1 and saved[0].caption is None
+
+
+# T104: a TEXT-ONLY artist post (caption, no image) is now allowed — it persists with a null image.
+def test_create_post_text_only_persists(client, as_user, db_session):
+    as_user(_artist(), session=db_session)
+    body = _post_body()
+    del body["imageUrl"]
+    res = client.post("/api/artist/posts", json=body)
+    assert res.status_code == 201
+    data = res.json()["data"]
+    assert data["imageUrl"] is None and data["caption"] == "backstage"
+    saved = db_session.exec(select(ArtistPost)).all()
+    assert len(saved) == 1 and saved[0].image_url is None
+
+
+# T104: a post with NEITHER a photo NOR text is rejected -> 400, nothing persisted. Covers a
+# missing caption + missing image and a whitespace-only caption (trimmed to empty).
+def test_create_post_empty_returns_400(client, as_user, db_session):
+    as_user(_artist(), session=db_session)
+    res = client.post("/api/artist/posts", json={})
     assert res.status_code == 400
+    res2 = client.post("/api/artist/posts", json={"caption": "   "})
+    assert res2.status_code == 400
+    assert db_session.exec(select(ArtistPost)).all() == []

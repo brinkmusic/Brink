@@ -257,7 +257,13 @@ class Post(SQLModel, table=True):
     id: str = _pk_cuid()
     user_id: str = Field(sa_column=_fk("userId", "User.id", ondelete="CASCADE"))
     # Track now lives in the `silver` schema (T39), so its foreign key target is schema-qualified.
-    track_id: str = Field(sa_column=_fk("trackId", "silver.Track.spotifyId", ondelete="RESTRICT"))
+    # NULLABLE since T104: a post can be TEXT-ONLY (just a caption, no song). When there is no
+    # song, trackId stays NULL and the caption carries the whole post. The guard against a post
+    # with neither song nor text lives in the create endpoint (routers/posts.py), not here.
+    track_id: Optional[str] = Field(
+        default=None,
+        sa_column=_fk("trackId", "silver.Track.spotifyId", ondelete="RESTRICT", nullable=True),
+    )
     caption: Optional[str] = Field(default=None, sa_column=Column("caption", Text, nullable=True))
     # Must be one of the PostSource values (MANUAL or SPOTIFY) — see the enum above.
     source: PostSource = Field(
@@ -324,8 +330,14 @@ class ArtistPost(SQLModel, table=True):
     artist_user_id: str = Field(sa_column=_fk("artistUserId", "User.id", ondelete="CASCADE"))
     # The object URL of the uploaded promo image. Storage is Supabase Storage (the private
     # "artist-images" bucket) — chosen in ADR-0002, retained under ADR-0010 — NOT Cloudinary.
-    image_url: str = Field(sa_column=Column("imageUrl", Text, nullable=False))
-    caption: str = Field(sa_column=Column("caption", Text, nullable=False))
+    # Both NULLABLE since T104: an artist post can be TEXT-ONLY (a caption with no photo) or
+    # PHOTO-ONLY (a photo with no caption). imageUrl is the stored object path (NULL = no photo);
+    # caption is the text (NULL = no words). The guard against a post with neither photo nor text
+    # lives in the create endpoint (routers/artist.py), not here.
+    image_url: Optional[str] = Field(
+        default=None, sa_column=Column("imageUrl", Text, nullable=True)
+    )
+    caption: Optional[str] = Field(default=None, sa_column=Column("caption", Text, nullable=True))
     linked_track_id: Optional[str] = Field(
         default=None, sa_column=Column("linkedTrackId", Text, nullable=True)
     )

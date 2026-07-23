@@ -14,6 +14,7 @@
 
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -90,6 +91,17 @@ def home(request: Request, session: Session = Depends(get_session)):
 # Turn a timestamp into a friendly "3m ago" style label for the feed. WHY here (not
 # in the template): Jinja has no built-in "time ago", so we compute the words in
 # Python and pass a ready-to-show string.
+# Turn an ArtistPost's stored image path into what the template needs (T104), TRI-STATE:
+#   - None  -> the post is TEXT-ONLY (no photo) → the template renders a note card.
+#   - ""    -> the post HAS a photo but signing it failed (T103) → the template shows a placeholder.
+#   - a URL -> a valid signed read URL → the template shows the image.
+# Centralised so the profile page and the artist page sign the same way.
+def _artist_image_url(path: Optional[str]) -> Optional[str]:
+    if not path:
+        return None
+    return create_signed_read_url_or_blank(UPLOAD_BUCKET, path)
+
+
 def _ago(when: datetime) -> str:
     now = datetime.now(timezone.utc)
     # Posts are stored in UTC; if the value has no timezone attached, treat it as UTC
@@ -155,12 +167,16 @@ def _feed_items(session: Session, user) -> list[dict]:
             # read URL from build_feed, T53), no track.
             common["image_url"] = it["imageUrl"]
         else:
-            # A song-share post: flatten the nested track fields.
-            common["title"] = it["track"]["title"]
-            common["artist"] = it["track"]["artistName"]
-            common["album_art"] = it["track"]["albumArtUrl"]
-            # The Spotify track id, so the card can open the in-place embed player (T94).
-            common["spotify_id"] = it["track"]["spotifyId"]
+            # A regular user post: flatten the nested track fields. `track` is None for a TEXT-ONLY
+            # post (T104) — leave the song fields None so the template renders a note card instead
+            # of a song row (no title/artist/art/play button).
+            track = it["track"]
+            common["title"] = track["title"] if track else None
+            common["artist"] = track["artistName"] if track else None
+            common["album_art"] = track["albumArtUrl"] if track else None
+            # The Spotify track id, so the card can open the in-place embed player (T94). None
+            # for a text-only post, which the template uses to decide song-row vs note.
+            common["spotify_id"] = track["spotifyId"] if track else None
             # The most recent reactor (or None) for the "Liked by X and N others" line (T96).
             common["liked_by"] = it["likedBy"]
             # How many times the author has played this track (T102) — the card shows the
@@ -346,7 +362,7 @@ def _profile_data(
         artist_posts = [
             {
                 "id": post.id,
-                "image_url": create_signed_read_url_or_blank(UPLOAD_BUCKET, post.image_url),
+                "image_url": _artist_image_url(post.image_url),
                 "caption": post.caption,
                 "when": _ago(post.created_at),
                 "reaction_counts": reaction_counts[post.id],
@@ -468,9 +484,9 @@ def artist_page(request: Request, session: Session = Depends(get_session)):
     # for each one here (T53), so the template gets an <img src> that actually displays.
     posts = [
         {
-            # Resilient signing (T103): "" on failure (logged) -> the template shows a placeholder,
-            # so one un-signable image can no longer 500 the whole artist page.
-            "image_url": create_signed_read_url_or_blank(UPLOAD_BUCKET, post.image_url),
+            # Tri-state via _artist_image_url (T104): None (text-only → note), "" (signing failed
+            # → placeholder, T103, so one un-signable image can no longer 500 the page), or a URL.
+            "image_url": _artist_image_url(post.image_url),
             "caption": post.caption,
             "when": _ago(post.created_at),
         }

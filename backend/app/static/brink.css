@@ -235,7 +235,9 @@ body {
 .steps > * + * { margin-top: 1rem; }
 
 /* ---- Composer (feed, T40) ---- */
-.composer { position: relative; }
+/* T104: stack the composer's text box, attached-song chip, "add a song" controls, status, and
+   Share with even spacing (was ad-hoc margins when only the search + selected step existed). */
+.composer { position: relative; display: grid; gap: 0.6rem; }
 .composer-search,
 .composer-caption {
   width: 100%;
@@ -287,10 +289,40 @@ body {
   color: var(--mute);
   font-size: 0.82rem;
 }
-.composer-selected { display: grid; gap: 0.6rem; }
-.composer-track { margin: 0; display: flex; flex-direction: column; }
+/* T104: the composer text box is now a textarea (multi-line "just writing"); let it grow a little
+   vertically but not collapse below a comfortable two lines. */
+textarea.composer-caption { resize: vertical; min-height: 2.75rem; }
+/* The optional "add a song" controls (search + now-playing + results), stacked. */
+.composer-song { display: grid; gap: 0.5rem; }
+/* T104: the attached-song chip — a pill showing the picked track with a × to remove it and go
+   back to a text-only post. */
+.composer-track-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--ink);
+}
+.composer-track { margin: 0; display: flex; flex-direction: column; min-width: 0; }
 .composer-track-title { font-weight: 600; font-size: 0.95rem; }
 .composer-track-artist { color: var(--mute); font-size: 0.85rem; }
+.composer-track-remove {
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.composer-track-remove:hover,
+.composer-track-remove:focus-visible { background: var(--panel); color: var(--text); outline: none; }
 .composer-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 
 /* ---- Artist page (T51) ---- */
@@ -341,6 +373,15 @@ body {
   border: 1px dashed var(--line);
 }
 .artist-post-caption { margin: 0; font-size: 0.95rem; }
+/* T104: a text-only artist post (no photo) gets the same distinct "note" look as user notes —
+   an accent edge and larger words — so it stands apart from photo posts in the feed and page. */
+.artist-post-note { border-left: 3px solid var(--accent); }
+.artist-post-note-body {
+  font-size: 1.15rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .artist-engagement-summary {
   border-top: 1px solid var(--line);
   padding-top: 0.65rem;
@@ -451,6 +492,18 @@ body {
 .post-track { margin: 0; font-weight: 600; font-size: 0.95rem; }
 .post-artist { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
 .post-caption { margin: 0.4rem 0 0; font-size: 0.9rem; color: var(--text); font-style: italic; }
+/* T104: a TEXT-ONLY post ("just writing", no song). It has no album-art row, so it stacks as a
+   single column and gets a distinct "note" look — a faint tint + an accent edge — so it reads as
+   a thought rather than a song share. The words themselves are shown larger (.post-note-body). */
+.post-note { flex-direction: column; background: var(--ink); border-left: 3px solid var(--accent); }
+.post-note-body {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;      /* keep the writer's own line breaks */
+  overflow-wrap: anywhere;    /* long unbroken strings wrap instead of overflowing */
+}
 .post-meta { margin: 0.4rem 0 0; color: var(--mute); font-size: 0.75rem; }
 /* T102: the "▶ played N times by {author}" endorsement line — muted, consistent with .post-meta. */
 .post-plays { margin: 0.25rem 0 0; color: var(--mute); font-size: 0.75rem; }
