@@ -20,44 +20,61 @@
     <p class="hero-sub">What people are playing right now 🎶</p>
   </div>
 
-  {# Composer (T40): search a song, add a caption, share it. See static/composer.js. #}
+  {# Composer (T40, reworked in T104). The text box and Share are ALWAYS visible so you can post
+     "just writing" with no song. Adding a song is an OPTIONAL step: search or tap "add what you're
+     hearing", and the picked track shows as a removable chip. Share posts the text + optional song.
+     See static/composer.js. #}
   <section class="composer card">
-    <label class="sr-only" for="composer-search-input">Search a song to share</label>
-    <input
-      id="composer-search-input"
-      type="text"
-      class="composer-search"
-      placeholder="Search a song to share…"
-      autocomplete="off"
-      aria-describedby="composer-status"
-      oninput="composerSearch(this)"
-    />
-    {# T101: one tap drops the song you're playing right now into the same selected-track step
-       below (title/artist + caption + Share), so you confirm with one more tap. See composer.js
-       shareNowPlaying(). aria-controls points at the status line it writes progress/errors into. #}
-    <button
-      type="button"
-      class="btn btn-ghost composer-nowplaying"
-      aria-controls="composer-status"
-      onclick="shareNowPlaying(this)"
-    >🎧 Share what you're hearing</button>
-    <ul class="composer-results" role="listbox" aria-label="Song search results" hidden></ul>
-    <p id="composer-status" class="composer-status" aria-live="polite"></p>
-    <div class="composer-selected" hidden>
-      <p class="composer-track">
+    <label class="sr-only" for="composer-caption-input">Write a post</label>
+    <textarea
+      id="composer-caption-input"
+      class="composer-caption"
+      rows="2"
+      placeholder="Share a thought…"
+      maxlength="300"
+    ></textarea>
+
+    {# The attached song, shown only after one is picked (composer.js reveals it). The × removes the
+       song again and brings the search back — the post then goes out as text-only. #}
+    <div class="composer-track-chip" hidden>
+      <span class="composer-track">
         <span class="composer-track-title"></span>
         <span class="composer-track-artist"></span>
-      </p>
+      </span>
+      <button
+        type="button"
+        class="composer-track-remove"
+        aria-label="Remove song"
+        onclick="composerRemoveTrack(this)"
+      >×</button>
+    </div>
+
+    {# Optional "add a song" controls. Hidden once a song is attached (one song per post). #}
+    <div class="composer-song">
+      <label class="sr-only" for="composer-search-input">Search a song to add</label>
       <input
+        id="composer-search-input"
         type="text"
-        class="composer-caption"
-        placeholder="Say something about it (optional)…"
-        maxlength="300"
+        class="composer-search"
+        placeholder="🎵 Add a song…"
+        autocomplete="off"
+        aria-describedby="composer-status"
+        oninput="composerSearch(this)"
       />
-      <div class="composer-actions">
-        <button type="button" class="btn btn-ghost" onclick="composerReset(this)">Cancel</button>
-        <button type="button" class="btn btn-spotify" onclick="composerPublish(this)">Share 🎶</button>
-      </div>
+      {# T101: one tap drops the song you're playing right now into the chip above (no direct
+         publish — you still hit Share). See composer.js shareNowPlaying(). #}
+      <button
+        type="button"
+        class="btn btn-ghost composer-nowplaying"
+        aria-controls="composer-status"
+        onclick="shareNowPlaying(this)"
+      >🎧 Add what you're hearing</button>
+      <ul class="composer-results" role="listbox" aria-label="Song search results" hidden></ul>
+    </div>
+
+    <p id="composer-status" class="composer-status" aria-live="polite"></p>
+    <div class="composer-actions">
+      <button type="button" class="btn btn-spotify composer-share" onclick="composerPublish(this)">Share</button>
     </div>
   </section>
 
@@ -68,19 +85,20 @@
       {# An artist behind-the-scenes post (T049): the image + caption of an artist you follow, with
          the SAME like/comment controls as an artist profile (T54), wired to the T52 /api/artist
          endpoints via static/artist-engagement.js. The image URL is already a signed read URL. #}
-      <article class="artist-post card">
+      {# image_url is TRI-STATE (T104): a URL (show the image), "" (an image exists but signing
+         failed → T103 placeholder), or None (text-only post → a note card, no image element). #}
+      <article class="artist-post card{% if p.image_url is none %} artist-post-note{% endif %}">
         <p class="post-meta">
           <a class="post-author" href="/u/{{ p.author_handle }}">{{ p.author }}</a>
           · behind the scenes · shared {{ p.when }}
         </p>
-        {# T103: image_url is "" when signing failed — show a muted placeholder, never a broken
-           <img> (an empty src). The card (caption + engagement) still renders fully. #}
         {% if p.image_url %}
         <img class="artist-post-img" src="{{ p.image_url }}" alt="{{ p.caption }}" />
-        {% else %}
+        {% elif p.image_url is not none %}
+        {# had an image but signing failed (T103) — muted placeholder, never a broken <img>. #}
         <div class="artist-post-img artist-post-img-missing" role="img" aria-label="Image unavailable"></div>
         {% endif %}
-        {% if p.caption %}<p class="artist-post-caption">{{ p.caption }}</p>{% endif %}
+        {% if p.caption %}<p class="artist-post-caption{% if p.image_url is none %} artist-post-note-body{% endif %}">{{ p.caption }}</p>{% endif %}
 
         {# Audience reactions on artist posts, backed by T52's /api/artist endpoints. #}
         <div class="reactions artist-reactions" data-post-id="{{ p.id }}">
@@ -140,7 +158,11 @@
         </div>
       </article>
       {% else %}
-      <article class="post">
+      {# A regular user post. It has a SONG when spotify_id is set; a TEXT-ONLY post (T104) has no
+         song, so we render a distinct "note" card — the caption as the main content, no album art
+         / play button / song row. `post-note` styles that quieter, quote-like look. #}
+      <article class="post{% if not p.spotify_id %} post-note{% endif %}">
+        {% if p.spotify_id %}
         {# The album art doubles as a play button (T94): tapping it asks player.js to open
            Spotify's free embed player for this track right inside the card (and tapping again
            closes it). It's a real <button> so keyboards and screen readers can use it too;
@@ -159,11 +181,17 @@
           {% endif %}
           <span class="post-art-play" aria-hidden="true">▶</span>
         </button>
+        {% endif %}
         <div class="post-body">
+          {% if p.spotify_id %}
           <p class="post-track">{{ p.title }}</p>
           <p class="post-artist">{{ p.artist }}</p>
           {% if p.caption %}
             <p class="post-caption">"{{ p.caption }}"</p>
+          {% endif %}
+          {% else %}
+          {# Text-only note: the caption IS the post, shown larger (see .post-note-body in CSS). #}
+          <p class="post-note-body">{{ p.caption }}</p>
           {% endif %}
           <p class="post-meta">
             <a class="post-author" href="/u/{{ p.author_handle }}">{{ p.author }}</a>
@@ -274,7 +302,7 @@
 {# The small scripts that make the composer (T40), reactions (T11), comments (T12), the
    liked-by reactors list (T96), the in-card Spotify player (T94) and the double-tap-to-heart
    gesture (T97) live. double-tap.js must load AFTER reactions.js — it reuses its react(). #}
-<script src="/static/composer.js?v=85"></script>
+<script src="/static/composer.js?v=104"></script>
 <script src="/static/reactions.js?v=85"></script>
 <script src="/static/comments.js?v=85"></script>
 <script src="/static/liked-by.js?v=96"></script>

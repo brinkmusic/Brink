@@ -102,12 +102,20 @@ def create_artist_post(
 ):
     _require_artist(user)
 
+    # An artist post must carry SOMETHING (T104): a photo or some text. Trim the caption so a
+    # whitespace-only one doesn't count as text. Neither a photo nor real text → 400, matching the
+    # "you can't post nothing" rule the upload box enforces in the UI.
+    caption = body.caption.strip() if body.caption else None
+    if not body.image_url and not caption:
+        return fail("a post needs a photo or some text", 400)
+
     # The author is ALWAYS the authenticated artist — never read from the body, so it can't be
-    # spoofed. image_url/caption/linked_track_id come from the (already validated) request.
+    # spoofed. image_url/caption/linked_track_id come from the (already validated) request; either
+    # image_url or caption may be None now (photo-only or text-only).
     post = ArtistPost(
         artist_user_id=user.id,
         image_url=body.image_url,
-        caption=body.caption,
+        caption=caption,
         linked_track_id=body.linked_track_id,
     )
     session.add(post)
