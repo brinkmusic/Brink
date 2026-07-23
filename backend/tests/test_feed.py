@@ -66,6 +66,35 @@ def test_feed_unauthenticated_returns_401(client):
     assert res.status_code == 401
 
 
+# T104: a TEXT-ONLY user post (no track) and a TEXT-ONLY artist post (no image) both appear in the
+# feed. The song post's `track` is null and the artist post's `imageUrl` is null (a note card), and
+# the trackless post never carries a play-count line.
+def test_feed_includes_text_only_posts(client, as_user, db_session):
+    db_session.add(_user("me", "me"))
+    db_session.commit()
+    # A text-only regular post (trackId None) and, since the viewer is themselves an artist, a
+    # text-only artist post (imageUrl None). Both authored by "me" so they show without a follow.
+    db_session.add(Post(id="p-text", user_id="me", track_id=None, caption="no song here",
+                        source=PostSource.MANUAL, created_at=NOW))
+    db_session.add(ArtistPost(id="ap-text", artist_user_id="me", image_url=None,
+                              caption="no photo here", created_at=NOW - timedelta(minutes=1)))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    assert res.status_code == 200
+    items = {p["id"]: p for p in res.json()["data"]}
+
+    text_post = items["p-text"]
+    assert text_post["kind"] == "song" and text_post["track"] is None
+    assert text_post["caption"] == "no song here"
+    assert text_post["authorPlayCount"] == 0
+
+    artist_post = items["ap-text"]
+    assert artist_post["kind"] == "artist" and artist_post["imageUrl"] is None
+    assert artist_post["caption"] == "no photo here"
+
+
 # A user who follows nobody still sees their own posts.
 def test_feed_no_follows_shows_self(client, as_user, db_session):
     db_session.add(Track(spotify_id="spot-1", title="A", artist_name="X"))

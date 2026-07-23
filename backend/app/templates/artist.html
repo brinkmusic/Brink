@@ -17,16 +17,18 @@
   {% if is_artist %}
   <div class="artist-upload card">
     <p class="card-label">Share something new</p>
+    {# T104: the caption is now ALWAYS visible and a photo is OPTIONAL — an artist can post just
+       text, just a photo, or both. artist-upload.js enables Share as soon as there's a photo OR
+       some text. (Before T104 the caption was hidden until a photo was picked, because a post
+       always needed a photo — see the old T57 behavior.) #}
+    <textarea class="artist-caption" rows="2" placeholder="Share something with your fans…" maxlength="2000"
+      oninput="artistCaptionInput(this)"></textarea>
     <input
       type="file"
       class="artist-file"
       accept="image/jpeg,image/png"
       onchange="artistFilePicked(this)"
     />
-    {# The caption starts HIDDEN and only appears once a valid image is picked (T57) — an artist
-       post always needs an image, so showing the caption up front wrongly implied you could post
-       with just text. artist-upload.js reveals it in artistFilePicked(). #}
-    <input type="text" class="artist-caption" placeholder="Add a caption…" maxlength="2000" hidden />
     <p class="artist-status" role="status"></p>
     <div class="composer-actions">
       <button type="button" class="btn btn-spotify artist-share" onclick="artistUpload(this)" disabled>
@@ -48,15 +50,15 @@
   {% if posts %}
     <div class="stack">
       {% for post in posts %}
-      <article class="artist-post card">
-        {# T103: image_url is "" when signing failed — show a muted placeholder instead of a broken
-           <img>, so an un-signable image can't blank or 500 this page. #}
+      {# image_url is TRI-STATE (T104): a URL (show image), "" (image exists but signing failed →
+         T103 placeholder), or None (text-only post → a note card, no image element). #}
+      <article class="artist-post card{% if post.image_url is none %} artist-post-note{% endif %}">
         {% if post.image_url %}
         <img class="artist-post-img" src="{{ post.image_url }}" alt="{{ post.caption }}" />
-        {% else %}
+        {% elif post.image_url is not none %}
         <div class="artist-post-img artist-post-img-missing" role="img" aria-label="Image unavailable"></div>
         {% endif %}
-        <p class="artist-post-caption">{{ post.caption }}</p>
+        {% if post.caption %}<p class="artist-post-caption{% if post.image_url is none %} artist-post-note-body{% endif %}">{{ post.caption }}</p>{% endif %}
         <p class="post-meta">shared {{ post.when }}</p>
       </article>
       {% endfor %}
@@ -68,5 +70,5 @@
   {% endif %}
 </section>
 
-{% if is_artist %}<script src="/static/artist-upload.js?v=85"></script>{% endif %}
+{% if is_artist %}<script src="/static/artist-upload.js?v=104"></script>{% endif %}
 {% endblock %}

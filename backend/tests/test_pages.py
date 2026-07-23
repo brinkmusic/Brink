@@ -296,6 +296,20 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert 'id="composer-status"' in body          # JS has a visible status/error target
     assert "composerSearch(this)" in body          # the search box is wired
     assert "/static/composer.js" in body           # the script is loaded
+    # T104: the text box + Share are always present (a song is optional), and the remove-song
+    # control on the attached-song chip is wired.
+    assert 'id="composer-caption-input"' in body   # the always-visible "just writing" box
+    assert "composerPublish(this)" in body         # the always-visible Share button is wired
+    assert "composerRemoveTrack(this)" in body     # the attached-song chip's × is wired
+
+
+# T104: the composer script can publish a TEXT-ONLY post — it doesn't bail when no song is
+# attached, sends `track: null`, and blocks a completely empty share.
+def test_composer_script_supports_text_only(client):
+    script = client.get("/static/composer.js").text
+    assert "composerRemoveTrack" in script          # removing an attached song is supported
+    assert "track: track" in script                 # the track is optional in the publish body
+    assert "Write something or add a song" in script  # the empty-share guard message
 
 
 # ---- T102: feed song card shows "played N times by {author}" at 2+ plays ----
@@ -326,6 +340,25 @@ def test_feed_song_card_shows_author_play_count_past_threshold(client, db_sessio
     body = client.get("/feed").text
     assert "played 3 times by Viewer" in body   # 3 plays -> endorsement line shown
     assert "played 1 time" not in body          # 1 play -> below threshold, never rendered
+
+
+# T104: a TEXT-ONLY post (no track) renders as a distinct note card on the feed — the caption in a
+# `.post-note-body`, and no play button (there's no song to play).
+def test_feed_renders_text_only_post_as_note(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db_session.add(Post(id="pp-text", user_id=viewer.id, track_id=None,
+                        caption="thinking out loud", source=PostSource.MANUAL, created_at=now))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "post-note" in body                  # the note card styling is applied
+    assert "thinking out loud" in body          # the caption is the post body
+    # No play button for a song-less post: the note card omits the .post-art play control.
+    assert 'aria-label="Play thinking out loud"' not in body
 
 
 # ---- T101: one-tap "Share what you're hearing" button in the composer ----
@@ -878,10 +911,20 @@ def test_artist_page_shows_upload_for_artist(client, db_session, monkeypatch):
     body = client.get("/artist").text
     assert 'class="artist-file"' in body            # the file picker is shown
     assert "/static/artist-upload.js" in body       # the upload script is loaded
-    # T57: the caption starts hidden — a post needs an image, so the caption box only appears
-    # after a valid file is picked (revealed by artist-upload.js). It must render with `hidden`.
+    # T104: the caption is now ALWAYS visible (a photo is optional — an artist can post text only),
+    # so the box renders WITHOUT `hidden` (reverting the old T57 reveal-on-image behavior).
     assert 'class="artist-caption"' in body
-    assert 'maxlength="2000" hidden' in body
+    assert 'maxlength="2000" hidden' not in body
+    assert "artistCaptionInput(this)" in body       # typing text alone can enable Share (T104)
+
+
+# T104: the artist upload script can publish a TEXT-ONLY post — it enables Share on text alone and
+# skips the image upload when no file is picked (imageUrl is only added when there's a file).
+def test_artist_upload_script_supports_text_only(client):
+    script = client.get("/static/artist-upload.js").text
+    assert "artistCaptionInput" in script            # a caption alone can make the post shareable
+    assert "if (_artistFile)" in script              # the image upload runs only when a file exists
+    assert "body.imageUrl = path" in script          # imageUrl is set only inside that branch
 
 
 def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch):

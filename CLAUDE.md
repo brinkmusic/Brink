@@ -226,12 +226,20 @@ agents, not a changelog.
   hardened artist-image signing: a single un-signable image now degrades to a placeholder via the
   shared `create_signed_read_url_or_blank` wrapper, instead of blanking the whole feed or 500ing
   `/artist` (fixes a 2026-07-22 production incident whose trigger was a bad Render Supabase key).
+  `T104` made posts **text-only-capable**: the song is now optional on a regular post
+  (`Post.trackId` nullable) and the photo optional on an artist post (`ArtistPost.imageUrl`/
+  `caption` nullable) — migration `fe4e66a13f08` (additive; applied to brink-dev). Both create
+  endpoints reject a post with neither media nor text (400); the composer shows an always-visible
+  text box + Share with the song/photo as an optional attach step; text-only posts render a distinct
+  note card (`.post-note` / `.artist-post-note`). Artist feed `image_url` is now tri-state
+  (URL / `""` T103 placeholder / `None` text-only note).
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
 - **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. The
-  Wave 2 music-identity trio (`T100`–`T102`) is **complete**. For analytics, `T32` is unblocked and
-  `T14` is still gated. The 2026-07-22 non-analytics UI hardening wave (`T80`–`T86`) and the social
-  quick-wins wave (`T94`–`T97`) are complete.
+  Wave 2 music-identity trio (`T100`–`T102`), `T103` signing hardening, and `T104` text-only posts
+  are **complete**. For analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22
+  non-analytics UI hardening wave (`T80`–`T86`) and the social quick-wins wave (`T94`–`T97`) are
+  complete.
 
 ## Watch-outs
 
