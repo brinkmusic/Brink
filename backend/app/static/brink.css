@@ -432,6 +432,36 @@ body {
 .react-emoji { line-height: 1; }
 .react-count { font-variant-numeric: tabular-nums; }
 
+/* ---- "Liked by X and N others" (feed, T96) ---- */
+.liked-by { margin-top: 0.45rem; }
+/* The line is a real <button> (it opens the reactors panel), styled as quiet text so it
+   reads as social proof, not a control — until you hover/focus it. */
+.liked-by-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--mute);
+  cursor: pointer;
+}
+.liked-by-btn b { color: var(--text); font-weight: 600; }
+.liked-by-btn:hover { text-decoration: underline; }
+.liked-by-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The panel listing everyone who reacted, opened by the line above. */
+.reactors-panel { margin-top: 0.4rem; }
+.reactor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.reactor { font-size: 0.85rem; display: flex; align-items: baseline; gap: 0.4rem; }
+.reactor-name { color: var(--text); font-weight: 600; text-decoration: none; }
+.reactor-name:hover { text-decoration: underline; }
+.reactors-status { margin: 0.2rem 0 0; color: var(--mute); font-size: 0.8rem; }
+
 /* ---- Comments (feed, T42) ---- */
 .comments { margin-top: 0.5rem; }
 /* The few newest comments shown right on the card (T95): a compact list above the 💬

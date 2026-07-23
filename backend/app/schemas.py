@@ -172,6 +172,16 @@ class CommentOut(CamelModel):
     author: AuthorOut
 
 
+# One person in GET /api/posts/{id}/reactions' "who reacted" list (T96): the same public
+# author fields as AuthorOut, plus every reaction type they left on the post (a user can
+# leave up to one of EACH type, so `types` combines them, e.g. ["FIRE", "HEART"]).
+class ReactorOut(CamelModel):
+    display_name: str
+    handle: str
+    avatar_url: Optional[str] = None
+    types: list[str]
+
+
 # What POST/DELETE /api/follow/{userId} return: the target's id and whether the caller now follows
 # them (true after a follow, false after an unfollow). A tiny, explicit shape — never a raw row.
 class FollowStateOut(CamelModel):
@@ -202,6 +212,9 @@ class FeedPostOut(CamelModel):
     # never null — a stable shape for the frontend. Reuses CommentOut (the same DTO the
     # comments API returns), so both surfaces expose identical, allow-listed fields.
     latest_comments: list[CommentOut] = []
+    # Whoever reacted MOST RECENTLY (T96), or null when the post has no reactions — backs the
+    # "Liked by X and N others" line. Reuses the public AuthorOut shape (no leaks).
+    liked_by: Optional[AuthorOut] = None
 
 
 # An artist "behind-the-scenes" post as the feed returns it (T049): a followed artist's promo image
