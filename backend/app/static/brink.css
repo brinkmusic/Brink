@@ -387,21 +387,55 @@ body {
 /* ---- Feed: post cards ---- */
 .post {
   display: flex;
+  /* wrap lets the full-width player row (T94, below) drop under the art + text */
+  flex-wrap: wrap;
   gap: 0.9rem;
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 1rem;
   padding: 0.9rem;
 }
+/* The art is a <button> since T94 (it opens the in-card player), so reset the browser's
+   default button chrome (border/padding) and make it obviously tappable. */
 .post-art {
   flex-shrink: 0;
   width: 3.5rem;
   height: 3.5rem;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  position: relative; /* anchors the ▶ overlay below */
   border-radius: 0.6rem;
   overflow: hidden;
   background: linear-gradient(to bottom right, var(--accent), var(--hot));
 }
 .post-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The small ▶ badge over the art that signals "this plays" (T94). Centered on the art;
+   brightens on hover/focus so the affordance is discoverable. */
+.post-art-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+}
+.post-art:hover .post-art-play,
+.post-art:focus-visible .post-art-play { opacity: 1; background: rgba(0, 0, 0, 0.5); }
+/* The row player.js inserts when a card is playing (T94): a full-width row under the card
+   content holding Spotify's compact 152px embed. flex-basis 100% + the card's flex-wrap
+   is what pushes it onto its own line. */
+.post-player { flex-basis: 100%; }
+.post-player iframe {
+  display: block;
+  width: 100%;
+  height: 152px;
+  border: 0;
+  border-radius: 0.8rem;
+}
 .post-body { min-width: 0; }
 .post-track { margin: 0; font-weight: 600; font-size: 0.95rem; }
 .post-artist { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }

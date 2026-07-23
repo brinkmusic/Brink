@@ -149,6 +149,8 @@ def _feed_items(session: Session, user) -> list[dict]:
             common["title"] = it["track"]["title"]
             common["artist"] = it["track"]["artistName"]
             common["album_art"] = it["track"]["albumArtUrl"]
+            # The Spotify track id, so the card can open the in-place embed player (T94).
+            common["spotify_id"] = it["track"]["spotifyId"]
         items.append(common)
     return items
 

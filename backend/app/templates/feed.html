@@ -114,11 +114,24 @@
       </article>
       {% else %}
       <article class="post">
-        <div class="post-art">
+        {# The album art doubles as a play button (T94): tapping it asks player.js to open
+           Spotify's free embed player for this track right inside the card (and tapping again
+           closes it). It's a real <button> so keyboards and screen readers can use it too;
+           aria-expanded tracks whether the player is open. Works even when there's no art —
+           the gradient placeholder still shows and stays tappable. #}
+        <button
+          type="button"
+          class="post-art"
+          data-spotify-id="{{ p.spotify_id }}"
+          aria-label="Play {{ p.title }}"
+          aria-expanded="false"
+          onclick="togglePlayer(this)"
+        >
           {% if p.album_art %}
             <img src="{{ p.album_art }}" alt="" />
           {% endif %}
-        </div>
+          <span class="post-art-play" aria-hidden="true">▶</span>
+        </button>
         <div class="post-body">
           <p class="post-track">{{ p.title }}</p>
           <p class="post-artist">{{ p.artist }}</p>
@@ -190,10 +203,12 @@
   {% endif %}
 </section>
 
-{# The small scripts that make the composer (T40), reactions (T11) and comments (T12) live. #}
+{# The small scripts that make the composer (T40), reactions (T11), comments (T12) and the
+   in-card Spotify player (T94) live. #}
 <script src="/static/composer.js?v=85"></script>
 <script src="/static/reactions.js?v=85"></script>
 <script src="/static/comments.js?v=85"></script>
+<script src="/static/player.js?v=94"></script>
 {# When any artist behind-the-scenes post is present (T049), load its engagement script — the SAME
    one the artist profile uses (T54), which drives artistReact/toggleArtistComments/submitArtistComment. #}
 {% if posts | selectattr("kind", "equalto", "artist") | list %}
