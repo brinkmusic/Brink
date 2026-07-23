@@ -220,13 +220,15 @@ agents, not a changelog.
   your latest plays on load (fire-and-forget, throttled 2/600s, reuses the snapshot ingest). `T101`
   added a one-tap "🎧 Share what you're hearing" button to the composer: it reads `GET
   /api/me/now-playing` and drops the current track into the existing composer selected state,
-  publishing with `PostSource.SPOTIFY` (no new endpoint; reuses T20 + T10).
+  publishing with `PostSource.SPOTIFY` (no new endpoint; reuses T20 + T10). `T102` added a
+  "▶ played N times by {author}" endorsement line to feed song cards (shown from 2 plays up),
+  computed as one batched `(author, track)` count over `silver.Play` in `build_feed`.
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
-- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. In
-  Wave 2, `T100`/`T101` are done — **`T102` (play counts) is next**. For
-  analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22 non-analytics UI hardening
-  wave (`T80`–`T86`) and the social quick-wins wave (`T94`–`T97`) are complete.
+- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. The
+  Wave 2 music-identity trio (`T100`–`T102`) is **complete**. For analytics, `T32` is unblocked and
+  `T14` is still gated. The 2026-07-22 non-analytics UI hardening wave (`T80`–`T86`) and the social
+  quick-wins wave (`T94`–`T97`) are complete.
 
 ## Watch-outs
 
