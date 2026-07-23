@@ -298,6 +298,31 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert "/static/composer.js" in body           # the script is loaded
 
 
+# ---- T101: one-tap "Share what you're hearing" button in the composer ----
+
+
+# The composer carries a "share what you're hearing" button wired to the now-playing handler,
+# so a user can drop their current Spotify track into the composer with one tap.
+def test_feed_composer_has_share_now_playing_button(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "shareNowPlaying(this)" in body   # the button is wired to the T101 handler
+
+
+# The composer script drives the one-tap flow: it fetches the now-playing endpoint, publishes the
+# resulting post with the SPOTIFY source (so it's distinguishable from a typed MANUAL post), and
+# handles the "nothing playing" empty case via the status line rather than breaking.
+def test_composer_script_shares_now_playing(client):
+    script = client.get("/static/composer.js").text
+    assert "/api/me/now-playing" in script      # it asks what's playing
+    assert "shareNowPlaying" in script          # the handler exists
+    assert '"SPOTIFY"' in script                 # these posts publish with the SPOTIFY source
+    assert "Nothing playing" in script          # the null case is handled with friendly copy
+
+
 # ---- T94: feed song cards are playable in place via the Spotify embed player ----
 
 

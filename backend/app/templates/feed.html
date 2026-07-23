@@ -32,6 +32,15 @@
       aria-describedby="composer-status"
       oninput="composerSearch(this)"
     />
+    {# T101: one tap drops the song you're playing right now into the same selected-track step
+       below (title/artist + caption + Share), so you confirm with one more tap. See composer.js
+       shareNowPlaying(). aria-controls points at the status line it writes progress/errors into. #}
+    <button
+      type="button"
+      class="btn btn-ghost composer-nowplaying"
+      aria-controls="composer-status"
+      onclick="shareNowPlaying(this)"
+    >🎧 Share what you're hearing</button>
     <ul class="composer-results" role="listbox" aria-label="Song search results" hidden></ul>
     <p id="composer-status" class="composer-status" aria-live="polite"></p>
     <div class="composer-selected" hidden>
