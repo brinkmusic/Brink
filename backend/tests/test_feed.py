@@ -249,6 +249,72 @@ def test_feed_artist_item_carries_engagement(client, as_user, db_session, monkey
     assert item["viewerReactions"] == {"HEART": True, "FIRE": False, "SPARKLE": False}
 
 
+# ---- T95: each feed item carries its latest comments inline (Instagram-style) ----
+
+
+# A song post carries its NEWEST comments (capped at 3), listed in chronological order within
+# that subset (oldest of the shown three first — the Instagram reading order), each with its
+# body and author. A post with no comments carries an empty list, never null.
+def test_feed_post_carries_latest_comments_capped_and_ordered(client, as_user, db_session):
+    _seed_world(db_session)
+    # Five comments on the friend's post, one minute apart: c1 (oldest) .. c5 (newest).
+    for i in range(1, 6):
+        db_session.add(Comment(post_id="p-friend", user_id="me", body=f"c{i}",
+                               created_at=NOW - timedelta(minutes=5 - i)))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    data = res.json()["data"]
+    friend_post = next(p for p in data if p["id"] == "p-friend")
+    # The newest three (c3, c4, c5), shown oldest-first within the subset.
+    assert [c["body"] for c in friend_post["latestComments"]] == ["c3", "c4", "c5"]
+    assert friend_post["latestComments"][0]["author"]["displayName"] == "me"
+    assert friend_post["commentCount"] == 5
+    # The viewer's own uncommented post has the stable empty shape.
+    own_post = next(p for p in data if p["id"] == "p-me")
+    assert own_post["latestComments"] == []
+
+
+# The comment DTO must not leak private author fields (ADR-0012): only the public
+# display name / handle / avatar appear, never an email or internal ids.
+def test_feed_latest_comments_expose_only_public_author_fields(client, as_user, db_session):
+    _seed_world(db_session)
+    db_session.add(Comment(post_id="p-friend", user_id="friend", body="hi", created_at=NOW))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    friend_post = next(p for p in res.json()["data"] if p["id"] == "p-friend")
+    author = friend_post["latestComments"][0]["author"]
+    assert set(author.keys()) == {"displayName", "handle", "avatarUrl"}
+
+
+# An artist behind-the-scenes item carries its latest comments too, from the mirrored
+# ArtistComment table (T52) — same cap and order as song posts.
+def test_feed_artist_item_carries_latest_comments(client, as_user, db_session, monkeypatch):
+    _stub_signed_read(monkeypatch)
+    db_session.add(_user("me", "me"))
+    db_session.add(User(id="artist", handle="artist", display_name="The Artist",
+                        is_artist=True, created_at=datetime.now(timezone.utc)))
+    db_session.commit()
+    db_session.add(Follow(follower_id="me", following_id="artist"))
+    db_session.add(ArtistPost(id="ap-1", artist_user_id="artist", image_url="artist/x.jpg",
+                              caption="clip", created_at=NOW))
+    db_session.commit()
+    db_session.add(ArtistComment(artist_post_id="ap-1", user_id="me", body="first",
+                                 created_at=NOW - timedelta(minutes=1)))
+    db_session.add(ArtistComment(artist_post_id="ap-1", user_id="artist", body="second",
+                                 created_at=NOW))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    item = next(p for p in res.json()["data"] if p["id"] == "ap-1")
+    assert [c["body"] for c in item["latestComments"]] == ["first", "second"]
+    assert item["latestComments"][1]["author"]["displayName"] == "The Artist"
+
+
 # ---- T96: each song post names its most recent reactor ("Liked by X and N others") ----
 
 

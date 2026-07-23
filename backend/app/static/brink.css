@@ -464,6 +464,24 @@ body {
 
 /* ---- Comments (feed, T42) ---- */
 .comments { margin-top: 0.5rem; }
+/* The few newest comments shown right on the card (T95): a compact list above the 💬
+   toggle — author name (a profile link) then the comment text, one per line. */
+.comment-inline-list {
+  list-style: none;
+  margin: 0 0 0.35rem;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+.comment-inline { font-size: 0.85rem; line-height: 1.35; overflow-wrap: anywhere; }
+.comment-inline-author {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  margin-right: 0.35rem;
+}
+.comment-inline-author:hover { text-decoration: underline; }
+.comment-inline-body { color: var(--mute); }
 .comment-toggle {
   display: inline-flex;
   align-items: center;

@@ -116,6 +116,10 @@ async function submitArtistComment(event, form) {
     const empty = list.querySelector(".comment-empty");
     if (empty) empty.remove();
     list.prepend(renderArtistComment(comment));
+    // On the FEED the newest comments also show inline on the card (T95); reuse the helper
+    // from comments.js when it's loaded. The typeof guard keeps this a no-op on pages that
+    // load this script without comments.js (e.g. the artist profile).
+    if (typeof appendInlineComment === "function") appendInlineComment(box, comment);
     input.value = "";
     if (status) status.textContent = "";
     bumpArtistCommentCount(box, 1);
