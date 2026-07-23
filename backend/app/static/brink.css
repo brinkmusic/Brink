@@ -19,6 +19,13 @@
   --hot: #f472b6;    /* reactions / streaks (pink) */
 }
 
+/* The HTML `hidden` attribute must ALWAYS win. WHY this rule exists: `hidden` only hides an
+   element via the browser's default `display: none`, so ANY explicit `display` we set in this
+   file (e.g. `.composer-track-chip { display: flex }`) silently overrides it and the element
+   shows even when marked hidden (this caused the empty song-chip box, T104). `!important` here
+   guarantees a `hidden` element stays gone regardless of other display rules. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 
 html, body { margin: 0; height: 100%; }
