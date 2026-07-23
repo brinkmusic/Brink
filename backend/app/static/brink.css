@@ -485,6 +485,8 @@ body {
   border-top: 1px solid var(--line);
   padding-top: 0.75rem;
 }
+/* Author-level display rules override the browser's default [hidden] rule, so preserve it here. */
+.edit-profile-form[hidden] { display: none; }
 .edit-profile-field {
   display: grid;
   gap: 0.35rem;
