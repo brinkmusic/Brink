@@ -68,6 +68,20 @@ def test_create_post_persists_post_and_upserts_track(client, as_user, db_session
     assert db_session.get(Track, "spot-1") is not None
 
 
+# A SPOTIFY-source post (the one-tap "share what you're hearing" path, T101) round-trips through
+# the SAME create endpoint: 201, the saved source is SPOTIFY (so these posts stay distinguishable
+# from typed MANUAL posts), and the Track is upserted like any other post.
+def test_create_spotify_source_post_persists(client, as_user, db_session):
+    as_user(_user(), session=db_session)
+    res = client.post("/api/posts", json=_valid_body(source="SPOTIFY"))
+
+    assert res.status_code == 201
+    assert res.json()["data"]["source"] == "SPOTIFY"
+    saved = db_session.exec(select(Post)).all()
+    assert len(saved) == 1
+    assert saved[0].source == PostSource.SPOTIFY
+
+
 # A malformed track payload (missing required title) -> 400 via the validation handler.
 def test_create_malformed_track_returns_400(client, as_user):
     as_user(_user())
