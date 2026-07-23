@@ -149,6 +149,8 @@ def _feed_items(session: Session, user) -> list[dict]:
             common["title"] = it["track"]["title"]
             common["artist"] = it["track"]["artistName"]
             common["album_art"] = it["track"]["albumArtUrl"]
+            # The most recent reactor (or None) for the "Liked by X and N others" line (T96).
+            common["liked_by"] = it["likedBy"]
         items.append(common)
     return items
 

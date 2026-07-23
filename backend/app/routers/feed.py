@@ -135,6 +135,21 @@ def _build_song_items(session: Session, user: User, author_ids: set[str]) -> lis
     ).all():
         viewer_reactions.setdefault(post_id, _no_viewer_reactions())[ReactionType(rtype).value] = True
 
+    # Each post's MOST RECENT reactor (T96) — backs the "Liked by X and N others" line. One
+    # batched query: every reaction on these posts joined to its reactor, newest first; the
+    # first row we see per post wins (dict "not in" check), so it's their newest reactor.
+    liked_by: dict[str, AuthorOut] = {}
+    for post_id, display_name, handle, avatar_url in session.exec(
+        select(Reaction.post_id, User.display_name, User.handle, User.avatar_url)
+        .join(User, User.id == Reaction.user_id)
+        .where(Reaction.post_id.in_(post_ids))
+        .order_by(Reaction.created_at.desc())
+    ).all():
+        if post_id not in liked_by:
+            liked_by[post_id] = AuthorOut(
+                display_name=display_name, handle=handle, avatar_url=avatar_url
+            )
+
     # Assemble each post's response from the batched lookups (falling back to the zero/empty shapes
     # for a post that has no reactions/comments yet).
     items = []
@@ -160,6 +175,7 @@ def _build_song_items(session: Session, user: User, author_ids: set[str]) -> lis
             reaction_counts=reaction_counts.get(post.id, _zero_counts()),
             comment_count=comment_counts.get(post.id, 0),
             viewer_reactions=viewer_reactions.get(post.id, _no_viewer_reactions()),
+            liked_by=liked_by.get(post.id),  # None when the post has no reactions (T96)
         )
         # by_alias=True -> emit camelCase field names (reactionCounts, commentCount, ...).
         items.append((post.created_at, out.model_dump(by_alias=True, mode="json")))
