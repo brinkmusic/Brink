@@ -442,6 +442,34 @@ body {
 .post-caption { margin: 0.4rem 0 0; font-size: 0.9rem; color: var(--text); font-style: italic; }
 .post-meta { margin: 0.4rem 0 0; color: var(--mute); font-size: 0.75rem; }
 
+/* ---- Double-tap to heart (T97) ---- */
+/* The card anchors the floating heart (position: relative makes the heart's absolute
+   coordinates relative to the card, not the page). Declared as its own rule so it composes
+   with the base .post card rule above. touch-action: manipulation removes the browser's
+   double-tap-to-zoom on cards, which would otherwise swallow the gesture on phones. */
+.post {
+  position: relative;
+  touch-action: manipulation;
+}
+/* The temporary big heart double-tap.js drops over the card: centered, ignores the mouse
+   (pointer-events: none, so it never blocks a follow-up tap), and animated by the keyframes
+   below — pop in, hold a beat, drift up and fade. JS removes it when the animation ends. */
+.double-tap-heart {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 3rem;
+  pointer-events: none;
+  animation: double-tap-pop 800ms ease forwards;
+}
+@keyframes double-tap-pop {
+  0%   { transform: scale(0.3); opacity: 0; }
+  25%  { transform: scale(1.15); opacity: 1; }
+  60%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.3) translateY(-0.5rem); opacity: 0; }
+}
+
 /* ---- Reaction buttons (feed, T41) ---- */
 .reactions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
 .react-btn {

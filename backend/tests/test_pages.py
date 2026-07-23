@@ -340,6 +340,40 @@ def test_feed_song_card_playable_without_art(client, db_session, monkeypatch):
     assert 'aria-label="Play No Art Song"' in body
 
 
+# ---- T97: double-tap a song card to heart it (Instagram's signature gesture) ----
+
+
+# The feed loads the double-tap script whenever song posts render, so the gesture is live.
+def test_feed_loads_double_tap_script(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_dt", title="Tap Tap", artist_name="Gesture"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_dt", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    assert "/static/double-tap.js" in client.get("/feed").text
+
+
+# The gesture must be ADD-ONLY (Instagram semantics: double-tap never removes a heart —
+# removal stays on the ❤️ button) and must reuse the existing react() logic rather than
+# talking to the API itself. We assert on the script's source, like the T86 script test.
+def test_double_tap_script_is_add_only_and_reuses_react(client):
+    script = client.get("/static/double-tap.js").text
+    assert 'classList.contains("reacted")' in script   # checks before hearting — never unhearts
+    assert "react(" in script                          # delegates to reactions.js
+    assert "prefers-reduced-motion" in script          # respects the reduced-motion setting
+
+
+# The floating-heart animation the gesture triggers exists in the stylesheet.
+def test_stylesheet_has_double_tap_heart_animation(client):
+    css = client.get("/static/brink.css").text
+    assert ".double-tap-heart" in css
+    assert "@keyframes double-tap-pop" in css
+
+
 # ---- T049: followed artists' behind-the-scenes posts render in the feed page ----
 
 
