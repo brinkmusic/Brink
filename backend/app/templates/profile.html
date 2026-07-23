@@ -62,7 +62,13 @@
     {% if p.is_self %}
     <div class="edit-profile">
       <div class="profile-actions">
-        <button type="button" class="btn btn-ghost edit-profile-btn" onclick="toggleEditProfile(this)">
+        <button
+          type="button"
+          class="btn btn-ghost edit-profile-btn"
+          aria-expanded="false"
+          aria-controls="edit-profile-form"
+          onclick="toggleEditProfile(this)"
+        >
           Edit profile
         </button>
         {# On your OWN profile, if you're not already an artist, offer to become one (T55). Clicking
@@ -80,7 +86,7 @@
       {% if not p.is_artist %}
       <p id="become-artist-status" class="profile-action-status" aria-live="polite"></p>
       {% endif %}
-      <form class="edit-profile-form" hidden onsubmit="saveProfile(event, this)">
+      <form id="edit-profile-form" class="edit-profile-form" hidden onsubmit="saveProfile(event, this)">
         <label class="edit-profile-field">
           <span>Profile picture (JPEG/PNG, ≤ 10 MB)</span>
           <input type="file" class="edit-avatar-file" accept="image/jpeg,image/png" />

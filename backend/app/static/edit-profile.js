@@ -16,7 +16,13 @@ const EDIT_ALLOWED_TYPES = ["image/jpeg", "image/png"];
 // Show/hide the edit form when the "Edit profile" button is clicked.
 function toggleEditProfile(btn) {
   const form = btn.closest(".edit-profile").querySelector(".edit-profile-form");
-  form.hidden = !form.hidden;
+  const opening = form.hasAttribute("hidden");
+  if (opening) {
+    form.removeAttribute("hidden");
+  } else {
+    form.setAttribute("hidden", "");
+  }
+  btn.setAttribute("aria-expanded", opening ? "true" : "false");
 }
 
 // The Save handler. `event` is the form submit; we stop the browser's default page reload so we can
