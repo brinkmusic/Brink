@@ -215,10 +215,13 @@ agents, not a changelog.
   avatars use a public `avatars` bucket; artist images use private `artist-images` signed reads.
   The feed's social quick-wins wave (`T94`–`T97`) shipped: song cards play in place via the
   Spotify embed, show their newest comments inline, carry a "Liked by X and N others" line with a
-  reactors list, and support double-tap-to-heart.
+  reactors list, and support double-tap-to-heart. `T100` freshened listening history: the snapshot
+  cron now runs every 30 min (was 2 h), and `POST /api/me/plays/refresh` lets your own profile pull
+  your latest plays on load (fire-and-forget, throttled 2/600s, reuses the snapshot ingest).
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
-- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. For
+- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. In
+  Wave 2, `T100` is done — **`T101` (share now-playing) is next**, then `T102` (play counts). For
   analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22 non-analytics UI hardening
   wave (`T80`–`T86`) and the social quick-wins wave (`T94`–`T97`) are complete.
 

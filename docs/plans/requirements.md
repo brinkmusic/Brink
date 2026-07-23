@@ -33,10 +33,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | SP-1 | Currently-playing endpoint + "now playing" surface. | T20 | ◻ |
-| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ✅ |
+| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21, T100 | ✅ (T100 tightened the cron to every 30 min and added `POST /api/me/plays/refresh` for a visit-triggered self-sync, reusing the same dedup ingest) |
 | SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ✅ |
 | SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ✅ |
-| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ✅ |
+| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21, T100 | ✅ (T100's self-refresh is throttled 2/600s via `enforce_rate_limit`) |
 
 ## Layer 4 — Analytics & Data Science (AN)
 | ID | Acceptance | Ticket(s) | Status |
