@@ -298,6 +298,48 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert "/static/composer.js" in body           # the script is loaded
 
 
+# ---- T94: feed song cards are playable in place via the Spotify embed player ----
+
+
+# A song card carries its Spotify track id and an accessible play control, and loads the
+# player script. The embed iframe itself must NOT be in the initial HTML — player.js only
+# builds it when the listener taps play (keeps the page light: no third-party frames on load).
+def test_feed_song_card_is_playable(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino",
+                         album_art_url="https://img.example/redbone.jpg"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_redbone", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'data-spotify-id="t_redbone"' in body   # the card knows which track it plays
+    assert 'aria-label="Play Redbone"' in body     # the art is a labelled play button
+    assert "togglePlayer(this)" in body            # wired to the player script
+    assert "/static/player.js" in body             # the script is loaded
+    assert "<iframe" not in body                   # lazy: no embed frame on initial load
+
+
+# A post whose track has no album art must still be playable — the play button renders
+# (with its gradient placeholder background) even without an <img> inside it.
+def test_feed_song_card_playable_without_art(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_noart", title="No Art Song", artist_name="Somebody"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_noart", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'data-spotify-id="t_noart"' in body
+    assert 'aria-label="Play No Art Song"' in body
+
+
 # ---- T049: followed artists' behind-the-scenes posts render in the feed page ----
 
 
