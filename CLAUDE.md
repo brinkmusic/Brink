@@ -37,7 +37,9 @@ The frontend is the Jinja/HTMX pages under `backend/app/` above.)*
 
 ## Commands
 
-Local dev reads the root `.env` (the `brink-dev` Supabase project), so it never touches production.
+Local dev reads the root `.env` (the `brink-dev` Supabase project). **Careful: the deployed Render
+app uses the SAME database** (confirmed 2026-07-23; split tracked in T99) — local writes are
+visible in production, so treat local dev as production until T99 lands.
 
 ```
 # The whole app â€” one process. The FastAPI app serves BOTH the JSON API and the HTML pages
@@ -174,7 +176,10 @@ must use `ALTER TABLE ... SET SCHEMA` (preserves rows) â€” never autogenera
 ## Environment
 
 - Supabase project `brink-dev` (ref `ljzwskfhiviunmqxerwu`). Data API disabled â€” tables are
-  reached only through the backend's ORM (SQLModel/SQLAlchemy).
+  reached only through the backend's ORM (SQLModel/SQLAlchemy). **This is currently the ONLY
+  database: the deployed Render service points at it too** (confirmed 2026-07-23) — there is no
+  separate production DB yet. `T99` (backlog) tracks the split, deliberately deferred past the
+  2026-07-30 deadline.
 - Root `.env`: `DATABASE_URL`/`DIRECT_URL` (Supabase pooler 6543/5432), `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`, `SPOTIFY_CLIENT_ID`/`SECRET`, `TOKEN_ENC_KEY`.
 - **Getting the values (onboarding):** the `.env` file is git-ignored and never shared in the
@@ -210,25 +215,38 @@ agents, not a changelog.
   avatars use a public `avatars` bucket; artist images use private `artist-images` signed reads.
   The feed's social quick-wins wave (`T94`–`T97`) shipped: song cards play in place via the
   Spotify embed, show their newest comments inline, carry a "Liked by X and N others" line with a
-  reactors list, and support double-tap-to-heart.
+  reactors list, and support double-tap-to-heart. `T100` freshened listening history: the snapshot
+  cron now runs every 30 min (was 2 h), and `POST /api/me/plays/refresh` lets your own profile pull
+  your latest plays on load (fire-and-forget, throttled 2/600s, reuses the snapshot ingest). `T101`
+  added a one-tap "🎧 Share what you're hearing" button to the composer: it reads `GET
+  /api/me/now-playing` and drops the current track into the existing composer selected state,
+  publishing with `PostSource.SPOTIFY` (no new endpoint; reuses T20 + T10). `T102` added a
+  "▶ played N times by {author}" endorsement line to feed song cards (shown from 2 plays up),
+  computed as one batched `(author, track)` count over `silver.Play` in `build_feed`.
 - **Analytics state:** Kaggle audio features are joined into `silver.Track`; synthetic seeding
   `T32` is ready for Jonah. T14 remains gated on the analytics spine (`T33`/`T35`).
-- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. For
-  analytics, `T32` is unblocked and `T14` is still gated. The 2026-07-22 non-analytics UI hardening
-  wave (`T80`–`T86`) and the social quick-wins wave (`T94`–`T97`) are complete.
+- **Next feature work:** start from `docs/plans/tickets/README.md` before choosing a ticket. The
+  Wave 2 music-identity trio (`T100`–`T102`) is **complete**. For analytics, `T32` is unblocked and
+  `T14` is still gated. The 2026-07-22 non-analytics UI hardening wave (`T80`–`T86`) and the social
+  quick-wins wave (`T94`–`T97`) are complete.
 
 ## Watch-outs
 
+- **Dev and production share one database** (the `brink-dev` Supabase project — confirmed
+  2026-07-23, split tracked in `T99`, deferred past the deadline). Until then: no destructive
+  local experiments, no throwaway seed data you wouldn't demo, and remember any local write is
+  live for real users. One upside: a migration run locally is already applied for production.
 - Spotify `provider_token` from the browser lasts about 1 hour and is **not** refreshed by Supabase.
   Server/long-term Spotify access must go through our stored refresh token path (T22/T21).
 - Supabase redirect allow-lists matter for auth: deployed and localhost `/auth/callback` and
   `/auth/confirm` URLs must be configured, or login/signup flows cannot return cleanly.
 - Storage buckets are owner-managed infrastructure: `artist-images` is private and needs signed read
   URLs; `avatars` is public and must exist before profile-picture uploads work.
-- Schema changes still need manual care on `brink-dev`: run Alembic migrations from `backend/`, and
-  preserve medallion schemas (`bronze`, `silver`, `gold`) when autogenerating. The T96
-  `Reaction.createdAt` migration (`f4a2d81c96e0`) is applied on `brink-dev`; **production needs
-  `uv run alembic upgrade head` at the next release** or the liked-by line can't order reactions.
+- Schema changes still need manual care: run Alembic migrations from `backend/` against `brink-dev`
+  (and against production at each release — `uv run alembic -x dburl="<Render DIRECT_URL>" upgrade head`
+  accepts a dashboard URL as-is since T98), and preserve medallion schemas (`bronze`, `silver`,
+  `gold`) when autogenerating. The T96 `Reaction.createdAt` migration (`f4a2d81c96e0`) is applied
+  on both brink-dev and production (verified 2026-07-23).
 - The DB still has a `_prisma_migrations` table from the retired Prisma stack. Alembic ignores it
   (`backend/alembic/env.py`); it is harmless and can be dropped later.
 - Render deploys production from `main`, not `develop`. Scheduled GitHub workflows also only run

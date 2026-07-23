@@ -332,4 +332,7 @@
 {% if p.is_self and not p.is_artist %}<script src="/static/become-artist.js?v=85"></script>{% endif %}
 {# Makes the "Edit profile" form live (T48) — own profile only. #}
 {% if p.is_self %}<script src="/static/edit-profile.js?v=85"></script>{% endif %}
+{# Fire-and-forget: pull your latest Spotify plays on load so recent listening is fresh (T100) —
+   own profile only, so it never runs when viewing someone else's page. #}
+{% if p.is_self %}<script src="/static/plays-refresh.js?v=85"></script>{% endif %}
 {% endblock %}

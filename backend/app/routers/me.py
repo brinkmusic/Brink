@@ -4,6 +4,7 @@
 #   PATCH /api/me/profile            -> set the caller's own bio (T48).
 #   POST  /api/me/avatar/sign-upload -> mint a signed upload URL for a new profile picture (T48).
 #   POST  /api/me/avatar             -> point the caller's avatar at an uploaded image (T48).
+#   POST  /api/me/plays/refresh      -> pull the caller's own recently-played from Spotify NOW (T100).
 # Login is required on all of them, and every write is ALWAYS applied to the authenticated caller
 # (resolved from their session), never to a client-supplied id, so nothing here can be spoofed.
 #
@@ -17,7 +18,13 @@ from sqlmodel import Session
 from app.db import get_session
 from app.deps import require_user
 from app.models import User
+from app.rate_limit import enforce_rate_limit
 from app.responses import fail, ok
+# Reuse the SNAPSHOT ingest pipeline (T21) rather than writing a second one: _ingest_user lands the
+# raw Spotify payload in bronze and conforms Track/Play into silver with the same (userId, playedAt)
+# dedup the cron uses. get_recently_played is the Spotify HTTP boundary (returns None on any degraded
+# case: no linked account, refresh failure, outage).
+from app.routers.snapshot import _ingest_user
 from app.schemas import (
     ArtistStateOut,
     AvatarOut,
@@ -28,6 +35,13 @@ from app.schemas import (
     UpdateProfileBody,
 )
 from app.security.supabase import create_signed_upload_url, public_object_url
+from app.spotify import get_recently_played
+
+# How often one user may force a self-refresh (ADR-0011). The profile page fires this once per visit,
+# so a small cap (2 per 10 minutes) is plenty for a real visitor yet stops a client hammering Spotify.
+# Module-level so it reads clearly and tests can reason about it.
+PLAYS_REFRESH_RATE_LIMIT = 2
+PLAYS_REFRESH_RATE_WINDOW_SECONDS = 600
 
 # The PUBLIC Supabase Storage bucket that holds profile pictures (created manually by Andrea — see
 # the ticket's "Manual (user)" step). "Public" (unlike the artist-images bucket) means objects are
@@ -134,3 +148,33 @@ def set_avatar(
 
     out = AvatarOut(avatar_url=avatar_url)
     return ok(out.model_dump(by_alias=True, mode="json"))
+
+
+@router.post("/api/me/plays/refresh")
+def refresh_plays(
+    user: User = Depends(require_user),   # login required; the caller can only refresh their OWN plays
+    session: Session = Depends(get_session),
+):
+    # Abuse/Spotify guard first: refuse (429) if this user has forced a refresh too many times
+    # recently. enforce_rate_limit raises RateLimitError on the cap, which the app-wide handler turns
+    # into the standard 429 { error } envelope.
+    enforce_rate_limit(
+        session,
+        subject=user.id,
+        action="plays_refresh",
+        limit=PLAYS_REFRESH_RATE_LIMIT,
+        window_seconds=PLAYS_REFRESH_RATE_WINDOW_SECONDS,
+    )
+
+    # Pull the caller's last 50 plays from Spotify. None means we couldn't get them (no linked
+    # account, token refresh failed, Spotify outage) — that's a NORMAL empty result, not an error
+    # (T20 degradation philosophy), so we report 0 inserted rather than failing the request.
+    payload = get_recently_played(session, user.id)
+    inserted = 0
+    if payload is not None:
+        # Same ingest the cron runs: land raw -> conform Track/Play with (userId, playedAt) dedup, so
+        # firing this repeatedly (or alongside the cron) can never double-count. Commit once, here.
+        inserted = _ingest_user(session, user.id, payload)
+        session.commit()
+
+    return ok({"playsInserted": inserted})

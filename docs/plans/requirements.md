@@ -19,7 +19,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (`/api/state`) + dead front-end stubs. *(satisfied by retiring the whole SPA — the entire `apps/web/` was deleted in T60, ADR-0013)* | T60 | ✅ |
-| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
+| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10, T101 | ✅ (T101 exercises the `SPOTIFY`-source create path from the one-tap share button; round-trip test added) |
 | BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. User search and follower/following lists make the graph discoverable. | T13, T15, T16 | ✅ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
@@ -33,10 +33,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | SP-1 | Currently-playing endpoint + "now playing" surface. | T20 | ◻ |
-| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ✅ |
+| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21, T100 | ✅ (T100 tightened the cron to every 30 min and added `POST /api/me/plays/refresh` for a visit-triggered self-sync, reusing the same dedup ingest) |
 | SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ✅ |
 | SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ✅ |
-| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ✅ |
+| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21, T100 | ✅ (T100's self-refresh is throttled 2/600s via `enforce_rate_limit`) |
 
 ## Layer 4 — Analytics & Data Science (AN)
 | ID | Acceptance | Ticket(s) | Status |
@@ -47,15 +47,15 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | AN-4 † | Assign each user to nearest cluster. *(computed on read in the Python API; `User.clusterId` dropped)* | T33, T14 | ◻ |
 | AN-5 † | Compatibility = cosine of full taste vectors. *(computed on read in the Python API; no pairwise table)* | T35 | ◻ |
 | AN-6 | Popularity regression; persist R²/RMSE/feature-importances. | T36 | ◻ |
-| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(computed live in the Python API, no `UserStats` table)* | T44, T14 | ◧ (T44: top **tracks/artists**, streak, 30-day totals done live over `Play` in `app/stats.py`; top **genres** deferred to T14, needs the T31 Kaggle genre join) |
+| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(computed live in the Python API, no `UserStats` table)* | T44, T14, T102 | ◧ (T44: top **tracks/artists**, streak, 30-day totals done live over `Play` in `app/stats.py`; T102 adds a batched per-(author, track) play count on feed cards over the same `Play` data; top **genres** still deferred to T14, needs the T31 Kaggle genre join) |
 | AN-8 | Pipeline idempotent + re-runnable; logs coverage/k/silhouette/R²/RMSE. | T30, T38 | ◻ |
 | AN-9 † | Analytics UI on real model data; no hardcoded constants. *(reads metrics/clusters + on-read values)* | T45 | ◻ |
 
 ## Layer 5 — Frontend / UX-UI (UI)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| UI-1 | Post composer with Spotify catalog search → publish. | T40, T81 | ✅ (T81 follow-up hardens keyboard interaction and labels; no API behavior change.) |
-| UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts)* | T41, T47, T049 | ✅ |
+| UI-1 | Post composer with Spotify catalog search → publish. | T40, T81, T101 | ✅ (T81 follow-up hardens keyboard interaction and labels; T101 adds a one-tap "share what you're hearing" button that reuses the same selected-track → publish path; no API behavior change.) |
+| UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts; T102 added the "played N times by {author}" endorsement line on song cards)* | T41, T47, T049, T102 | ✅ |
 | UI-3 | Reactions call BE-5; counts reflect server truth. | T41, T96, T97 | ✅ (T96 adds the "Liked by X and N others" line + a `GET /api/posts/{id}/reactions` reactors list, backed by a new additive `Reaction.createdAt` migration. T97 adds the double-tap-to-heart gesture on song cards — add-only, reuses the same `react()` path; no API change.) |
 | UI-4 | Comments become real input + list. | T42, T81, T95 | ✅ (T81 follow-up hardens expanded/loading/error states. T95 renders each card's newest comments inline, Instagram-style; no API endpoint change.) |
 | UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16, T80, T82 | ✅ (T80/T82 are UI hardening follow-ups for profile actions and responsive layout.) |

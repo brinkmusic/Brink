@@ -10,10 +10,12 @@
 
 from datetime import datetime, timezone
 
+from sqlmodel import select
+
 from app.db import get_session
 from app.deps import AuthError, require_user
 from app.main import app
-from app.models import User
+from app.models import Play, User
 from app.routers import me
 
 
@@ -231,3 +233,95 @@ def test_avatar_save_rejects_foreign_path(client, as_user, db_session):
 
     assert res.status_code == 400
     assert db_session.get(User, "listener-1").avatar_url is None
+
+
+# --- POST /api/me/plays/refresh — T100 ---------------------------------------------
+# Pulls the caller's OWN recently-played from Spotify and ingests it immediately, so opening
+# your own profile shows up-to-the-minute history instead of waiting for the 30-min cron. It
+# reuses the SHARED snapshot ingest (_ingest_user) — these tests stub only the Spotify HTTP
+# boundary (get_recently_played) and let the real ingest run against the in-memory DB, per the
+# ticket's anti-mock note.
+
+
+# Build a minimal Spotify recently-played payload with one play, in the shape _ingest_user parses.
+def _recently_played(track_id="track-1", played_at="2026-07-22T10:00:00.000Z"):
+    return {
+        "items": [
+            {
+                "played_at": played_at,
+                "track": {
+                    "id": track_id,
+                    "name": "A Song",
+                    "artists": [{"name": "An Artist"}],
+                    "album": {"images": [{"url": "https://img/cover.jpg"}]},
+                    "popularity": 50,
+                },
+            }
+        ]
+    }
+
+
+# No login session -> the AuthError handler returns our 401 { error } envelope.
+def test_plays_refresh_unauthenticated_returns_401(client):
+    def raise_auth_error():
+        raise AuthError("invalid session")
+
+    app.dependency_overrides[require_user] = raise_auth_error
+    app.dependency_overrides[get_session] = lambda: None
+    res = client.post("/api/me/plays/refresh")
+    assert res.status_code == 401
+    assert res.json() == {"error": "invalid session"}
+
+
+# The happy path: the caller's recently-played is pulled and ingested through the shared pipeline,
+# so a Play row lands in the DB and the response reports how many were inserted.
+def test_plays_refresh_ingests_plays(client, as_user, db_session, monkeypatch):
+    as_user(_listener(), session=db_session)
+    monkeypatch.setattr(me, "get_recently_played", lambda session, user_id: _recently_played())
+
+    res = client.post("/api/me/plays/refresh")
+
+    assert res.status_code == 200
+    assert res.json()["data"]["playsInserted"] == 1
+    plays = db_session.exec(select(Play).where(Play.user_id == "listener-1")).all()
+    assert len(plays) == 1
+    assert plays[0].track_id == "track-1"
+
+
+# Running it twice with the same play must NOT double-count — the shared ingest dedups on
+# (userId, playedAt), so the second run inserts 0.
+def test_plays_refresh_does_not_double_count(client, as_user, db_session, monkeypatch):
+    as_user(_listener(), session=db_session)
+    monkeypatch.setattr(me, "get_recently_played", lambda session, user_id: _recently_played())
+
+    first = client.post("/api/me/plays/refresh")
+    second = client.post("/api/me/plays/refresh")
+
+    assert first.json()["data"]["playsInserted"] == 1
+    assert second.json()["data"]["playsInserted"] == 0
+    plays = db_session.exec(select(Play).where(Play.user_id == "listener-1")).all()
+    assert len(plays) == 1
+
+
+# A user with no linked Spotify (get_recently_played returns None) is a normal empty result, not an
+# error: 200 with playsInserted 0 (matches the T20 degradation philosophy).
+def test_plays_refresh_unlinked_user_returns_empty(client, as_user, db_session, monkeypatch):
+    as_user(_listener(), session=db_session)
+    monkeypatch.setattr(me, "get_recently_played", lambda session, user_id: None)
+
+    res = client.post("/api/me/plays/refresh")
+
+    assert res.status_code == 200
+    assert res.json()["data"]["playsInserted"] == 0
+    assert db_session.exec(select(Play).where(Play.user_id == "listener-1")).all() == []
+
+
+# The endpoint is throttled (ADR-0011): 2 calls per window are allowed, the 3rd is refused with a
+# 429 so a profile visit can refresh but a client can't hammer Spotify.
+def test_plays_refresh_throttled_after_limit(client, as_user, db_session, monkeypatch):
+    as_user(_listener(), session=db_session)
+    monkeypatch.setattr(me, "get_recently_played", lambda session, user_id: None)
+
+    assert client.post("/api/me/plays/refresh").status_code == 200
+    assert client.post("/api/me/plays/refresh").status_code == 200
+    assert client.post("/api/me/plays/refresh").status_code == 429
