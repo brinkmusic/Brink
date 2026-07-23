@@ -24,6 +24,7 @@ EXPECTED_API_ROUTES = {
     ("PATCH", "/api/me/profile"),
     ("POST", "/api/me/avatar/sign-upload"),
     ("POST", "/api/me/avatar"),
+    ("POST", "/api/me/plays/refresh"),  # sync own recently-played on profile visit (T100)
     ("POST", "/api/snapshot"),
     ("POST", "/api/artist/sign-upload"),
     ("POST", "/api/artist/posts"),

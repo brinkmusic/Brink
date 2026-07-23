@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Small
 category: Feature
@@ -84,13 +84,30 @@ Two independent halves:
 | `docs/plans/tickets/README.md` | MODIFY | record completion (at close-out) |
 
 ## Testing Checklist
-- [ ] 401 without a session
-- [ ] refresh ingests plays through the SHARED `_ingest_user` (no duplicated logic)
-- [ ] double-run doesn't double-count (dedup holds through this path)
-- [ ] 3rd call inside the window → 429 envelope
-- [ ] unlinked user → `playsInserted: 0`, status 200
-- [ ] own profile page includes the background-refresh call; other profiles don't
-- [ ] full backend suite passes
+- [x] 401 without a session
+- [x] refresh ingests plays through the SHARED `_ingest_user` (no duplicated logic)
+- [x] double-run doesn't double-count (dedup holds through this path)
+- [x] 3rd call inside the window → 429 envelope
+- [x] unlinked user → `playsInserted: 0`, status 200
+- [x] own profile page includes the background-refresh call; other profiles don't
+- [x] full backend suite passes (273 passed)
+
+## Outcome (as built)
+- **Cron:** `.github/workflows/snapshot.yml` cadence `0 */2 * * *` → `*/30 * * * *` (every 30 min),
+  comment updated to explain the 50-play-loss rationale.
+- **Endpoint:** `POST /api/me/plays/refresh` in `backend/app/routers/me.py`. Login required;
+  throttled `2` per `600s` via `enforce_rate_limit` (action `"plays_refresh"`); calls
+  `get_recently_played` then the SHARED `_ingest_user` from `routers/snapshot.py` (no second ingest)
+  and commits; returns `{ data: { playsInserted: N } }`. Unlinked user (payload `None`) →
+  `playsInserted: 0`, 200 (T20 degradation philosophy). Route added to the T61 inventory gate
+  (`tests/test_api_surface.py`).
+- **Frontend:** new `backend/app/static/plays-refresh.js` (one fire-and-forget `fetch`, swallows
+  failures), loaded from `profile.html` only when `p.is_self` — never on someone else's profile.
+  Live DOM update of the listening section was deliberately left out of scope (fresh data shows on
+  next render).
+- **Tests:** 5 new in `tests/test_me.py` (401, ingest-via-shared-pipeline, dedup double-run,
+  unlinked-empty, 429 throttle); stub only the Spotify boundary, real ingest runs against the
+  in-memory DB (no `_ingest_user` mock, per the anti-mock note).
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable

@@ -11,9 +11,14 @@
 name: Spotify snapshot
 
 on:
-  # Run roughly every 2 hours. Cron is UTC; "0 */2 * * *" = at minute 0 of every 2nd hour.
+  # Run every 30 minutes. Cron is UTC; "*/30 * * * *" = at minute 0 and 30 of every hour.
+  # WHY so often (T100): Spotify's recently-played API only ever returns the LAST 50 plays, so a
+  # heavy listener can burn through 50 plays between snapshots and permanently lose the overflow.
+  # A tighter cadence is the completeness path; the per-user /api/me/plays/refresh (fired on a
+  # profile visit) is the freshness path. The endpoint's (userId, playedAt) dedup makes the extra
+  # runs harmless. GitHub cron is best-effort and often fires late — that's fine here.
   schedule:
-    - cron: "0 */2 * * *"
+    - cron: "*/30 * * * *"
   # Also allow a manual run from the Actions tab (handy for testing).
   workflow_dispatch:
 
