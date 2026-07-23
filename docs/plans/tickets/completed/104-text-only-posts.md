@@ -1,5 +1,5 @@
 ---
-status: In Progress
+status: Completed
 priority: High
 complexity: Medium
 category: Feature
@@ -108,14 +108,48 @@ art / play button / image). A server-side guard rejects a post that has neither 
 | `docs/plans/requirements.md`, `docs/plans/tickets/README.md` | MODIFY | traceability (at close-out) |
 
 ## Testing Checklist
-- [ ] migration makes the three columns nullable; `alembic check` clean
-- [ ] `POST /api/posts` with no track + caption → 201, trackless post
-- [ ] `POST /api/posts` with no track + blank caption → 400
-- [ ] `POST /api/artist/posts` with no image + caption → 201; no image + blank caption → 400
-- [ ] feed includes a text-only user post (no track, no play-count line) and a text-only artist post
-- [ ] `GET /api/posts?userId` returns a trackless post
-- [ ] composer.js publishes text-only; artist-upload.js publishes image-less
-- [ ] full backend suite passes
+- [x] migration makes the three columns nullable; `alembic check` clean (applied to brink-dev)
+- [x] `POST /api/posts` with no track + caption → 201, trackless post
+- [x] `POST /api/posts` with no track + blank caption → 400
+- [x] `POST /api/artist/posts` with no image + caption → 201; no image + blank caption → 400
+- [x] feed includes a text-only user post (no track, no play-count line) and a text-only artist post
+- [x] `GET /api/posts?userId` returns a trackless post
+- [x] composer.js publishes text-only; artist-upload.js publishes image-less
+- [x] full backend suite passes (292 passed)
+
+## Outcome (as built)
+- **Migration** `fe4e66a13f08`: relaxes NOT NULL on `Post.trackId`, `ArtistPost.imageUrl`,
+  `ArtistPost.caption` (additive/backward-compatible — no data moves). Applied to brink-dev
+  (dev == prod today); `alembic check` clean.
+- **Schemas** (`schemas.py`): `CreatePostBody.track`, `CreateArtistPostBody.image_url`/`.caption`
+  now `Optional`; `PostOut`/`FeedPostOut.track`, `ArtistPostOut`/`ArtistFeedPostOut.image_url` +
+  `.caption` allow `None`. `FeedPostOut.kind == "song"` now means "a regular user post" (documented,
+  not renamed).
+- **Endpoints**: `POST /api/posts` (`routers/posts.py`) upserts a track only when one is sent and
+  writes `trackId = NULL` otherwise; `POST /api/artist/posts` (`routers/artist.py`) accepts no
+  image. Both trim the caption and return **400 `"a post needs a song/photo or some text"`** when a
+  post has neither media nor text. `list_posts` LEFT-joins Track.
+- **Feed** (`routers/feed.py`): `_build_song_items` LEFT-joins Track, builds `track` only when
+  present, and skips the T102 play-count for trackless posts; `_build_artist_items` sets
+  `image_url` **tri-state** — a signed URL, `""` (had an image, signing failed → T103 placeholder),
+  or `None` (text-only → note). `pages.py` mirrors this via a shared `_artist_image_url` helper and
+  guards the flatten against a `None` track.
+- **Composer** (`feed.html` + `composer.js`, `?v=104`): the caption textbox + **Share** are always
+  visible; the song search + "🎧 Add what you're hearing" (T101) are an optional attach step; a
+  picked track shows as a removable chip (`composerRemoveTrack`); Share publishes text + optional
+  song and blocks a fully-empty share client-side.
+- **Artist upload** (`artist.html` + `artist-upload.js`, `?v=104`): caption always visible (reverts
+  T57's reveal-on-image); `artistCaptionInput` enables Share on text alone; the sign+upload runs
+  only when a file is picked, otherwise it posts caption-only.
+- **Note styling** (`brink.css`): text-only user (`.post-note`/`.post-note-body`) and artist
+  (`.artist-post-note`/`-note-body`) posts render a distinct note card — tint + accent edge, larger
+  quote-like text, no album-art/play button/image.
+- **Tests**: `test_posts.py` (text-only create + empty 400 + trackless list), `test_artist.py`
+  (photo-only / text-only create + empty 400, replacing the old caption-required test), `test_feed.py`
+  (feed includes text-only user + artist posts), `test_pages.py` (composer/artist-upload source +
+  note-card render + caption-always-visible).
+- **Deliberately out of scope:** rich text/mentions/hashtags/links, multiple photos/video, and any
+  reactions/comments change (already per-post regardless of media).
 
 ## Notes / Risks
 - **Shared prod DB** (T99): the migration must be applied to brink-dev (dev == prod today).
