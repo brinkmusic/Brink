@@ -4,6 +4,8 @@
 #   GET  /api/posts?userId -> list one user's posts, newest first, each with its track
 # The feed, reactions and comments (later tickets) all build on the Post rows created here.
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
@@ -11,7 +13,7 @@ from app.db import get_session
 from app.deps import require_user
 from app.models import Post, Track, User
 from app.rate_limit import enforce_rate_limit
-from app.responses import ok
+from app.responses import fail, ok
 from app.schemas import CreatePostBody, PostOut, TrackOut
 from app.tracks import upsert_track
 
@@ -26,8 +28,9 @@ router = APIRouter(prefix="/api/posts", tags=["posts"])
 
 
 # Build the API response shape for one post + its track. Centralized so both endpoints
-# return the exact same fields (ADR-0012: never return the raw table row).
-def _to_post_out(post: Post, track: Track) -> dict:
+# return the exact same fields (ADR-0012: never return the raw table row). `track` is None for a
+# TEXT-ONLY post (T104) — the response then carries `track: null` and the frontend renders a note.
+def _to_post_out(post: Post, track: Optional[Track]) -> dict:
     out = PostOut(
         id=post.id,
         user_id=post.user_id,
@@ -40,7 +43,7 @@ def _to_post_out(post: Post, track: Track) -> dict:
             artist_name=track.artist_name,
             album_art_url=track.album_art_url,
             popularity=track.popularity,
-        ),
+        ) if track is not None else None,
     )
     # by_alias=True -> emit camelCase field names (trackId, albumArtUrl, ...) for the frontend.
     return out.model_dump(by_alias=True, mode="json")
@@ -52,7 +55,14 @@ def create_post(
     user: User = Depends(require_user),   # ensures the caller is logged in; gives us their record
     session: Session = Depends(get_session),
 ):
-    # Abuse guard first: refuse (429) if this user has created too many posts recently.
+    # A post must carry SOMETHING (T104): either a song or some text. Trim the caption so a
+    # whitespace-only caption doesn't count as text. If there's neither a track nor real text,
+    # reject with 400 — the same "you can't share nothing" rule the composer enforces in the UI.
+    caption = body.caption.strip() if body.caption else None
+    if body.track is None and not caption:
+        return fail("a post needs a song or some text", 400)
+
+    # Abuse guard: refuse (429) if this user has created too many posts recently.
     enforce_rate_limit(
         session,
         subject=user.id,
@@ -61,22 +71,28 @@ def create_post(
         window_seconds=POST_RATE_WINDOW_SECONDS,
     )
 
-    # Make sure the song exists (or is refreshed) before the post links to it.
-    track = upsert_track(session, body.track)
-    # Write the Track to the database NOW, before adding the Post that foreign-key-references it.
-    # WHY: our models declare FK columns but no ORM relationships, so SQLAlchemy inserts rows in the
-    # order they were added, NOT in foreign-key dependency order — so without this flush a brand-new
-    # Track and its Post could be sent to Postgres in an order that violates Post.trackId's FK (the
-    # same failure mode as the T23 snapshot-500). flush() sends the pending Track in this same
-    # transaction; the commit below still finalizes everything together.
-    session.flush()
+    # A TEXT-ONLY post links to no track (trackId stays NULL). Only when a song is attached do we
+    # upsert it and record its id.
+    track = None
+    track_id = None
+    if body.track is not None:
+        # Make sure the song exists (or is refreshed) before the post links to it.
+        track = upsert_track(session, body.track)
+        track_id = body.track.spotify_id
+        # Write the Track to the database NOW, before adding the Post that foreign-key-references
+        # it. WHY: our models declare FK columns but no ORM relationships, so SQLAlchemy inserts
+        # rows in the order they were added, NOT in foreign-key dependency order — so without this
+        # flush a brand-new Track and its Post could be sent to Postgres in an order that violates
+        # Post.trackId's FK (the same failure mode as the T23 snapshot-500). flush() sends the
+        # pending Track in this same transaction; the commit below still finalizes everything.
+        session.flush()
 
     # The author is ALWAYS the authenticated user — never taken from the request body, so it
     # can't be spoofed. source/caption come from the (already validated) body.
     post = Post(
         user_id=user.id,
-        track_id=body.track.spotify_id,
-        caption=body.caption,
+        track_id=track_id,
+        caption=caption,
         source=body.source,
     )
     session.add(post)
@@ -90,11 +106,12 @@ def create_post(
 @router.get("")
 def list_posts(userId: str, session: Session = Depends(get_session)):
     # userId is a REQUIRED query parameter (no default), so a missing one is rejected as a
-    # 400 by the global validation handler. We join each post to its track so the response
-    # includes the song, and order newest-first for feed-style display.
+    # 400 by the global validation handler. We LEFT-join each post to its track (isouter=True)
+    # so TEXT-ONLY posts (no track, T104) still come back — with an INNER join they'd silently
+    # vanish. `track` is None for those. Newest-first for feed-style display.
     rows = session.exec(
         select(Post, Track)
-        .join(Track, Track.spotify_id == Post.track_id)
+        .join(Track, Track.spotify_id == Post.track_id, isouter=True)
         .where(Post.user_id == userId)
         .order_by(Post.created_at.desc())
     ).all()

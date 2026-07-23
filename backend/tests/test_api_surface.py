@@ -13,6 +13,7 @@ EXPECTED_API_ROUTES = {
     ("GET", "/api/posts"),
     ("POST", "/api/posts/{post_id}/reactions"),
     ("DELETE", "/api/posts/{post_id}/reactions"),
+    ("GET", "/api/posts/{post_id}/reactions"),  # who reacted (T96)
     ("POST", "/api/posts/{post_id}/comments"),
     ("GET", "/api/posts/{post_id}/comments"),
     ("POST", "/api/follow/{user_id}"),
@@ -23,6 +24,7 @@ EXPECTED_API_ROUTES = {
     ("PATCH", "/api/me/profile"),
     ("POST", "/api/me/avatar/sign-upload"),
     ("POST", "/api/me/avatar"),
+    ("POST", "/api/me/plays/refresh"),  # sync own recently-played on profile visit (T100)
     ("POST", "/api/snapshot"),
     ("POST", "/api/artist/sign-upload"),
     ("POST", "/api/artist/posts"),

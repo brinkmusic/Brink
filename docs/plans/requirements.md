@@ -19,7 +19,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | BE-1 | Supabase Postgres + schema (SQLModel/Alembic); pooled URLs in env. | T01, T05 | ✅ |
 | BE-2 | Remove `apps/web/src/lib/backend.ts` (`/api/state`) + dead front-end stubs. *(satisfied by retiring the whole SPA — the entire `apps/web/` was deleted in T60, ADR-0013)* | T60 | ✅ |
-| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10 | ✅ |
+| BE-3 | `POST /api/posts` — create post (manual/Spotify); upsert track. | T10, T101, T104 | ✅ (T101 exercises the `SPOTIFY`-source create path from the one-tap share button; T104 makes the track **optional** — a text-only post has `trackId = NULL` — with a 400 guard against a post that has neither a song nor text) |
 | BE-4 | `GET /api/feed` — followees+self, newest, counts + viewer reaction. User search and follower/following lists make the graph discoverable. | T13, T15, T16 | ✅ |
 | BE-5 | `POST/DELETE /api/posts/:id/reactions` — server-deduped toggle. | T11 | ✅ |
 | BE-6 | `POST/GET /api/posts/:id/comments`. | T12 | ✅ |
@@ -33,10 +33,10 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | SP-1 | Currently-playing endpoint + "now playing" surface. | T20 | ◻ |
-| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21 | ✅ |
+| SP-2 † | Scheduled snapshot: refresh token, pull recently-played, upsert `Track`/`Play` (dedup). | T21, T100 | ✅ (T100 tightened the cron to every 30 min and added `POST /api/me/plays/refresh` for a visit-triggered self-sync, reusing the same dedup ingest) |
 | SP-3 | Upsert `Track` rows whenever tracks are seen. | T10 | ✅ |
 | SP-4 | Graceful degradation: Spotify outage / unlinked user never breaks the app. | T20, T21 | ✅ |
-| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21 | ✅ |
+| SP-5 | Respect rate limits; back off on 429; never block a request path. | T21, T100 | ✅ (T100's self-refresh is throttled 2/600s via `enforce_rate_limit`) |
 
 ## Layer 4 — Analytics & Data Science (AN)
 | ID | Acceptance | Ticket(s) | Status |
@@ -47,34 +47,35 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | AN-4 † | Assign each user to nearest cluster. *(computed on read in the Python API; `User.clusterId` dropped)* | T33, T14 | ◻ |
 | AN-5 † | Compatibility = cosine of full taste vectors. *(computed on read in the Python API; no pairwise table)* | T35 | ◻ |
 | AN-6 | Popularity regression; persist R²/RMSE/feature-importances. | T36 | ◻ |
-| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(computed live in the Python API, no `UserStats` table)* | T44, T14 | ◧ (T44: top **tracks/artists**, streak, 30-day totals done live over `Play` in `app/stats.py`; top **genres** deferred to T14, needs the T31 Kaggle genre join) |
+| AN-7 † | Aggregations: top tracks/genres/artists, streak, 30-day totals. *(computed live in the Python API, no `UserStats` table)* | T44, T14, T102 | ◧ (T44: top **tracks/artists**, streak, 30-day totals done live over `Play` in `app/stats.py`; T102 adds a batched per-(author, track) play count on feed cards over the same `Play` data; top **genres** still deferred to T14, needs the T31 Kaggle genre join) |
 | AN-8 | Pipeline idempotent + re-runnable; logs coverage/k/silhouette/R²/RMSE. | T30, T38 | ◻ |
 | AN-9 † | Analytics UI on real model data; no hardcoded constants. *(reads metrics/clusters + on-read values)* | T45 | ◻ |
 
 ## Layer 5 — Frontend / UX-UI (UI)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
-| UI-1 | Post composer with Spotify catalog search → publish. | T40 | ✅ |
-| UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts)* | T41, T47, T049 | ✅ |
-| UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
-| UI-4 | Comments become real input + list. | T42 | ✅ |
-| UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16 | ✅ |
-| UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics) |
+| UI-1 | Post composer with Spotify catalog search → publish. | T40, T81, T101, T104 | ✅ (T81 follow-up hardens keyboard interaction and labels; T101 adds a one-tap "share what you're hearing" button that reuses the same selected-track → publish path; T104 makes the song **optional** — the text box + Share are always shown and a song is an optional removable chip, so a user can post "just writing".) |
+| UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts; T102 added the "played N times by {author}" endorsement line on song cards; T103 hardened artist-image signing so one un-signable image degrades to a placeholder instead of blanking the feed / 500ing the artist page)* | T41, T47, T049, T102, T103 | ✅ |
+| UI-3 | Reactions call BE-5; counts reflect server truth. | T41, T96, T97 | ✅ (T96 adds the "Liked by X and N others" line + a `GET /api/posts/{id}/reactions` reactors list, backed by a new additive `Reaction.createdAt` migration. T97 adds the double-tap-to-heart gesture on song cards — add-only, reuses the same `react()` path; no API change.) |
+| UI-4 | Comments become real input + list. | T42, T81, T95 | ✅ (T81 follow-up hardens expanded/loading/error states. T95 renders each card's newest comments inline, Instagram-style; no API endpoint change.) |
+| UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16, T80, T82 | ✅ (T80/T82 are UI hardening follow-ups for profile actions and responsive layout.) |
+| UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14, T82 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics. T82 hardens responsive listening layouts.) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
 | UI-8 | Predict folded into Analytics; delete fabricated page/route. | T45 | ◻ |
-| UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60) |
-| UI-10 | "Now playing" indicator on profile + feed. | T20, T44 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up) |
-| UI-11 | Editable profile: user bio + profile-picture upload. | T048 | ✅ |
+| UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60, T80, T81, T83, T84, T85, T86 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60. T80/T81/T83 are polish follow-ups for visible failure, loading, and empty-state quality. T84 keeps optional profile enrichments from turning `/u/{handle}` into a 500. T85 prevents stale static assets from hiding those shipped UI states. T86 restores the edit form's collapsed initial state.) |
+| UI-10 | "Now playing" indicator on profile + feed. | T20, T44, T82 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up. T82 hardens the existing profile layout.) |
+| UI-11 | Editable profile: user bio + profile-picture upload. | T048, T83, T85, T86 | ✅ (T83 polishes the edit-profile controls, T85 ensures browsers load that design, and T86 keeps the form hidden until Edit profile is activated. No API behavior change.) |
+| UI-12 | Feed song cards are playable in place via the Spotify embed player (no auth needed; lazy-loaded on tap, one open player at a time). | T94 | ✅ |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |
 |----|------------|-----------|--------|
 | MEDIA-1 | Supabase Storage private bucket + signed upload URL (service role). | T50 | ✅ |
-| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. *(T53 made the uploaded images actually display — signed read URLs for the private bucket; T57 hides the caption box until an image is picked, since a post always needs one)* | T51, T53, T57 | ✅ |
-| MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50 | ✅ |
+| MEDIA-2 | Upload UI: ≤10 MB + JPEG/PNG validation (client+server); progress/error. *(T53 made the uploaded images actually display — signed read URLs for the private bucket; T104 makes the photo **optional** and reverts T57's caption-hide, since an artist post can now be text-only)* | T51, T53, T57, T83, T104 | ✅ (T83 follow-up polishes the existing upload controls; T104 makes the caption always-visible and the photo optional — no change to the ≤10 MB/JPEG/PNG validation, which still runs when a photo IS attached.) |
+| MEDIA-3 | Create `ArtistPost` with Storage URL + optional linked track. | T50, T104 | ✅ (T104 makes the Storage URL **optional** too — a text-only `ArtistPost` has `imageUrl = NULL` — with a 400 guard against a post that has neither a photo nor text) |
 | MEDIA-4 | Per-post engagement analytics shown to the artist. | T52, T54 | ✅ (reaction + comment counts, owner-only on artist profiles; view count deferred) |
 | MEDIA-5 | ≥98% upload success across 5 file types up to 10 MB. | T51, T53 | ◧ (T53 verified the storage round-trip live on brink-dev: service-role upload → signed read URL → 200 with matching bytes, unsigned GET 400; the browser-upload half + the 5-file-type success-rate measurement remain) |
-| MEDIA-6 | Self-serve artist designation in-app (no DB edit) — become an artist from your own profile. | T55, T56 | ✅ (`POST /api/me/become-artist` sets `isArtist` on the authenticated caller; own-profile "Become an artist" button; one-way, self-serve per ADR-0008. T56 polished the button: readable ghost buttons, top-right placement, "cannot be undone" confirmation) |
+| MEDIA-6 | Self-serve artist designation in-app (no DB edit) — become an artist from your own profile. | T55, T56, T80 | ✅ (`POST /api/me/become-artist` sets `isArtist` on the authenticated caller; own-profile "Become an artist" button; one-way, self-serve per ADR-0008. T56 polished the button: readable ghost buttons, top-right placement, "cannot be undone" confirmation. T80 follow-up makes the action more discoverable/responsive and adds visible failure feedback.) |
 
 ## Layer 7 — Infrastructure & Scheduling (INFRA)
 | ID | Acceptance | Ticket(s) | Status |

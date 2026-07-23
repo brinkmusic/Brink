@@ -41,8 +41,12 @@ class TrackIn(CamelModel):
 # The body of POST /api/posts. `source` is the PostSource enum, so any value other than
 # MANUAL/SPOTIFY is rejected as a 400. There is deliberately NO author/user field here:
 # the author is always the authenticated caller, so it cannot be spoofed from the body.
+#
+# T104: `track` is now OPTIONAL — a post can be TEXT-ONLY (just a caption, no song). The rule
+# "a post must have a song OR some text (not neither)" is checked in the endpoint after trimming
+# the caption (see routers/posts.py), rather than here, because it spans two fields.
 class CreatePostBody(CamelModel):
-    track: TrackIn
+    track: Optional[TrackIn] = None
     source: PostSource
     caption: Optional[str] = None
 
@@ -76,13 +80,15 @@ class SignUploadBody(CamelModel):
     size_bytes: Annotated[int, Field(gt=0, le=10 * 1024 * 1024)]
 
 
-# The body of POST /api/artist/posts (T50). image_url is the object URL of the already-uploaded
-# image (via the signed URL above); caption is required (the ArtistPost.caption column is NOT
-# NULL); linked_track_id optionally ties the post to a song. No artistUserId here either — the
-# author is always the authenticated caller, so it cannot be spoofed from the body.
+# The body of POST /api/artist/posts (T50). Both image_url and caption are now OPTIONAL (T104):
+# an artist post can be photo-only, text-only, or both. image_url is the object path of the
+# already-uploaded image (via the signed URL above); caption is the text; linked_track_id
+# optionally ties the post to a song. The "must have a photo OR some text" rule is checked in the
+# endpoint (routers/artist.py), not here, because it spans two fields. No artistUserId here either
+# — the author is always the authenticated caller, so it cannot be spoofed from the body.
 class CreateArtistPostBody(CamelModel):
-    image_url: str
-    caption: str
+    image_url: Optional[str] = None
+    caption: Optional[str] = None
     linked_track_id: Optional[str] = None
 
 
@@ -130,7 +136,8 @@ class PostOut(CamelModel):
     caption: Optional[str]
     source: PostSource
     created_at: datetime
-    track: TrackOut
+    # T104: null for a TEXT-ONLY post (no song attached).
+    track: Optional[TrackOut] = None
 
 
 # What the reaction endpoints return: the post's id plus a count for EVERY reaction type
@@ -172,6 +179,16 @@ class CommentOut(CamelModel):
     author: AuthorOut
 
 
+# One person in GET /api/posts/{id}/reactions' "who reacted" list (T96): the same public
+# author fields as AuthorOut, plus every reaction type they left on the post (a user can
+# leave up to one of EACH type, so `types` combines them, e.g. ["FIRE", "HEART"]).
+class ReactorOut(CamelModel):
+    display_name: str
+    handle: str
+    avatar_url: Optional[str] = None
+    types: list[str]
+
+
 # What POST/DELETE /api/follow/{userId} return: the target's id and whether the caller now follows
 # them (true after a follow, false after an unfollow). A tiny, explicit shape — never a raw row.
 class FollowStateOut(CamelModel):
@@ -193,10 +210,26 @@ class FeedPostOut(CamelModel):
     caption: Optional[str]
     source: PostSource
     created_at: datetime
-    track: TrackOut
+    # T104: null for a TEXT-ONLY post. The card renders a note (no album art / play button)
+    # instead of a song row. `kind` stays "song" — it means "a regular user post" (with or
+    # without a track), as opposed to the "artist" post below — renaming it would ripple through
+    # the templates/JS for no behavior gain.
+    track: Optional[TrackOut] = None
     reaction_counts: dict[str, int]
     comment_count: int
     viewer_reactions: dict[str, bool]
+    # The post's NEWEST comments (capped at 3, chronological within that subset) so the feed
+    # can show them inline without a click (T95). Always a list — empty when uncommented,
+    # never null — a stable shape for the frontend. Reuses CommentOut (the same DTO the
+    # comments API returns), so both surfaces expose identical, allow-listed fields.
+    latest_comments: list[CommentOut] = []
+    # Whoever reacted MOST RECENTLY (T96), or null when the post has no reactions — backs the
+    # "Liked by X and N others" line. Reuses the public AuthorOut shape (no leaks).
+    liked_by: Optional[AuthorOut] = None
+    # How many times the POST'S AUTHOR has played this exact track (T102) — the "played N times by
+    # {author}" endorsement line. Always present (0 default) for a stable shape; the card only
+    # renders the line from 2 up (one play isn't yet a signal).
+    author_play_count: int = 0
 
 
 # An artist "behind-the-scenes" post as the feed returns it (T049): a followed artist's promo image
@@ -209,12 +242,18 @@ class ArtistFeedPostOut(CamelModel):
     id: str
     kind: Literal["artist"] = "artist"
     author: AuthorOut
-    caption: str
-    image_url: str
+    # T104: both optional — an artist post can be text-only (no image) or photo-only (no caption).
+    caption: Optional[str] = None
+    # TRI-STATE (T104): a signed read URL (show the image), "" (an image exists but signing
+    # failed — render the T103 placeholder), or null (no image at all — render the note card).
+    image_url: Optional[str] = None
     created_at: datetime
     reaction_counts: dict[str, int]
     comment_count: int
     viewer_reactions: dict[str, bool]
+    # Same inline latest-comments shape as FeedPostOut above (T95), computed over the
+    # mirrored ArtistComment table (T52).
+    latest_comments: list[CommentOut] = []
 
 
 # What POST /api/artist/sign-upload returns (T50): the pieces the browser needs to upload the
@@ -252,8 +291,9 @@ class AvatarOut(CamelModel):
 class ArtistPostOut(CamelModel):
     id: str
     artist_user_id: str
-    image_url: str
-    caption: str
+    # T104: both optional — an artist post can be text-only or photo-only.
+    image_url: Optional[str] = None
+    caption: Optional[str] = None
     linked_track_id: Optional[str] = None
     created_at: datetime
 

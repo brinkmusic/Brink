@@ -68,6 +68,43 @@ def test_create_post_persists_post_and_upserts_track(client, as_user, db_session
     assert db_session.get(Track, "spot-1") is not None
 
 
+# A SPOTIFY-source post (the one-tap "share what you're hearing" path, T101) round-trips through
+# the SAME create endpoint: 201, the saved source is SPOTIFY (so these posts stay distinguishable
+# from typed MANUAL posts), and the Track is upserted like any other post.
+def test_create_spotify_source_post_persists(client, as_user, db_session):
+    as_user(_user(), session=db_session)
+    res = client.post("/api/posts", json=_valid_body(source="SPOTIFY"))
+
+    assert res.status_code == 201
+    assert res.json()["data"]["source"] == "SPOTIFY"
+    saved = db_session.exec(select(Post)).all()
+    assert len(saved) == 1
+    assert saved[0].source == PostSource.SPOTIFY
+
+
+# T104: a TEXT-ONLY post (a caption, no track) is now allowed — it persists with a null trackId
+# and comes back with `track: null`.
+def test_create_text_only_post_persists(client, as_user, db_session):
+    as_user(_user(), session=db_session)
+    res = client.post("/api/posts", json={"source": "MANUAL", "caption": "just thinking out loud"})
+
+    assert res.status_code == 201
+    data = res.json()["data"]
+    assert data["track"] is None
+    assert data["caption"] == "just thinking out loud"
+    saved = db_session.exec(select(Post)).all()
+    assert len(saved) == 1 and saved[0].track_id is None
+
+
+# T104: a post with NEITHER a track NOR text is rejected -> 400, nothing persisted. Covers no
+# caption at all and a whitespace-only caption (trimmed to empty).
+def test_create_empty_post_returns_400(client, as_user, db_session):
+    as_user(_user(), session=db_session)
+    assert client.post("/api/posts", json={"source": "MANUAL"}).status_code == 400
+    assert client.post("/api/posts", json={"source": "MANUAL", "caption": "   "}).status_code == 400
+    assert db_session.exec(select(Post)).all() == []
+
+
 # A malformed track payload (missing required title) -> 400 via the validation handler.
 def test_create_malformed_track_returns_400(client, as_user):
     as_user(_user())
@@ -146,3 +183,23 @@ def test_list_returns_user_posts_newest_first_with_track(client, db_session):
     data = res.json()["data"]
     assert [p["caption"] for p in data] == ["newer", "older"]  # newest first, u2 excluded
     assert data[0]["track"]["title"] == "A"
+
+
+# T104: a TEXT-ONLY post (no track) is returned by the listing too — the LEFT join keeps it,
+# with `track: null`. (An INNER join would silently drop it.)
+def test_list_includes_text_only_post(client, db_session):
+    db_session.add(_user("u1"))
+    db_session.commit()
+    db_session.add(Post(user_id="u1", track_id=None, caption="text only",
+                        source=PostSource.MANUAL,
+                        created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    res = client.get("/api/posts", params={"userId": "u1"})
+
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert len(data) == 1
+    assert data[0]["caption"] == "text only"
+    assert data[0]["track"] is None

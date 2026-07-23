@@ -20,31 +20,61 @@
     <p class="hero-sub">What people are playing right now 🎶</p>
   </div>
 
-  {# Composer (T40): search a song, add a caption, share it. See static/composer.js. #}
+  {# Composer (T40, reworked in T104). The text box and Share are ALWAYS visible so you can post
+     "just writing" with no song. Adding a song is an OPTIONAL step: search or tap "add what you're
+     hearing", and the picked track shows as a removable chip. Share posts the text + optional song.
+     See static/composer.js. #}
   <section class="composer card">
-    <input
-      type="text"
-      class="composer-search"
-      placeholder="Search a song to share…"
-      autocomplete="off"
-      oninput="composerSearch(this)"
-    />
-    <ul class="composer-results" hidden></ul>
-    <div class="composer-selected" hidden>
-      <p class="composer-track">
+    <label class="sr-only" for="composer-caption-input">Write a post</label>
+    <textarea
+      id="composer-caption-input"
+      class="composer-caption"
+      rows="2"
+      placeholder="Share a thought…"
+      maxlength="300"
+    ></textarea>
+
+    {# The attached song, shown only after one is picked (composer.js reveals it). The × removes the
+       song again and brings the search back — the post then goes out as text-only. #}
+    <div class="composer-track-chip" hidden>
+      <span class="composer-track">
         <span class="composer-track-title"></span>
         <span class="composer-track-artist"></span>
-      </p>
+      </span>
+      <button
+        type="button"
+        class="composer-track-remove"
+        aria-label="Remove song"
+        onclick="composerRemoveTrack(this)"
+      >×</button>
+    </div>
+
+    {# Optional "add a song" controls. Hidden once a song is attached (one song per post). #}
+    <div class="composer-song">
+      <label class="sr-only" for="composer-search-input">Search a song to add</label>
       <input
+        id="composer-search-input"
         type="text"
-        class="composer-caption"
-        placeholder="Say something about it (optional)…"
-        maxlength="300"
+        class="composer-search"
+        placeholder="🎵 Add a song…"
+        autocomplete="off"
+        aria-describedby="composer-status"
+        oninput="composerSearch(this)"
       />
-      <div class="composer-actions">
-        <button type="button" class="btn btn-ghost" onclick="composerReset(this)">Cancel</button>
-        <button type="button" class="btn btn-spotify" onclick="composerPublish(this)">Share 🎶</button>
-      </div>
+      {# T101: one tap drops the song you're playing right now into the chip above (no direct
+         publish — you still hit Share). See composer.js shareNowPlaying(). #}
+      <button
+        type="button"
+        class="btn btn-ghost composer-nowplaying"
+        aria-controls="composer-status"
+        onclick="shareNowPlaying(this)"
+      >🎧 Add what you're hearing</button>
+      <ul class="composer-results" role="listbox" aria-label="Song search results" hidden></ul>
+    </div>
+
+    <p id="composer-status" class="composer-status" aria-live="polite"></p>
+    <div class="composer-actions">
+      <button type="button" class="btn btn-spotify composer-share" onclick="composerPublish(this)">Share</button>
     </div>
   </section>
 
@@ -55,13 +85,20 @@
       {# An artist behind-the-scenes post (T049): the image + caption of an artist you follow, with
          the SAME like/comment controls as an artist profile (T54), wired to the T52 /api/artist
          endpoints via static/artist-engagement.js. The image URL is already a signed read URL. #}
-      <article class="artist-post card">
+      {# image_url is TRI-STATE (T104): a URL (show the image), "" (an image exists but signing
+         failed → T103 placeholder), or None (text-only post → a note card, no image element). #}
+      <article class="artist-post card{% if p.image_url is none %} artist-post-note{% endif %}">
         <p class="post-meta">
           <a class="post-author" href="/u/{{ p.author_handle }}">{{ p.author }}</a>
           · behind the scenes · shared {{ p.when }}
         </p>
+        {% if p.image_url %}
         <img class="artist-post-img" src="{{ p.image_url }}" alt="{{ p.caption }}" />
-        {% if p.caption %}<p class="artist-post-caption">{{ p.caption }}</p>{% endif %}
+        {% elif p.image_url is not none %}
+        {# had an image but signing failed (T103) — muted placeholder, never a broken <img>. #}
+        <div class="artist-post-img artist-post-img-missing" role="img" aria-label="Image unavailable"></div>
+        {% endif %}
+        {% if p.caption %}<p class="artist-post-caption{% if p.image_url is none %} artist-post-note-body{% endif %}">{{ p.caption }}</p>{% endif %}
 
         {# Audience reactions on artist posts, backed by T52's /api/artist endpoints. #}
         <div class="reactions artist-reactions" data-post-id="{{ p.id }}">
@@ -80,13 +117,34 @@
         </div>
 
         <div class="comments artist-comments" data-post-id="{{ p.id }}">
-          <button type="button" class="comment-toggle" onclick="toggleArtistComments(this)">
-            💬 <span class="comment-count">{{ p.comment_count }}</span>
+          {# The newest comments render right on the card (T95) — no click needed, like
+             Instagram. The full list + the add-comment box stay in the 💬 panel below. #}
+          {% if p.latest_comments %}
+          <ul class="comment-inline-list">
+            {% for c in p.latest_comments %}
+            <li class="comment-inline">
+              <a class="comment-inline-author" href="/u/{{ c.author_handle }}">{{ c.author }}</a>
+              <span class="comment-inline-body">{{ c.body }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <button
+            type="button"
+            class="comment-toggle"
+            aria-expanded="false"
+            aria-controls="artist-comment-panel-{{ p.id }}"
+            onclick="toggleArtistComments(this)"
+          >
+            💬 {% if p.comment_count > p.latest_comments | length %}View all {% endif %}<span class="comment-count">{{ p.comment_count }}</span>
           </button>
-          <div class="comment-panel" hidden>
+          <div id="artist-comment-panel-{{ p.id }}" class="comment-panel" hidden>
             <ul class="comment-list"></ul>
+            <p id="artist-comment-status-{{ p.id }}" class="comment-status" aria-live="polite"></p>
             <form class="comment-form" onsubmit="submitArtistComment(event, this)">
+              <label class="sr-only" for="artist-comment-input-{{ p.id }}">Add a comment</label>
               <input
+                id="artist-comment-input-{{ p.id }}"
                 type="text"
                 name="body"
                 placeholder="Add a comment…"
@@ -100,22 +158,52 @@
         </div>
       </article>
       {% else %}
-      <article class="post">
-        <div class="post-art">
+      {# A regular user post. It has a SONG when spotify_id is set; a TEXT-ONLY post (T104) has no
+         song, so we render a distinct "note" card — the caption as the main content, no album art
+         / play button / song row. `post-note` styles that quieter, quote-like look. #}
+      <article class="post{% if not p.spotify_id %} post-note{% endif %}">
+        {% if p.spotify_id %}
+        {# The album art doubles as a play button (T94): tapping it asks player.js to open
+           Spotify's free embed player for this track right inside the card (and tapping again
+           closes it). It's a real <button> so keyboards and screen readers can use it too;
+           aria-expanded tracks whether the player is open. Works even when there's no art —
+           the gradient placeholder still shows and stays tappable. #}
+        <button
+          type="button"
+          class="post-art"
+          data-spotify-id="{{ p.spotify_id }}"
+          aria-label="Play {{ p.title }}"
+          aria-expanded="false"
+          onclick="togglePlayer(this)"
+        >
           {% if p.album_art %}
             <img src="{{ p.album_art }}" alt="" />
           {% endif %}
-        </div>
+          <span class="post-art-play" aria-hidden="true">▶</span>
+        </button>
+        {% endif %}
         <div class="post-body">
+          {% if p.spotify_id %}
           <p class="post-track">{{ p.title }}</p>
           <p class="post-artist">{{ p.artist }}</p>
           {% if p.caption %}
             <p class="post-caption">"{{ p.caption }}"</p>
           {% endif %}
+          {% else %}
+          {# Text-only note: the caption IS the post, shown larger (see .post-note-body in CSS). #}
+          <p class="post-note-body">{{ p.caption }}</p>
+          {% endif %}
           <p class="post-meta">
             <a class="post-author" href="/u/{{ p.author_handle }}">{{ p.author }}</a>
             · shared {{ p.when }}
           </p>
+
+          {# Play-count endorsement (T102): how many times the AUTHOR has actually played this track.
+             Only shown from 2 up — a single play just means "they heard it once", not a signal — so
+             the "1 time" wording can never appear. Muted, sits just under the meta line. #}
+          {% if p.author_play_count >= 2 %}
+          <p class="post-plays">▶ played {{ p.author_play_count }} times by {{ p.author }}</p>
+          {% endif %}
 
           {# Reaction bar. data-post-id tells the script which post to react to; each
              button carries its type. "reacted" marks the ones this viewer already tapped. #}
@@ -134,16 +222,59 @@
             {% endfor %}
           </div>
 
-          {# Comments (T42). The button shows the count and opens a panel that lazily loads
-             this post's comments and offers a box to add one (see static/comments.js). #}
-          <div class="comments" data-post-id="{{ p.id }}">
-            <button type="button" class="comment-toggle" onclick="toggleComments(this)">
-              💬 <span class="comment-count">{{ p.comment_count }}</span>
+          {# "Liked by X and N others" (T96): names the most recent reactor as social proof.
+             The line is a button — tapping it opens a small panel listing everyone who
+             reacted, fetched lazily by static/liked-by.js from the T96 API. Hidden entirely
+             when the post has no reactions. #}
+          {% if p.liked_by %}
+          {% set liked_others = (p.counts.values() | sum) - 1 %}
+          <div class="liked-by" data-post-id="{{ p.id }}">
+            <button
+              type="button"
+              class="liked-by-btn"
+              aria-expanded="false"
+              aria-controls="reactors-panel-{{ p.id }}"
+              onclick="toggleReactors(this)"
+            >
+              Liked by <b>{{ p.liked_by.displayName }}</b>{% if liked_others == 1 %} and 1 other{% elif liked_others > 1 %} and {{ liked_others }} others{% endif %}
             </button>
-            <div class="comment-panel" hidden>
+            <div id="reactors-panel-{{ p.id }}" class="reactors-panel" hidden>
+              <ul class="reactor-list"></ul>
+              <p class="reactors-status" aria-live="polite"></p>
+            </div>
+          </div>
+          {% endif %}
+
+          {# Comments (T42). Since T95 the newest few render right on the card, Instagram
+             style; the button opens a panel that lazily loads the FULL list and offers a
+             box to add one (see static/comments.js). #}
+          <div class="comments" data-post-id="{{ p.id }}">
+            {% if p.latest_comments %}
+            <ul class="comment-inline-list">
+              {% for c in p.latest_comments %}
+              <li class="comment-inline">
+                <a class="comment-inline-author" href="/u/{{ c.author_handle }}">{{ c.author }}</a>
+                <span class="comment-inline-body">{{ c.body }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+            <button
+              type="button"
+              class="comment-toggle"
+              aria-expanded="false"
+              aria-controls="comment-panel-{{ p.id }}"
+              onclick="toggleComments(this)"
+            >
+              💬 {% if p.comment_count > p.latest_comments | length %}View all {% endif %}<span class="comment-count">{{ p.comment_count }}</span>
+            </button>
+            <div id="comment-panel-{{ p.id }}" class="comment-panel" hidden>
               <ul class="comment-list"></ul>
+              <p id="comment-status-{{ p.id }}" class="comment-status" aria-live="polite"></p>
               <form class="comment-form" onsubmit="submitComment(event, this)">
+                <label class="sr-only" for="comment-input-{{ p.id }}">Add a comment</label>
                 <input
+                  id="comment-input-{{ p.id }}"
                   type="text"
                   name="body"
                   placeholder="Add a comment…"
@@ -163,17 +294,23 @@
   {% else %}
     <div class="card empty">
       <p>No songs shared yet. When people start posting, their tracks land right here. 🎧</p>
+      <p>Search above to share the first one.</p>
     </div>
   {% endif %}
 </section>
 
-{# The small scripts that make the composer (T40), reactions (T11) and comments (T12) live. #}
-<script src="/static/composer.js"></script>
-<script src="/static/reactions.js"></script>
-<script src="/static/comments.js"></script>
+{# The small scripts that make the composer (T40), reactions (T11), comments (T12), the
+   liked-by reactors list (T96), the in-card Spotify player (T94) and the double-tap-to-heart
+   gesture (T97) live. double-tap.js must load AFTER reactions.js — it reuses its react(). #}
+<script src="/static/composer.js?v=104"></script>
+<script src="/static/reactions.js?v=85"></script>
+<script src="/static/comments.js?v=85"></script>
+<script src="/static/liked-by.js?v=96"></script>
+<script src="/static/player.js?v=94"></script>
+<script src="/static/double-tap.js?v=97"></script>
 {# When any artist behind-the-scenes post is present (T049), load its engagement script — the SAME
    one the artist profile uses (T54), which drives artistReact/toggleArtistComments/submitArtistComment. #}
 {% if posts | selectattr("kind", "equalto", "artist") | list %}
-<script src="/static/artist-engagement.js"></script>
+<script src="/static/artist-engagement.js?v=85"></script>
 {% endif %}
 {% endblock %}

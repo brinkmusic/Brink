@@ -14,6 +14,7 @@
 
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -38,7 +39,7 @@ from app.models import (
 from app.routers.artist import UPLOAD_BUCKET
 from app.routers.feed import build_feed
 from app.routers.users import FOLLOW_LIST_LIMIT
-from app.security.supabase import create_signed_read_url
+from app.security.supabase import create_signed_read_url_or_blank
 from app.stats import listening_summary
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,17 @@ def home(request: Request, session: Session = Depends(get_session)):
 # Turn a timestamp into a friendly "3m ago" style label for the feed. WHY here (not
 # in the template): Jinja has no built-in "time ago", so we compute the words in
 # Python and pass a ready-to-show string.
+# Turn an ArtistPost's stored image path into what the template needs (T104), TRI-STATE:
+#   - None  -> the post is TEXT-ONLY (no photo) → the template renders a note card.
+#   - ""    -> the post HAS a photo but signing it failed (T103) → the template shows a placeholder.
+#   - a URL -> a valid signed read URL → the template shows the image.
+# Centralised so the profile page and the artist page sign the same way.
+def _artist_image_url(path: Optional[str]) -> Optional[str]:
+    if not path:
+        return None
+    return create_signed_read_url_or_blank(UPLOAD_BUCKET, path)
+
+
 def _ago(when: datetime) -> str:
     now = datetime.now(timezone.utc)
     # Posts are stored in UTC; if the value has no timezone attached, treat it as UTC
@@ -139,16 +151,37 @@ def _feed_items(session: Session, user) -> list[dict]:
             "counts": it["reactionCounts"],
             "mine": mine,
             "comment_count": it["commentCount"],
+            # The post's newest comments, pre-shaped for the template (T95): just the pieces
+            # the card renders — who said it (name + handle for the profile link) and what.
+            "latest_comments": [
+                {
+                    "author": c["author"]["displayName"],
+                    "author_handle": c["author"]["handle"],
+                    "body": c["body"],
+                }
+                for c in it["latestComments"]
+            ],
         }
         if it["kind"] == "artist":
             # An artist behind-the-scenes post: an image + caption (imageUrl is already a signed
             # read URL from build_feed, T53), no track.
             common["image_url"] = it["imageUrl"]
         else:
-            # A song-share post: flatten the nested track fields.
-            common["title"] = it["track"]["title"]
-            common["artist"] = it["track"]["artistName"]
-            common["album_art"] = it["track"]["albumArtUrl"]
+            # A regular user post: flatten the nested track fields. `track` is None for a TEXT-ONLY
+            # post (T104) — leave the song fields None so the template renders a note card instead
+            # of a song row (no title/artist/art/play button).
+            track = it["track"]
+            common["title"] = track["title"] if track else None
+            common["artist"] = track["artistName"] if track else None
+            common["album_art"] = track["albumArtUrl"] if track else None
+            # The Spotify track id, so the card can open the in-place embed player (T94). None
+            # for a text-only post, which the template uses to decide song-row vs note.
+            common["spotify_id"] = track["spotifyId"] if track else None
+            # The most recent reactor (or None) for the "Liked by X and N others" line (T96).
+            common["liked_by"] = it["likedBy"]
+            # How many times the author has played this track (T102) — the card shows the
+            # "played N times by {author}" line only from 2 up (see the template threshold).
+            common["author_play_count"] = it["authorPlayCount"]
         items.append(common)
     return items
 
@@ -272,11 +305,16 @@ def _profile_data(
     # private bucket paths, so each one gets a signed read URL before the browser sees it.
     artist_posts = []
     if person.is_artist:
-        artist_rows = session.exec(
-            select(ArtistPost)
-            .where(ArtistPost.artist_user_id == person.id)
-            .order_by(ArtistPost.created_at.desc())
-        ).all()
+        try:
+            artist_rows = session.exec(
+                select(ArtistPost)
+                .where(ArtistPost.artist_user_id == person.id)
+                .order_by(ArtistPost.created_at.desc())
+            ).all()
+        except Exception as e:  # noqa: BLE001 - optional artist content must not break profiles
+            logger.warning("artist posts unavailable for profile %s: %s", person.id, e)
+            session.rollback()
+            artist_rows = []
         artist_post_ids = [post.id for post in artist_rows]
 
         # Start every post with zeroes so templates can render a stable HEART/FIRE/SPARKLE set even
@@ -292,35 +330,39 @@ def _profile_data(
         }
 
         if artist_post_ids:
-            reaction_rows = session.exec(
-                select(ArtistReaction.artist_post_id, ArtistReaction.type, func.count())
-                .where(ArtistReaction.artist_post_id.in_(artist_post_ids))
-                .group_by(ArtistReaction.artist_post_id, ArtistReaction.type)
-            ).all()
-            for post_id, rtype, count in reaction_rows:
-                reaction_counts[post_id][ReactionType(rtype).value] = count
+            try:
+                reaction_rows = session.exec(
+                    select(ArtistReaction.artist_post_id, ArtistReaction.type, func.count())
+                    .where(ArtistReaction.artist_post_id.in_(artist_post_ids))
+                    .group_by(ArtistReaction.artist_post_id, ArtistReaction.type)
+                ).all()
+                for post_id, rtype, count in reaction_rows:
+                    reaction_counts[post_id][ReactionType(rtype).value] = count
 
-            comment_rows = session.exec(
-                select(ArtistComment.artist_post_id, func.count())
-                .where(ArtistComment.artist_post_id.in_(artist_post_ids))
-                .group_by(ArtistComment.artist_post_id)
-            ).all()
-            for post_id, count in comment_rows:
-                comment_counts[post_id] = count
+                comment_rows = session.exec(
+                    select(ArtistComment.artist_post_id, func.count())
+                    .where(ArtistComment.artist_post_id.in_(artist_post_ids))
+                    .group_by(ArtistComment.artist_post_id)
+                ).all()
+                for post_id, count in comment_rows:
+                    comment_counts[post_id] = count
 
-            mine_rows = session.exec(
-                select(ArtistReaction.artist_post_id, ArtistReaction.type).where(
-                    ArtistReaction.artist_post_id.in_(artist_post_ids),
-                    ArtistReaction.user_id == viewer_id,
-                )
-            ).all()
-            for post_id, rtype in mine_rows:
-                viewer_reactions[post_id][ReactionType(rtype).value] = True
+                mine_rows = session.exec(
+                    select(ArtistReaction.artist_post_id, ArtistReaction.type).where(
+                        ArtistReaction.artist_post_id.in_(artist_post_ids),
+                        ArtistReaction.user_id == viewer_id,
+                    )
+                ).all()
+                for post_id, rtype in mine_rows:
+                    viewer_reactions[post_id][ReactionType(rtype).value] = True
+            except Exception as e:  # noqa: BLE001 - engagement is an optional profile enrichment
+                logger.warning("artist engagement unavailable for profile %s: %s", person.id, e)
+                session.rollback()
 
         artist_posts = [
             {
                 "id": post.id,
-                "image_url": create_signed_read_url(UPLOAD_BUCKET, post.image_url),
+                "image_url": _artist_image_url(post.image_url),
                 "caption": post.caption,
                 "when": _ago(post.created_at),
                 "reaction_counts": reaction_counts[post.id],
@@ -399,7 +441,11 @@ def profile(
         # raises) when nothing is playing / Spotify isn't linked, so the badge simply hides.
         now_playing = None
         if data["is_self"]:
-            playing = spotify.get_currently_playing(session, viewer.id)
+            try:
+                playing = spotify.get_currently_playing(session, viewer.id)
+            except Exception as e:  # noqa: BLE001 - Spotify is optional profile enrichment
+                logger.warning("now-playing unavailable for profile %s: %s", viewer.id, e)
+                playing = None
             if playing and playing.get("is_playing") and playing.get("track"):
                 now_playing = playing["track"]
         page = templates.TemplateResponse(
@@ -438,7 +484,9 @@ def artist_page(request: Request, session: Session = Depends(get_session)):
     # for each one here (T53), so the template gets an <img src> that actually displays.
     posts = [
         {
-            "image_url": create_signed_read_url(UPLOAD_BUCKET, post.image_url),
+            # Tri-state via _artist_image_url (T104): None (text-only → note), "" (signing failed
+            # → placeholder, T103, so one un-signable image can no longer 500 the page), or a URL.
+            "image_url": _artist_image_url(post.image_url),
             "caption": post.caption,
             "when": _ago(post.created_at),
         }

@@ -42,10 +42,38 @@ def test_stylesheet_is_served(client):
     assert "text/css" in res.headers["content-type"]
 
 
+# T86: the edit form uses grid when open, so the author stylesheet must explicitly preserve the
+# HTML `hidden` state. Otherwise `display: grid` overrides the browser default and shows it early.
+def test_stylesheet_keeps_edit_profile_form_hidden(client):
+    css = client.get("/static/brink.css").text
+    assert ".edit-profile-form[hidden] { display: none; }" in css
+
+
+# The disclosure script must announce the same open/closed state that it renders visually.
+def test_edit_profile_script_syncs_expanded_state(client):
+    script = client.get("/static/edit-profile.js").text
+    assert 'btn.setAttribute("aria-expanded", opening ? "true" : "false")' in script
+
+
+# T85: a release can update HTML and CSS at the same time. The version query forces browsers
+# holding the pre-T80/T83 stylesheet to fetch the corrected button and edit-profile styles.
+def test_home_page_uses_versioned_stylesheet(client):
+    app.dependency_overrides[get_session] = lambda: MagicMock()
+    body = client.get("/").text
+    assert 'href="/static/brink.css?v=85"' in body
+
+
+# After that one-time cache bust, every static response asks the browser to revalidate before
+# reuse. This prevents later releases from pairing fresh HTML with stale CSS or JavaScript.
+def test_static_assets_require_revalidation(client):
+    res = client.get("/static/brink.css")
+    assert res.headers["cache-control"] == "no-cache"
+
+
 # ---- Feed page (reuses build_feed: posts from people you follow + your own) ----
 
 from types import SimpleNamespace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from app.db import get_session
@@ -134,6 +162,7 @@ def test_feed_empty_state(client, db_session, monkeypatch):
     res = client.get("/feed")
     assert res.status_code == 200
     assert "No songs shared yet" in res.text
+    assert "Search above to share the first one" in res.text
 
 
 # ---- T41: feed shows live reaction counts + highlights the viewer's own reactions ----
@@ -227,6 +256,32 @@ def test_feed_shows_comment_section_and_count(client, db_session, monkeypatch):
     assert 'class="comment-count">1<' in body
 
 
+# ---- T95: the latest comments render inline on the card (Instagram-style) ----
+
+
+def test_feed_renders_latest_comments_inline(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_ic", title="Chatty Song", artist_name="Artist"))
+    db_session.commit()
+    post = Post(user_id=viewer.id, track_id="t_ic", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    db_session.add(Comment(post_id=post.id, user_id=viewer.id, body="so good live"))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    # The comment shows on the card itself — no click needed — with its author linked.
+    assert "so good live" in body
+    assert 'class="comment-inline-list"' in body
+    assert 'class="comment-inline-author" href="/u/viewer"' in body
+    # The existing toggle/panel machinery is still there for "view all + add a comment".
+    assert 'onclick="toggleComments(this)"' in body
+
+
 # ---- T40: the composer (search + share a song) renders on the feed ----
 
 
@@ -237,8 +292,174 @@ def test_feed_has_composer(client, db_session, monkeypatch):
 
     body = client.get("/feed").text
     assert 'class="composer' in body               # the composer block is present
+    assert 'for="composer-search-input"' in body   # search input has a real label
+    assert 'id="composer-status"' in body          # JS has a visible status/error target
     assert "composerSearch(this)" in body          # the search box is wired
     assert "/static/composer.js" in body           # the script is loaded
+    # T104: the text box + Share are always present (a song is optional), and the remove-song
+    # control on the attached-song chip is wired.
+    assert 'id="composer-caption-input"' in body   # the always-visible "just writing" box
+    assert "composerPublish(this)" in body         # the always-visible Share button is wired
+    assert "composerRemoveTrack(this)" in body     # the attached-song chip's × is wired
+
+
+# T104: the composer script can publish a TEXT-ONLY post — it doesn't bail when no song is
+# attached, sends `track: null`, and blocks a completely empty share.
+def test_composer_script_supports_text_only(client):
+    script = client.get("/static/composer.js").text
+    assert "composerRemoveTrack" in script          # removing an attached song is supported
+    assert "track: track" in script                 # the track is optional in the publish body
+    assert "Write something or add a song" in script  # the empty-share guard message
+
+
+# ---- T102: feed song card shows "played N times by {author}" at 2+ plays ----
+
+
+# A song whose author has played it 2+ times shows the endorsement line; a song played only once
+# (below the threshold) shows no line at all — one play is "they just heard it", not a signal.
+def test_feed_song_card_shows_author_play_count_past_threshold(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)  # display_name "Viewer"
+    db_session.add(Track(spotify_id="t_multi", title="Multi", artist_name="Band"))
+    db_session.add(Track(spotify_id="t_once", title="Once", artist_name="Band"))
+    db_session.commit()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db_session.add(Post(id="pp-multi", user_id=viewer.id, track_id="t_multi",
+                        source=PostSource.MANUAL, created_at=now))
+    db_session.add(Post(id="pp-once", user_id=viewer.id, track_id="t_once",
+                        source=PostSource.MANUAL, created_at=now - timedelta(minutes=1)))
+    # The viewer played t_multi three times (shown) and t_once just once (hidden). Distinct times —
+    # Play is unique on (userId, playedAt).
+    for i in range(3):
+        db_session.add(Play(user_id=viewer.id, track_id="t_multi", played_at=now - timedelta(hours=i)))
+    db_session.add(Play(user_id=viewer.id, track_id="t_once", played_at=now - timedelta(days=1)))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "played 3 times by Viewer" in body   # 3 plays -> endorsement line shown
+    assert "played 1 time" not in body          # 1 play -> below threshold, never rendered
+
+
+# T104: a TEXT-ONLY post (no track) renders as a distinct note card on the feed — the caption in a
+# `.post-note-body`, and no play button (there's no song to play).
+def test_feed_renders_text_only_post_as_note(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db_session.add(Post(id="pp-text", user_id=viewer.id, track_id=None,
+                        caption="thinking out loud", source=PostSource.MANUAL, created_at=now))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "post-note" in body                  # the note card styling is applied
+    assert "thinking out loud" in body          # the caption is the post body
+    # No play button for a song-less post: the note card omits the .post-art play control.
+    assert 'aria-label="Play thinking out loud"' not in body
+
+
+# ---- T101: one-tap "Share what you're hearing" button in the composer ----
+
+
+# The composer carries a "share what you're hearing" button wired to the now-playing handler,
+# so a user can drop their current Spotify track into the composer with one tap.
+def test_feed_composer_has_share_now_playing_button(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "shareNowPlaying(this)" in body   # the button is wired to the T101 handler
+
+
+# The composer script drives the one-tap flow: it fetches the now-playing endpoint, publishes the
+# resulting post with the SPOTIFY source (so it's distinguishable from a typed MANUAL post), and
+# handles the "nothing playing" empty case via the status line rather than breaking.
+def test_composer_script_shares_now_playing(client):
+    script = client.get("/static/composer.js").text
+    assert "/api/me/now-playing" in script      # it asks what's playing
+    assert "shareNowPlaying" in script          # the handler exists
+    assert '"SPOTIFY"' in script                 # these posts publish with the SPOTIFY source
+    assert "Nothing playing" in script          # the null case is handled with friendly copy
+
+
+# ---- T94: feed song cards are playable in place via the Spotify embed player ----
+
+
+# A song card carries its Spotify track id and an accessible play control, and loads the
+# player script. The embed iframe itself must NOT be in the initial HTML — player.js only
+# builds it when the listener taps play (keeps the page light: no third-party frames on load).
+def test_feed_song_card_is_playable(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_redbone", title="Redbone", artist_name="Childish Gambino",
+                         album_art_url="https://img.example/redbone.jpg"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_redbone", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'data-spotify-id="t_redbone"' in body   # the card knows which track it plays
+    assert 'aria-label="Play Redbone"' in body     # the art is a labelled play button
+    assert "togglePlayer(this)" in body            # wired to the player script
+    assert "/static/player.js" in body             # the script is loaded
+    assert "<iframe" not in body                   # lazy: no embed frame on initial load
+
+
+# A post whose track has no album art must still be playable — the play button renders
+# (with its gradient placeholder background) even without an <img> inside it.
+def test_feed_song_card_playable_without_art(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_noart", title="No Art Song", artist_name="Somebody"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_noart", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert 'data-spotify-id="t_noart"' in body
+    assert 'aria-label="Play No Art Song"' in body
+
+
+# ---- T97: double-tap a song card to heart it (Instagram's signature gesture) ----
+
+
+# The feed loads the double-tap script whenever song posts render, so the gesture is live.
+def test_feed_loads_double_tap_script(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_dt", title="Tap Tap", artist_name="Gesture"))
+    db_session.commit()
+    db_session.add(Post(user_id=viewer.id, track_id="t_dt", source=PostSource.MANUAL))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    assert "/static/double-tap.js" in client.get("/feed").text
+
+
+# The gesture must be ADD-ONLY (Instagram semantics: double-tap never removes a heart —
+# removal stays on the ❤️ button) and must reuse the existing react() logic rather than
+# talking to the API itself. We assert on the script's source, like the T86 script test.
+def test_double_tap_script_is_add_only_and_reuses_react(client):
+    script = client.get("/static/double-tap.js").text
+    assert 'classList.contains("reacted")' in script   # checks before hearting — never unhearts
+    assert "react(" in script                          # delegates to reactions.js
+    assert "prefers-reduced-motion" in script          # respects the reduced-motion setting
+
+
+# The floating-heart animation the gesture triggers exists in the stylesheet.
+def test_stylesheet_has_double_tap_heart_animation(client):
+    css = client.get("/static/brink.css").text
+    assert ".double-tap-heart" in css
+    assert "@keyframes double-tap-pop" in css
 
 
 # ---- T049: followed artists' behind-the-scenes posts render in the feed page ----
@@ -261,7 +482,7 @@ def test_feed_shows_followed_artist_post(client, db_session, monkeypatch):
     db_session.refresh(post)
     # The feed builder signs the private image path; stub it so no test hits Supabase.
     monkeypatch.setattr(
-        "app.routers.feed.create_signed_read_url",
+        "app.routers.feed.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     app.dependency_overrides[get_session] = lambda: db_session
@@ -274,6 +495,8 @@ def test_feed_shows_followed_artist_post(client, db_session, monkeypatch):
     assert "artist-reactions" in body                                  # audience reaction bar
     assert "artistReact(this)" in body
     assert "toggleArtistComments(this)" in body
+    assert "aria-expanded=\"false\"" in body
+    assert f'aria-controls="artist-comment-panel-{post.id}"' in body
     assert f'data-post-id="{post.id}"' in body
     assert "/static/artist-engagement.js" in body                      # the engagement script
 
@@ -396,6 +619,9 @@ def test_own_profile_shows_edit_profile(client, db_session, monkeypatch):
 
     body = client.get("/u/viewer").text
     assert "Edit profile" in body
+    assert 'aria-expanded="false"' in body
+    assert 'aria-controls="edit-profile-form"' in body
+    assert 'id="edit-profile-form" class="edit-profile-form" hidden' in body
     assert "/static/edit-profile.js" in body
 
 
@@ -414,7 +640,10 @@ def test_own_profile_shows_become_artist_button(client, db_session, monkeypatch)
     app.dependency_overrides[get_session] = lambda: db_session
     _login(client, monkeypatch)
     body = client.get("/u/viewer").text
+    assert 'class="profile-actions"' in body
     assert "becomeArtist(this)" in body
+    assert 'aria-describedby="become-artist-status"' in body
+    assert 'id="become-artist-status"' in body
     assert "/static/become-artist.js" in body
 
 
@@ -453,7 +682,7 @@ def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatc
     db_session.commit()
     db_session.refresh(post)
     monkeypatch.setattr(
-        "app.routers.pages.create_signed_read_url",
+        "app.routers.pages.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     app.dependency_overrides[get_session] = lambda: db_session
@@ -468,8 +697,32 @@ def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatc
     assert f'data-post-id="{post.id}"' in body
     assert "artistReact(this)" in body
     assert "toggleArtistComments(this)" in body
+    assert f'aria-controls="artist-comment-panel-{post.id}"' in body
+    assert f'id="artist-comment-status-{post.id}"' in body
     assert "/static/artist-engagement.js" in body
     assert "Artist-only engagement" not in body
+
+
+# T104 regression: a TEXT-ONLY artist post (imageUrl None) on a profile renders as a note — NOT the
+# muted "image unavailable" placeholder, which only belongs to a real-but-unsignable image (T103).
+def test_artist_profile_text_only_post_has_no_image_box(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url=None, caption="just words"))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/u/stage-name").text
+    assert "just words" in body                    # the caption renders as the note body
+    assert "artist-post-note" in body              # the note styling is applied
+    assert "artist-post-img-missing" not in body   # no placeholder image box for a text-only post
+    assert "<img class=\"artist-post-img\"" not in body
 
 
 def test_artist_profile_owner_sees_engagement_summary(client, db_session, monkeypatch):
@@ -487,7 +740,7 @@ def test_artist_profile_owner_sees_engagement_summary(client, db_session, monkey
     db_session.add(ArtistComment(artist_post_id=post.id, user_id=fan.id, body="love this"))
     db_session.commit()
     monkeypatch.setattr(
-        "app.routers.pages.create_signed_read_url",
+        "app.routers.pages.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     app.dependency_overrides[get_session] = lambda: db_session
@@ -554,6 +807,7 @@ def test_own_profile_without_spotify_shows_link_prompt(client, db_session, monke
 
     body = client.get("/u/viewer").text
     assert "Link Spotify" in body
+    assert 'href="/auth/login"' in body
 
 
 def test_own_profile_shows_now_playing_badge(client, db_session, monkeypatch):
@@ -571,6 +825,85 @@ def test_own_profile_shows_now_playing_badge(client, db_session, monkeypatch):
     body = client.get("/u/viewer").text
     assert "Now playing" in body
     assert "Midnight" in body
+
+
+def test_own_profile_ignores_now_playing_failure(client, db_session, monkeypatch):
+    _seed_viewer(db_session)
+
+    def boom(session, user_id):
+        raise RuntimeError("spotify is having a bad day")
+
+    monkeypatch.setattr("app.spotify.get_currently_playing", boom)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    res = client.get("/u/viewer")
+    assert res.status_code == 200
+    assert "Viewer" in res.text
+    assert "Internal Server Error" not in res.text
+
+
+def test_artist_profile_ignores_artist_engagement_read_failure(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    post = ArtistPost(artist_user_id=artist.id, image_url="stage-name/backstage.jpg",
+                      caption="backstage warmup")
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+
+    monkeypatch.setattr(
+        "app.routers.pages.create_signed_read_url_or_blank",
+        lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
+    )
+    real_exec = db_session.exec
+
+    def flaky_exec(statement, *args, **kwargs):
+        if "ArtistReaction" in str(statement) or "ArtistComment" in str(statement):
+            raise RuntimeError("artist engagement tables unavailable")
+        return real_exec(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db_session, "exec", flaky_exec)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    res = client.get("/u/stage-name")
+    assert res.status_code == 200
+    assert "backstage warmup" in res.text
+    assert "Internal Server Error" not in res.text
+
+
+def test_artist_profile_omits_image_when_signing_fails(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    _seed_viewer(db_session)
+    artist = User(handle="stage-name", display_name="Stage Name", is_artist=True,
+                  created_at=datetime.now(timezone.utc))
+    db_session.add(artist)
+    db_session.commit()
+    db_session.refresh(artist)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url="stage-name/backstage.jpg",
+                              caption="backstage warmup"))
+    db_session.commit()
+
+    # Make the UNDERLYING signer raise so the real resilient wrapper (T103) is exercised: it should
+    # swallow the error and return "", and the template then omits the <img>/shows a placeholder.
+    def boom(bucket, path, expires_in=3600):
+        raise RuntimeError("storage signing unavailable")
+
+    monkeypatch.setattr("app.security.supabase.create_signed_read_url", boom)
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    res = client.get("/u/stage-name")
+    assert res.status_code == 200
+    assert "backstage warmup" in res.text          # the post still renders (not a 500, not blank)
+    assert 'src=""' not in res.text                # never a broken <img> with an empty src
+    assert "artist-post-img-missing" in res.text   # the muted placeholder is shown instead
 
 
 # ---- T51: artist page + upload UI ----
@@ -600,10 +933,20 @@ def test_artist_page_shows_upload_for_artist(client, db_session, monkeypatch):
     body = client.get("/artist").text
     assert 'class="artist-file"' in body            # the file picker is shown
     assert "/static/artist-upload.js" in body       # the upload script is loaded
-    # T57: the caption starts hidden — a post needs an image, so the caption box only appears
-    # after a valid file is picked (revealed by artist-upload.js). It must render with `hidden`.
+    # T104: the caption is now ALWAYS visible (a photo is optional — an artist can post text only),
+    # so the box renders WITHOUT `hidden` (reverting the old T57 reveal-on-image behavior).
     assert 'class="artist-caption"' in body
-    assert 'maxlength="2000" hidden' in body
+    assert 'maxlength="2000" hidden' not in body
+    assert "artistCaptionInput(this)" in body       # typing text alone can enable Share (T104)
+
+
+# T104: the artist upload script can publish a TEXT-ONLY post — it enables Share on text alone and
+# skips the image upload when no file is picked (imageUrl is only added when there's a file).
+def test_artist_upload_script_supports_text_only(client):
+    script = client.get("/static/artist-upload.js").text
+    assert "artistCaptionInput" in script            # a caption alone can make the post shareable
+    assert "if (_artistFile)" in script              # the image upload runs only when a file exists
+    assert "body.imageUrl = path" in script          # imageUrl is set only inside that branch
 
 
 def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch):
@@ -615,6 +958,7 @@ def test_artist_page_hides_upload_for_non_artist(client, db_session, monkeypatch
     body = client.get("/artist").text
     assert 'class="artist-file"' not in body        # no upload box for non-artists
     assert "Artist accounts only" in body
+    assert 'href="/u/viewer"' in body
 
 
 def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):
@@ -627,7 +971,7 @@ def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):
     # The bucket is private, so the page must sign a READ url for each stored path (T53). Stub the
     # helper so no test hits Supabase — it just wraps the raw path into a recognisable signed URL.
     monkeypatch.setattr(
-        "app.routers.pages.create_signed_read_url",
+        "app.routers.pages.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     _login(client, monkeypatch)
@@ -652,7 +996,7 @@ def test_artist_page_signs_image_read_urls(client, db_session, monkeypatch):
         captured["path"] = path
         return "https://signed/read-url?token=readtok"
 
-    monkeypatch.setattr("app.routers.pages.create_signed_read_url", fake_sign)
+    monkeypatch.setattr("app.routers.pages.create_signed_read_url_or_blank", fake_sign)
     _login(client, monkeypatch)
 
     body = client.get("/artist").text
@@ -661,6 +1005,30 @@ def test_artist_page_signs_image_read_urls(client, db_session, monkeypatch):
     # the rendered <img> uses the signed URL, and the raw path is NOT emitted as an src
     assert 'src="https://signed/read-url?token=readtok"' in body
     assert 'src="the-artist/x.jpg"' not in body
+
+
+# T103 resilience: the 2026-07-22 incident — a signing failure 500'd the whole artist page. Now the
+# page must render (200) with a muted placeholder instead of crashing. We make the UNDERLYING signer
+# raise so the real resilient wrapper handles it.
+def test_artist_page_survives_signing_failure(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    artist = _seed_artist(db_session)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url="the-artist/x.jpg",
+                              caption="tour dates soon"))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+
+    def boom(bucket, path, expires_in=3600):
+        raise RuntimeError("StorageApiError: Object not found")
+
+    monkeypatch.setattr("app.security.supabase.create_signed_read_url", boom)
+    _login(client, monkeypatch)
+
+    res = client.get("/artist")
+    assert res.status_code == 200                  # NOT the 500 from the incident
+    assert "tour dates soon" in res.text           # the post still renders
+    assert 'src=""' not in res.text                # never a broken <img>
+    assert "artist-post-img-missing" in res.text   # the muted placeholder is shown instead
 
 
 # ---- T47: authenticated nav (feed / my profile / artist studio / log out) ----
@@ -734,3 +1102,35 @@ def test_nav_logged_in_on_home_page(client, db_session, monkeypatch):
     body = client.get("/").text
     assert 'href="/feed"' in body
     assert 'href="/auth/logout"' in body
+
+
+# ---- T96: the "Liked by X and N others" line renders on song cards ----
+
+
+def test_feed_renders_liked_by_line(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    other = User(handle="fan", display_name="Fan One", created_at=datetime.now(timezone.utc))
+    db_session.add(other)
+    db_session.add(Track(spotify_id="t_lb", title="Popular Song", artist_name="Artist"))
+    db_session.commit()
+    db_session.refresh(other)
+    post = Post(user_id=viewer.id, track_id="t_lb", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    # Two reactions: the viewer's is older, Fan One's is the most recent.
+    db_session.add(Reaction(post_id=post.id, user_id=viewer.id, type=ReactionType.HEART,
+                            created_at=datetime(2026, 7, 22, 11, 0, 0)))
+    db_session.add(Reaction(post_id=post.id, user_id=other.id, type=ReactionType.FIRE,
+                            created_at=datetime(2026, 7, 22, 12, 0, 0)))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "Liked by" in body
+    assert "Fan One" in body            # the most recent reactor is named
+    assert "and 1 other" in body        # 2 total reactions -> "and 1 other"
+    assert "toggleReactors(this)" in body   # the line opens the reactors list
+    assert "/static/liked-by.js" in body    # the script is loaded

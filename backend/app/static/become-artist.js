@@ -17,9 +17,12 @@ async function becomeArtist(btn) {
   );
   if (!ok) return;
 
+  const status = document.getElementById("become-artist-status");
   btn.disabled = true;
+  btn.setAttribute("aria-busy", "true");
   const original = btn.textContent;
-  btn.textContent = "Switching…";
+  btn.textContent = "Switching...";
+  if (status) status.textContent = "Creating your artist profile...";
 
   try {
     const res = await fetch("/api/me/become-artist", { method: "POST" });
@@ -29,6 +32,8 @@ async function becomeArtist(btn) {
   } catch (err) {
     btn.textContent = original;
     btn.disabled = false;
+    btn.removeAttribute("aria-busy");
+    if (status) status.textContent = "Couldn't create the artist profile. Please try again.";
     console.warn(err);
   }
 }
