@@ -73,7 +73,7 @@ def test_static_assets_require_revalidation(client):
 # ---- Feed page (reuses build_feed: posts from people you follow + your own) ----
 
 from types import SimpleNamespace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from app.db import get_session
@@ -296,6 +296,36 @@ def test_feed_has_composer(client, db_session, monkeypatch):
     assert 'id="composer-status"' in body          # JS has a visible status/error target
     assert "composerSearch(this)" in body          # the search box is wired
     assert "/static/composer.js" in body           # the script is loaded
+
+
+# ---- T102: feed song card shows "played N times by {author}" at 2+ plays ----
+
+
+# A song whose author has played it 2+ times shows the endorsement line; a song played only once
+# (below the threshold) shows no line at all — one play is "they just heard it", not a signal.
+def test_feed_song_card_shows_author_play_count_past_threshold(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)  # display_name "Viewer"
+    db_session.add(Track(spotify_id="t_multi", title="Multi", artist_name="Band"))
+    db_session.add(Track(spotify_id="t_once", title="Once", artist_name="Band"))
+    db_session.commit()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db_session.add(Post(id="pp-multi", user_id=viewer.id, track_id="t_multi",
+                        source=PostSource.MANUAL, created_at=now))
+    db_session.add(Post(id="pp-once", user_id=viewer.id, track_id="t_once",
+                        source=PostSource.MANUAL, created_at=now - timedelta(minutes=1)))
+    # The viewer played t_multi three times (shown) and t_once just once (hidden). Distinct times —
+    # Play is unique on (userId, playedAt).
+    for i in range(3):
+        db_session.add(Play(user_id=viewer.id, track_id="t_multi", played_at=now - timedelta(hours=i)))
+    db_session.add(Play(user_id=viewer.id, track_id="t_once", played_at=now - timedelta(days=1)))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "played 3 times by Viewer" in body   # 3 plays -> endorsement line shown
+    assert "played 1 time" not in body          # 1 play -> below threshold, never rendered
 
 
 # ---- T101: one-tap "Share what you're hearing" button in the composer ----

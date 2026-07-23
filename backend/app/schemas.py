@@ -215,6 +215,10 @@ class FeedPostOut(CamelModel):
     # Whoever reacted MOST RECENTLY (T96), or null when the post has no reactions — backs the
     # "Liked by X and N others" line. Reuses the public AuthorOut shape (no leaks).
     liked_by: Optional[AuthorOut] = None
+    # How many times the POST'S AUTHOR has played this exact track (T102) — the "played N times by
+    # {author}" endorsement line. Always present (0 default) for a stable shape; the card only
+    # renders the line from 2 up (one play isn't yet a signal).
+    author_play_count: int = 0
 
 
 # An artist "behind-the-scenes" post as the feed returns it (T049): a followed artist's promo image

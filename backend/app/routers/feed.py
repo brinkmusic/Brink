@@ -17,7 +17,7 @@
 # are batched the same way against the ArtistReaction/ArtistComment tables.
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import func, tuple_
 from sqlmodel import Session, select
 
 from app.db import get_session
@@ -28,6 +28,7 @@ from app.models import (
     ArtistReaction,
     Comment,
     Follow,
+    Play,
     Post,
     Reaction,
     ReactionType,
@@ -183,6 +184,21 @@ def _build_song_items(session: Session, user: User, author_ids: set[str]) -> lis
     # The newest few comments per post, shown inline on the card (T95) — one batched query.
     latest_comments = _latest_comments(session, Comment, "post_id", post_ids)
 
+    # How many times each post's AUTHOR has played the track THEY shared (T102) — the "played N
+    # times by {author}" endorsement line. One grouped query over Play for the EXACT (author, track)
+    # pairs in this batch (no N+1). tuple_(a, b).in_([...]) is a row-value IN — "(userId, trackId) is
+    # one of these pairs" — and works on both Postgres and the SQLite test DB. We match on the pair
+    # (not just author, not just track) so a post only ever counts the author's plays of that one
+    # track. Missing pair -> 0 via the .get default below.
+    author_track_pairs = {(post.user_id, post.track_id) for post, _, _ in rows}
+    play_counts: dict[tuple, int] = {}
+    for uid, tid, n in session.exec(
+        select(Play.user_id, Play.track_id, func.count())
+        .where(tuple_(Play.user_id, Play.track_id).in_(list(author_track_pairs)))
+        .group_by(Play.user_id, Play.track_id)
+    ).all():
+        play_counts[(uid, tid)] = n
+
     # Each post's MOST RECENT reactor (T96) — backs the "Liked by X and N others" line. One
     # batched query: every reaction on these posts joined to its reactor, newest first; the
     # first row we see per post wins (dict "not in" check), so it's their newest reactor.
@@ -225,6 +241,8 @@ def _build_song_items(session: Session, user: User, author_ids: set[str]) -> lis
             viewer_reactions=viewer_reactions.get(post.id, _no_viewer_reactions()),
             latest_comments=latest_comments.get(post.id, []),
             liked_by=liked_by.get(post.id),  # None when the post has no reactions (T96)
+            # The author's own play count for this track (T102); 0 when they've never played it.
+            author_play_count=play_counts.get((post.user_id, post.track_id), 0),
         )
         # by_alias=True -> emit camelCase field names (reactionCounts, commentCount, ...).
         items.append((post.created_at, out.model_dump(by_alias=True, mode="json")))
