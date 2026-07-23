@@ -13,6 +13,7 @@ EXPECTED_API_ROUTES = {
     ("GET", "/api/posts"),
     ("POST", "/api/posts/{post_id}/reactions"),
     ("DELETE", "/api/posts/{post_id}/reactions"),
+    ("GET", "/api/posts/{post_id}/reactions"),  # who reacted (T96)
     ("POST", "/api/posts/{post_id}/comments"),
     ("GET", "/api/posts/{post_id}/comments"),
     ("POST", "/api/follow/{user_id}"),
