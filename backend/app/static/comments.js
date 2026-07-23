@@ -80,6 +80,7 @@ async function submitComment(event, form) {
     const empty = list.querySelector(".comment-empty");
     if (empty) empty.remove(); // drop the "no comments yet" placeholder
     list.prepend(renderComment(comment)); // newest-first
+    appendInlineComment(box, comment); // also show it on the card itself (T95)
     input.value = "";
     if (status) status.textContent = "";
     bumpCommentCount(box, 1);
@@ -110,6 +111,29 @@ function renderComment(c) {
 
   li.append(author, body, when);
   return li;
+}
+
+// Add a just-posted comment to the card's INLINE list (the few newest comments shown on the
+// card without a click, T95), so the card reflects it immediately. Creates the list if the
+// post had no comments yet. The inline list is chronological (newest last), unlike the
+// panel's newest-first list. textContent only — same injection-safety rule as above.
+function appendInlineComment(box, comment) {
+  let list = box.querySelector(".comment-inline-list");
+  if (!list) {
+    list = document.createElement("ul");
+    list.className = "comment-inline-list";
+    box.prepend(list); // the inline list sits above the 💬 toggle
+  }
+  const li = document.createElement("li");
+  li.className = "comment-inline";
+  const author = document.createElement("span");
+  author.className = "comment-inline-author";
+  author.textContent = comment.author.displayName;
+  const body = document.createElement("span");
+  body.className = "comment-inline-body";
+  body.textContent = comment.body;
+  li.append(author, body);
+  list.appendChild(li);
 }
 
 // A plain one-line row used for the empty / error states.

@@ -197,6 +197,11 @@ class FeedPostOut(CamelModel):
     reaction_counts: dict[str, int]
     comment_count: int
     viewer_reactions: dict[str, bool]
+    # The post's NEWEST comments (capped at 3, chronological within that subset) so the feed
+    # can show them inline without a click (T95). Always a list — empty when uncommented,
+    # never null — a stable shape for the frontend. Reuses CommentOut (the same DTO the
+    # comments API returns), so both surfaces expose identical, allow-listed fields.
+    latest_comments: list[CommentOut] = []
 
 
 # An artist "behind-the-scenes" post as the feed returns it (T049): a followed artist's promo image
@@ -215,6 +220,9 @@ class ArtistFeedPostOut(CamelModel):
     reaction_counts: dict[str, int]
     comment_count: int
     viewer_reactions: dict[str, bool]
+    # Same inline latest-comments shape as FeedPostOut above (T95), computed over the
+    # mirrored ArtistComment table (T52).
+    latest_comments: list[CommentOut] = []
 
 
 # What POST /api/artist/sign-upload returns (T50): the pieces the browser needs to upload the

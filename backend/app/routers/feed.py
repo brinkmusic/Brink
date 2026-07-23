@@ -35,7 +35,7 @@ from app.models import (
     User,
 )
 from app.responses import ok
-from app.schemas import ArtistFeedPostOut, AuthorOut, FeedPostOut, TrackOut
+from app.schemas import ArtistFeedPostOut, AuthorOut, CommentOut, FeedPostOut, TrackOut
 from app.security.supabase import create_signed_read_url
 
 # The private Supabase Storage bucket that holds artist promo images (same one artist.py uploads
@@ -54,6 +54,51 @@ def _zero_counts() -> dict[str, int]:
 
 def _no_viewer_reactions() -> dict[str, bool]:
     return {rt.value: False for rt in ReactionType}
+
+
+# How many of a post's newest comments the feed shows inline on the card (T95). The rest stay
+# behind the existing "💬" panel, which loads the full list from the comments API.
+LATEST_COMMENTS_CAP = 3
+
+
+# The newest comments for a batch of posts, in ONE query (no N+1): postId -> up to CAP
+# CommentOut DTOs, chronological within each post's subset (oldest of the shown ones first —
+# the Instagram reading order, so the newest sits closest to the comment box).
+#
+# WHY the generic (comment_model, post_id_attr) parameters: song posts and artist posts store
+# their comments in mirrored tables (Comment.post_id vs ArtistComment.artist_post_id — a foreign
+# key can only point at one table, see models.py), so the same logic runs against either table.
+# getattr(x, "name") is Python for "read the attribute called name" — it lets one function work
+# with both column names.
+def _latest_comments(session: Session, comment_model, post_id_attr: str, post_ids) -> dict[str, list[CommentOut]]:
+    id_column = getattr(comment_model, post_id_attr)
+    rows = session.exec(
+        select(comment_model, User)
+        .join(User, User.id == comment_model.user_id)
+        .where(id_column.in_(post_ids))
+        .order_by(comment_model.created_at.desc())
+    ).all()
+
+    # Walk newest-first and keep only the first CAP per post, building the same CommentOut DTO
+    # the comments API returns (ADR-0012: an explicit allow-list, never the raw rows).
+    latest: dict[str, list[CommentOut]] = {}
+    for comment, author in rows:
+        bucket = latest.setdefault(getattr(comment, post_id_attr), [])
+        if len(bucket) < LATEST_COMMENTS_CAP:
+            bucket.append(CommentOut(
+                id=comment.id,
+                body=comment.body,
+                created_at=comment.created_at,
+                author=AuthorOut(
+                    display_name=author.display_name,
+                    handle=author.handle,
+                    avatar_url=author.avatar_url,
+                ),
+            ))
+    # Flip each post's kept comments from newest-first to chronological for display.
+    for bucket in latest.values():
+        bucket.reverse()
+    return latest
 
 
 @router.get("/api/feed")
@@ -135,6 +180,9 @@ def _build_song_items(session: Session, user: User, author_ids: set[str]) -> lis
     ).all():
         viewer_reactions.setdefault(post_id, _no_viewer_reactions())[ReactionType(rtype).value] = True
 
+    # The newest few comments per post, shown inline on the card (T95) — one batched query.
+    latest_comments = _latest_comments(session, Comment, "post_id", post_ids)
+
     # Assemble each post's response from the batched lookups (falling back to the zero/empty shapes
     # for a post that has no reactions/comments yet).
     items = []
@@ -160,6 +208,7 @@ def _build_song_items(session: Session, user: User, author_ids: set[str]) -> lis
             reaction_counts=reaction_counts.get(post.id, _zero_counts()),
             comment_count=comment_counts.get(post.id, 0),
             viewer_reactions=viewer_reactions.get(post.id, _no_viewer_reactions()),
+            latest_comments=latest_comments.get(post.id, []),
         )
         # by_alias=True -> emit camelCase field names (reactionCounts, commentCount, ...).
         items.append((post.created_at, out.model_dump(by_alias=True, mode="json")))
@@ -209,6 +258,10 @@ def _build_artist_items(session: Session, user: User, author_ids: set[str]) -> l
     ).all():
         viewer_reactions.setdefault(post_id, _no_viewer_reactions())[ReactionType(rtype).value] = True
 
+    # The newest few comments per artist post, shown inline on the card (T95) — the same
+    # batched helper as the song half, run against the mirrored ArtistComment table.
+    latest_comments = _latest_comments(session, ArtistComment, "artist_post_id", post_ids)
+
     items = []
     for post, author in rows:
         # The image is stored as a bare path in the PRIVATE artist-images bucket, so sign a
@@ -226,6 +279,7 @@ def _build_artist_items(session: Session, user: User, author_ids: set[str]) -> l
             reaction_counts=reaction_counts.get(post.id, _zero_counts()),
             comment_count=comment_counts.get(post.id, 0),
             viewer_reactions=viewer_reactions.get(post.id, _no_viewer_reactions()),
+            latest_comments=latest_comments.get(post.id, []),
         )
         items.append((post.created_at, out.model_dump(by_alias=True, mode="json")))
     return items

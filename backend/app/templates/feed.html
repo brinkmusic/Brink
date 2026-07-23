@@ -84,6 +84,18 @@
         </div>
 
         <div class="comments artist-comments" data-post-id="{{ p.id }}">
+          {# The newest comments render right on the card (T95) — no click needed, like
+             Instagram. The full list + the add-comment box stay in the 💬 panel below. #}
+          {% if p.latest_comments %}
+          <ul class="comment-inline-list">
+            {% for c in p.latest_comments %}
+            <li class="comment-inline">
+              <a class="comment-inline-author" href="/u/{{ c.author_handle }}">{{ c.author }}</a>
+              <span class="comment-inline-body">{{ c.body }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
           <button
             type="button"
             class="comment-toggle"
@@ -91,7 +103,7 @@
             aria-controls="artist-comment-panel-{{ p.id }}"
             onclick="toggleArtistComments(this)"
           >
-            💬 <span class="comment-count">{{ p.comment_count }}</span>
+            💬 {% if p.comment_count > p.latest_comments | length %}View all {% endif %}<span class="comment-count">{{ p.comment_count }}</span>
           </button>
           <div id="artist-comment-panel-{{ p.id }}" class="comment-panel" hidden>
             <ul class="comment-list"></ul>
@@ -147,9 +159,20 @@
             {% endfor %}
           </div>
 
-          {# Comments (T42). The button shows the count and opens a panel that lazily loads
-             this post's comments and offers a box to add one (see static/comments.js). #}
+          {# Comments (T42). Since T95 the newest few render right on the card, Instagram
+             style; the button opens a panel that lazily loads the FULL list and offers a
+             box to add one (see static/comments.js). #}
           <div class="comments" data-post-id="{{ p.id }}">
+            {% if p.latest_comments %}
+            <ul class="comment-inline-list">
+              {% for c in p.latest_comments %}
+              <li class="comment-inline">
+                <a class="comment-inline-author" href="/u/{{ c.author_handle }}">{{ c.author }}</a>
+                <span class="comment-inline-body">{{ c.body }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
             <button
               type="button"
               class="comment-toggle"
@@ -157,7 +180,7 @@
               aria-controls="comment-panel-{{ p.id }}"
               onclick="toggleComments(this)"
             >
-              💬 <span class="comment-count">{{ p.comment_count }}</span>
+              💬 {% if p.comment_count > p.latest_comments | length %}View all {% endif %}<span class="comment-count">{{ p.comment_count }}</span>
             </button>
             <div id="comment-panel-{{ p.id }}" class="comment-panel" hidden>
               <ul class="comment-list"></ul>
