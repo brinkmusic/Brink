@@ -139,6 +139,16 @@ def _feed_items(session: Session, user) -> list[dict]:
             "counts": it["reactionCounts"],
             "mine": mine,
             "comment_count": it["commentCount"],
+            # The post's newest comments, pre-shaped for the template (T95): just the pieces
+            # the card renders — who said it (name + handle for the profile link) and what.
+            "latest_comments": [
+                {
+                    "author": c["author"]["displayName"],
+                    "author_handle": c["author"]["handle"],
+                    "body": c["body"],
+                }
+                for c in it["latestComments"]
+            ],
         }
         if it["kind"] == "artist":
             # An artist behind-the-scenes post: an image + caption (imageUrl is already a signed
@@ -149,6 +159,10 @@ def _feed_items(session: Session, user) -> list[dict]:
             common["title"] = it["track"]["title"]
             common["artist"] = it["track"]["artistName"]
             common["album_art"] = it["track"]["albumArtUrl"]
+            # The Spotify track id, so the card can open the in-place embed player (T94).
+            common["spotify_id"] = it["track"]["spotifyId"]
+            # The most recent reactor (or None) for the "Liked by X and N others" line (T96).
+            common["liked_by"] = it["likedBy"]
         items.append(common)
     return items
 

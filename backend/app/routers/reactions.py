@@ -2,8 +2,10 @@
 # The reactions endpoints — the lightest social signal on a post (T11):
 #   POST   /api/posts/{id}/reactions -> add the caller's reaction of a given type (idempotent)
 #   DELETE /api/posts/{id}/reactions -> remove the caller's reaction of that type
-# Both return the post's fresh per-type reaction counts. Reactions feed the engagement numbers
-# the feed (T41) and artist-engagement views (T52) show.
+#   GET    /api/posts/{id}/reactions -> WHO reacted (T96): unique reactors, newest first
+# The write verbs return the post's fresh per-type reaction counts. Reactions feed the
+# engagement numbers the feed (T41) and artist-engagement views (T52) show, and the "Liked by
+# X and N others" line (T96).
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
@@ -14,7 +16,7 @@ from app.deps import require_user
 from app.models import Post, Reaction, ReactionType, User
 from app.rate_limit import enforce_rate_limit
 from app.responses import fail, ok
-from app.schemas import ReactionBody, ReactionCountsOut
+from app.schemas import ReactionBody, ReactionCountsOut, ReactorOut
 
 # The per-user cap on reaction writes: at most REACTION_RATE_LIMIT add/remove actions per
 # window (ADR-0011). One shared "reaction" action covers both verbs, so rapidly toggling a
@@ -120,3 +122,42 @@ def remove_reaction(
         session.commit()
 
     return _counts_response(session, post_id, status=200)
+
+
+@router.get("/{post_id}/reactions")
+def list_reactors(
+    post_id: str,
+    user: User = Depends(require_user),   # login required — Brink is a private app
+    session: Session = Depends(get_session),
+):
+    # WHO reacted to this post (T96) — backs the tappable "Liked by X and N others" line.
+    # Same clean 404 as the write verbs when the post doesn't exist.
+    if session.get(Post, post_id) is None:
+        return fail("post not found", 404)
+
+    # Every reaction on the post joined to its reactor, newest first (createdAt was added to
+    # Reaction for exactly this — a random cuid id can't order by time).
+    rows = session.exec(
+        select(Reaction, User)
+        .join(User, User.id == Reaction.user_id)
+        .where(Reaction.post_id == post_id)
+        .order_by(Reaction.created_at.desc())
+    ).all()
+
+    # Fold multiple reactions by the same person into ONE list entry carrying all their types.
+    # Walking newest-first (and Python dicts remembering insertion order) means the person
+    # whose reaction is newest overall leads the list — like Instagram's likers sheet.
+    reactors: dict[str, ReactorOut] = {}
+    for reaction, reactor in rows:
+        entry = reactors.get(reaction.user_id)
+        if entry is None:
+            reactors[reaction.user_id] = ReactorOut(
+                display_name=reactor.display_name,
+                handle=reactor.handle,
+                avatar_url=reactor.avatar_url,
+                types=[ReactionType(reaction.type).value],
+            )
+        else:
+            entry.types.append(ReactionType(reaction.type).value)
+
+    return ok({"reactors": [r.model_dump(by_alias=True, mode="json") for r in reactors.values()]})

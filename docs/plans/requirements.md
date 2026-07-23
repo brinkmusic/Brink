@@ -56,8 +56,8 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 |----|------------|-----------|--------|
 | UI-1 | Post composer with Spotify catalog search → publish. | T40, T81 | ✅ (T81 follow-up hardens keyboard interaction and labels; no API behavior change.) |
 | UI-2 | Feed reads `/api/feed`; manually shared song cards, plus the behind-the-scenes posts of the artists you follow (interleaved newest-first, with like/comment controls). *(feed is manual-only — auto Spotify cards dropped per [ADR-0014](../decisions/adr/0014-feed-manual-posts-listening-summary.md); listening surfaces on the profile, not the feed; T47 added the app-shell nav — feed/profile/artist/logout links; T049 added followed artists' posts)* | T41, T47, T049 | ✅ |
-| UI-3 | Reactions call BE-5; counts reflect server truth. | T41 | ✅ |
-| UI-4 | Comments become real input + list. | T42, T81 | ✅ (T81 follow-up hardens expanded/loading/error states; no API behavior change.) |
+| UI-3 | Reactions call BE-5; counts reflect server truth. | T41, T96, T97 | ✅ (T96 adds the "Liked by X and N others" line + a `GET /api/posts/{id}/reactions` reactors list, backed by a new additive `Reaction.createdAt` migration. T97 adds the double-tap-to-heart gesture on song cards — add-only, reuses the same `react()` path; no API change.) |
+| UI-4 | Comments become real input + list. | T42, T81, T95 | ✅ (T81 follow-up hardens expanded/loading/error states. T95 renders each card's newest comments inline, Instagram-style; no API endpoint change.) |
 | UI-5 | Follow/unfollow buttons + follower counts/lists + searchable profiles, including artist profile content. | T43, T46, T54, T16, T80, T82 | ✅ (T80/T82 are UI hardening follow-ups for profile actions and responsive layout.) |
 | UI-6 | Profile renders stats + cluster + compatibility; link-Spotify prompt. | T44, T14, T82 | ◧ (T44: live listening **stats** + link-Spotify prompt done; **cluster + compatibility** deferred to T14, blocked on analytics. T82 hardens responsive listening layouts.) |
 | UI-7 | Analytics page renders real metrics/clusters; remove `CLUSTER_POINTS`. | T45 | ◻ |
@@ -65,6 +65,7 @@ The catalog of requirement IDs (`AUTH-*`, `BE-*`, …) and the **requirement →
 | UI-9 | Loading/empty/error states; no silent mock fallback. | T41, T44, T60, T80, T81, T83, T84, T85, T86 | ✅ (the live Jinja pages render real empty/error states — feed, profile — and the mock-fallback SPA was deleted in T60. T80/T81/T83 are polish follow-ups for visible failure, loading, and empty-state quality. T84 keeps optional profile enrichments from turning `/u/{handle}` into a 500. T85 prevents stale static assets from hiding those shipped UI states. T86 restores the edit form's collapsed initial state.) |
 | UI-10 | "Now playing" indicator on profile + feed. | T20, T44, T82 | ◧ (T44: own-profile badge done via me-scoped T20; **feed** badge + **other users'** now-playing need a new per-user endpoint — follow-up. T82 hardens the existing profile layout.) |
 | UI-11 | Editable profile: user bio + profile-picture upload. | T048, T83, T85, T86 | ✅ (T83 polishes the edit-profile controls, T85 ensures browsers load that design, and T86 keeps the form hidden until Edit profile is activated. No API behavior change.) |
+| UI-12 | Feed song cards are playable in place via the Spotify embed player (no auth needed; lazy-loaded on tap, one open player at a time). | T94 | ✅ |
 
 ## Layer 6 — Artist BTS Portal & Media (MEDIA)
 | ID | Acceptance | Ticket(s) | Status |

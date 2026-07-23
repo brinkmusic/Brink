@@ -84,6 +84,18 @@
         </div>
 
         <div class="comments artist-comments" data-post-id="{{ p.id }}">
+          {# The newest comments render right on the card (T95) — no click needed, like
+             Instagram. The full list + the add-comment box stay in the 💬 panel below. #}
+          {% if p.latest_comments %}
+          <ul class="comment-inline-list">
+            {% for c in p.latest_comments %}
+            <li class="comment-inline">
+              <a class="comment-inline-author" href="/u/{{ c.author_handle }}">{{ c.author }}</a>
+              <span class="comment-inline-body">{{ c.body }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
           <button
             type="button"
             class="comment-toggle"
@@ -91,7 +103,7 @@
             aria-controls="artist-comment-panel-{{ p.id }}"
             onclick="toggleArtistComments(this)"
           >
-            💬 <span class="comment-count">{{ p.comment_count }}</span>
+            💬 {% if p.comment_count > p.latest_comments | length %}View all {% endif %}<span class="comment-count">{{ p.comment_count }}</span>
           </button>
           <div id="artist-comment-panel-{{ p.id }}" class="comment-panel" hidden>
             <ul class="comment-list"></ul>
@@ -114,11 +126,24 @@
       </article>
       {% else %}
       <article class="post">
-        <div class="post-art">
+        {# The album art doubles as a play button (T94): tapping it asks player.js to open
+           Spotify's free embed player for this track right inside the card (and tapping again
+           closes it). It's a real <button> so keyboards and screen readers can use it too;
+           aria-expanded tracks whether the player is open. Works even when there's no art —
+           the gradient placeholder still shows and stays tappable. #}
+        <button
+          type="button"
+          class="post-art"
+          data-spotify-id="{{ p.spotify_id }}"
+          aria-label="Play {{ p.title }}"
+          aria-expanded="false"
+          onclick="togglePlayer(this)"
+        >
           {% if p.album_art %}
             <img src="{{ p.album_art }}" alt="" />
           {% endif %}
-        </div>
+          <span class="post-art-play" aria-hidden="true">▶</span>
+        </button>
         <div class="post-body">
           <p class="post-track">{{ p.title }}</p>
           <p class="post-artist">{{ p.artist }}</p>
@@ -147,9 +172,43 @@
             {% endfor %}
           </div>
 
-          {# Comments (T42). The button shows the count and opens a panel that lazily loads
-             this post's comments and offers a box to add one (see static/comments.js). #}
+          {# "Liked by X and N others" (T96): names the most recent reactor as social proof.
+             The line is a button — tapping it opens a small panel listing everyone who
+             reacted, fetched lazily by static/liked-by.js from the T96 API. Hidden entirely
+             when the post has no reactions. #}
+          {% if p.liked_by %}
+          {% set liked_others = (p.counts.values() | sum) - 1 %}
+          <div class="liked-by" data-post-id="{{ p.id }}">
+            <button
+              type="button"
+              class="liked-by-btn"
+              aria-expanded="false"
+              aria-controls="reactors-panel-{{ p.id }}"
+              onclick="toggleReactors(this)"
+            >
+              Liked by <b>{{ p.liked_by.displayName }}</b>{% if liked_others == 1 %} and 1 other{% elif liked_others > 1 %} and {{ liked_others }} others{% endif %}
+            </button>
+            <div id="reactors-panel-{{ p.id }}" class="reactors-panel" hidden>
+              <ul class="reactor-list"></ul>
+              <p class="reactors-status" aria-live="polite"></p>
+            </div>
+          </div>
+          {% endif %}
+
+          {# Comments (T42). Since T95 the newest few render right on the card, Instagram
+             style; the button opens a panel that lazily loads the FULL list and offers a
+             box to add one (see static/comments.js). #}
           <div class="comments" data-post-id="{{ p.id }}">
+            {% if p.latest_comments %}
+            <ul class="comment-inline-list">
+              {% for c in p.latest_comments %}
+              <li class="comment-inline">
+                <a class="comment-inline-author" href="/u/{{ c.author_handle }}">{{ c.author }}</a>
+                <span class="comment-inline-body">{{ c.body }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
             <button
               type="button"
               class="comment-toggle"
@@ -157,7 +216,7 @@
               aria-controls="comment-panel-{{ p.id }}"
               onclick="toggleComments(this)"
             >
-              💬 <span class="comment-count">{{ p.comment_count }}</span>
+              💬 {% if p.comment_count > p.latest_comments | length %}View all {% endif %}<span class="comment-count">{{ p.comment_count }}</span>
             </button>
             <div id="comment-panel-{{ p.id }}" class="comment-panel" hidden>
               <ul class="comment-list"></ul>
@@ -190,10 +249,15 @@
   {% endif %}
 </section>
 
-{# The small scripts that make the composer (T40), reactions (T11) and comments (T12) live. #}
+{# The small scripts that make the composer (T40), reactions (T11), comments (T12), the
+   liked-by reactors list (T96), the in-card Spotify player (T94) and the double-tap-to-heart
+   gesture (T97) live. double-tap.js must load AFTER reactions.js — it reuses its react(). #}
 <script src="/static/composer.js?v=85"></script>
 <script src="/static/reactions.js?v=85"></script>
 <script src="/static/comments.js?v=85"></script>
+<script src="/static/liked-by.js?v=96"></script>
+<script src="/static/player.js?v=94"></script>
+<script src="/static/double-tap.js?v=97"></script>
 {# When any artist behind-the-scenes post is present (T049), load its engagement script — the SAME
    one the artist profile uses (T54), which drives artistReact/toggleArtistComments/submitArtistComment. #}
 {% if posts | selectattr("kind", "equalto", "artist") | list %}

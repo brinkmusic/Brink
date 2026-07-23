@@ -281,6 +281,10 @@ class Reaction(SQLModel, table=True):
     type: ReactionType = Field(
         sa_column=Column("type", SAEnum(ReactionType, name="ReactionType"), nullable=False)
     )
+    # When the reaction was left (added in T96). WHY: "Liked by {most recent reactor}" and the
+    # newest-first reactors list need reactions ordered by time, and the row's random cuid id
+    # can't provide that. Existing rows were backfilled with the migration's CURRENT_TIMESTAMP.
+    created_at: datetime = _created_at()
 
 
 # A text comment a user left on a post.
