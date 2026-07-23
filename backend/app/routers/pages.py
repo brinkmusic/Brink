@@ -38,7 +38,7 @@ from app.models import (
 from app.routers.artist import UPLOAD_BUCKET
 from app.routers.feed import build_feed
 from app.routers.users import FOLLOW_LIST_LIMIT
-from app.security.supabase import create_signed_read_url
+from app.security.supabase import create_signed_read_url_or_blank
 from app.stats import listening_summary
 
 logger = logging.getLogger(__name__)
@@ -346,7 +346,7 @@ def _profile_data(
         artist_posts = [
             {
                 "id": post.id,
-                "image_url": _signed_artist_image_url(post.image_url),
+                "image_url": create_signed_read_url_or_blank(UPLOAD_BUCKET, post.image_url),
                 "caption": post.caption,
                 "when": _ago(post.created_at),
                 "reaction_counts": reaction_counts[post.id],
@@ -392,14 +392,6 @@ def _profile_data(
         "is_artist": person.is_artist,
         "artist_posts": artist_posts,
     }
-
-
-def _signed_artist_image_url(path: str) -> str:
-    try:
-        return create_signed_read_url(UPLOAD_BUCKET, path)
-    except Exception as e:  # noqa: BLE001 - a storage-signing issue should not 500 the profile
-        logger.warning("artist image signing failed for %s: %s", path, e)
-        return ""
 
 
 # A user's profile page: their header, a Follow/Unfollow button + follower counts (T43), and their
@@ -476,7 +468,9 @@ def artist_page(request: Request, session: Session = Depends(get_session)):
     # for each one here (T53), so the template gets an <img src> that actually displays.
     posts = [
         {
-            "image_url": create_signed_read_url(UPLOAD_BUCKET, post.image_url),
+            # Resilient signing (T103): "" on failure (logged) -> the template shows a placeholder,
+            # so one un-signable image can no longer 500 the whole artist page.
+            "image_url": create_signed_read_url_or_blank(UPLOAD_BUCKET, post.image_url),
             "caption": post.caption,
             "when": _ago(post.created_at),
         }

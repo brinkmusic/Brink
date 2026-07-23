@@ -73,7 +73,13 @@
           <a class="post-author" href="/u/{{ p.author_handle }}">{{ p.author }}</a>
           · behind the scenes · shared {{ p.when }}
         </p>
+        {# T103: image_url is "" when signing failed — show a muted placeholder, never a broken
+           <img> (an empty src). The card (caption + engagement) still renders fully. #}
+        {% if p.image_url %}
         <img class="artist-post-img" src="{{ p.image_url }}" alt="{{ p.caption }}" />
+        {% else %}
+        <div class="artist-post-img artist-post-img-missing" role="img" aria-label="Image unavailable"></div>
+        {% endif %}
         {% if p.caption %}<p class="artist-post-caption">{{ p.caption }}</p>{% endif %}
 
         {# Audience reactions on artist posts, backed by T52's /api/artist endpoints. #}

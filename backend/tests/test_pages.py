@@ -449,7 +449,7 @@ def test_feed_shows_followed_artist_post(client, db_session, monkeypatch):
     db_session.refresh(post)
     # The feed builder signs the private image path; stub it so no test hits Supabase.
     monkeypatch.setattr(
-        "app.routers.feed.create_signed_read_url",
+        "app.routers.feed.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     app.dependency_overrides[get_session] = lambda: db_session
@@ -649,7 +649,7 @@ def test_artist_profile_shows_artist_posts_to_fan(client, db_session, monkeypatc
     db_session.commit()
     db_session.refresh(post)
     monkeypatch.setattr(
-        "app.routers.pages.create_signed_read_url",
+        "app.routers.pages.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     app.dependency_overrides[get_session] = lambda: db_session
@@ -685,7 +685,7 @@ def test_artist_profile_owner_sees_engagement_summary(client, db_session, monkey
     db_session.add(ArtistComment(artist_post_id=post.id, user_id=fan.id, body="love this"))
     db_session.commit()
     monkeypatch.setattr(
-        "app.routers.pages.create_signed_read_url",
+        "app.routers.pages.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     app.dependency_overrides[get_session] = lambda: db_session
@@ -803,7 +803,7 @@ def test_artist_profile_ignores_artist_engagement_read_failure(client, db_sessio
     db_session.refresh(post)
 
     monkeypatch.setattr(
-        "app.routers.pages.create_signed_read_url",
+        "app.routers.pages.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     real_exec = db_session.exec
@@ -835,18 +835,20 @@ def test_artist_profile_omits_image_when_signing_fails(client, db_session, monke
                               caption="backstage warmup"))
     db_session.commit()
 
-    def boom(bucket, path):
+    # Make the UNDERLYING signer raise so the real resilient wrapper (T103) is exercised: it should
+    # swallow the error and return "", and the template then omits the <img>/shows a placeholder.
+    def boom(bucket, path, expires_in=3600):
         raise RuntimeError("storage signing unavailable")
 
-    monkeypatch.setattr("app.routers.pages.create_signed_read_url", boom)
+    monkeypatch.setattr("app.security.supabase.create_signed_read_url", boom)
     app.dependency_overrides[get_session] = lambda: db_session
     _login(client, monkeypatch)
 
     res = client.get("/u/stage-name")
     assert res.status_code == 200
-    assert "backstage warmup" in res.text
-    assert 'class="artist-post-img"' not in res.text
-    assert 'src=""' not in res.text
+    assert "backstage warmup" in res.text          # the post still renders (not a 500, not blank)
+    assert 'src=""' not in res.text                # never a broken <img> with an empty src
+    assert "artist-post-img-missing" in res.text   # the muted placeholder is shown instead
 
 
 # ---- T51: artist page + upload UI ----
@@ -904,7 +906,7 @@ def test_artist_page_shows_existing_posts(client, db_session, monkeypatch):
     # The bucket is private, so the page must sign a READ url for each stored path (T53). Stub the
     # helper so no test hits Supabase — it just wraps the raw path into a recognisable signed URL.
     monkeypatch.setattr(
-        "app.routers.pages.create_signed_read_url",
+        "app.routers.pages.create_signed_read_url_or_blank",
         lambda bucket, path: f"https://signed/{bucket}/{path}?token=readtok",
     )
     _login(client, monkeypatch)
@@ -929,7 +931,7 @@ def test_artist_page_signs_image_read_urls(client, db_session, monkeypatch):
         captured["path"] = path
         return "https://signed/read-url?token=readtok"
 
-    monkeypatch.setattr("app.routers.pages.create_signed_read_url", fake_sign)
+    monkeypatch.setattr("app.routers.pages.create_signed_read_url_or_blank", fake_sign)
     _login(client, monkeypatch)
 
     body = client.get("/artist").text
@@ -938,6 +940,30 @@ def test_artist_page_signs_image_read_urls(client, db_session, monkeypatch):
     # the rendered <img> uses the signed URL, and the raw path is NOT emitted as an src
     assert 'src="https://signed/read-url?token=readtok"' in body
     assert 'src="the-artist/x.jpg"' not in body
+
+
+# T103 resilience: the 2026-07-22 incident — a signing failure 500'd the whole artist page. Now the
+# page must render (200) with a muted placeholder instead of crashing. We make the UNDERLYING signer
+# raise so the real resilient wrapper handles it.
+def test_artist_page_survives_signing_failure(client, db_session, monkeypatch):
+    _ensure_artist_table(db_session)
+    artist = _seed_artist(db_session)
+    db_session.add(ArtistPost(artist_user_id=artist.id, image_url="the-artist/x.jpg",
+                              caption="tour dates soon"))
+    db_session.commit()
+    app.dependency_overrides[get_session] = lambda: db_session
+
+    def boom(bucket, path, expires_in=3600):
+        raise RuntimeError("StorageApiError: Object not found")
+
+    monkeypatch.setattr("app.security.supabase.create_signed_read_url", boom)
+    _login(client, monkeypatch)
+
+    res = client.get("/artist")
+    assert res.status_code == 200                  # NOT the 500 from the incident
+    assert "tour dates soon" in res.text           # the post still renders
+    assert 'src=""' not in res.text                # never a broken <img>
+    assert "artist-post-img-missing" in res.text   # the muted placeholder is shown instead
 
 
 # ---- T47: authenticated nav (feed / my profile / artist studio / log out) ----
