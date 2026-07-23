@@ -37,7 +37,9 @@ The frontend is the Jinja/HTMX pages under `backend/app/` above.)*
 
 ## Commands
 
-Local dev reads the root `.env` (the `brink-dev` Supabase project), so it never touches production.
+Local dev reads the root `.env` (the `brink-dev` Supabase project). **Careful: the deployed Render
+app uses the SAME database** (confirmed 2026-07-23; split tracked in T99) — local writes are
+visible in production, so treat local dev as production until T99 lands.
 
 ```
 # The whole app â€” one process. The FastAPI app serves BOTH the JSON API and the HTML pages
@@ -174,7 +176,10 @@ must use `ALTER TABLE ... SET SCHEMA` (preserves rows) â€” never autogenera
 ## Environment
 
 - Supabase project `brink-dev` (ref `ljzwskfhiviunmqxerwu`). Data API disabled â€” tables are
-  reached only through the backend's ORM (SQLModel/SQLAlchemy).
+  reached only through the backend's ORM (SQLModel/SQLAlchemy). **This is currently the ONLY
+  database: the deployed Render service points at it too** (confirmed 2026-07-23) — there is no
+  separate production DB yet. `T99` (backlog) tracks the split, deliberately deferred past the
+  2026-07-30 deadline.
 - Root `.env`: `DATABASE_URL`/`DIRECT_URL` (Supabase pooler 6543/5432), `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`, `SPOTIFY_CLIENT_ID`/`SECRET`, `TOKEN_ENC_KEY`.
 - **Getting the values (onboarding):** the `.env` file is git-ignored and never shared in the
@@ -219,6 +224,10 @@ agents, not a changelog.
 
 ## Watch-outs
 
+- **Dev and production share one database** (the `brink-dev` Supabase project — confirmed
+  2026-07-23, split tracked in `T99`, deferred past the deadline). Until then: no destructive
+  local experiments, no throwaway seed data you wouldn't demo, and remember any local write is
+  live for real users. One upside: a migration run locally is already applied for production.
 - Spotify `provider_token` from the browser lasts about 1 hour and is **not** refreshed by Supabase.
   Server/long-term Spotify access must go through our stored refresh token path (T22/T21).
 - Supabase redirect allow-lists matter for auth: deployed and localhost `/auth/callback` and
