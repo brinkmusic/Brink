@@ -256,6 +256,32 @@ def test_feed_shows_comment_section_and_count(client, db_session, monkeypatch):
     assert 'class="comment-count">1<' in body
 
 
+# ---- T95: the latest comments render inline on the card (Instagram-style) ----
+
+
+def test_feed_renders_latest_comments_inline(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    db_session.add(Track(spotify_id="t_ic", title="Chatty Song", artist_name="Artist"))
+    db_session.commit()
+    post = Post(user_id=viewer.id, track_id="t_ic", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    db_session.add(Comment(post_id=post.id, user_id=viewer.id, body="so good live"))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    # The comment shows on the card itself — no click needed — with its author linked.
+    assert "so good live" in body
+    assert 'class="comment-inline-list"' in body
+    assert 'class="comment-inline-author" href="/u/viewer"' in body
+    # The existing toggle/panel machinery is still there for "view all + add a comment".
+    assert 'onclick="toggleComments(this)"' in body
+
+
 # ---- T40: the composer (search + share a song) renders on the feed ----
 
 
