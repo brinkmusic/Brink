@@ -67,7 +67,12 @@ def _url() -> str:
     # (a direct connection, best for schema changes), falling back to DATABASE_URL.
     override = context.get_x_argument(as_dictionary=True).get("dburl")
     if override:
-        return override
+        # Normalize the pasted address too — the same driver/pgbouncer fixes the settings
+        # path gets below. WHY: a raw dashboard URL says "postgresql://", which SQLAlchemy
+        # routes to the psycopg2 driver we don't install; without this the one-off command
+        # crashes with "No module named psycopg2" (the T98 bug, hit during the T96
+        # production migration).
+        return normalize_url(override)
     settings = get_settings()
     return normalize_url(settings.direct_url or settings.database_url)
 
