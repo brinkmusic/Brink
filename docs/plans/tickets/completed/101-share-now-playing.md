@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: High
 complexity: Small
 category: Feature
@@ -78,11 +78,33 @@ breaks.
 | `docs/plans/tickets/README.md` | MODIFY | record completion (at close-out) |
 
 ## Testing Checklist
-- [ ] the button renders in the composer and is wired to the new handler
-- [ ] composer.js fetches `/api/me/now-playing` and handles the null case via the status line
-- [ ] a now-playing selection publishes with `source: "SPOTIFY"`; search flow stays `MANUAL`
-- [ ] status/disabled states follow the T81 conventions
-- [ ] full backend suite passes
+- [x] the button renders in the composer and is wired to the new handler
+- [x] composer.js fetches `/api/me/now-playing` and handles the null case via the status line
+- [x] a now-playing selection publishes with `source: "SPOTIFY"`; search flow stays `MANUAL`
+- [x] status/disabled states follow the T81 conventions
+- [x] full backend suite passes (276 passed)
+
+## Outcome (as built)
+- **Button:** "🎧 Share what you're hearing" in the composer card (`templates/feed.html`), a
+  `.btn.btn-ghost.composer-nowplaying` wired to `shareNowPlaying(this)`, `aria-controls` the
+  existing `#composer-status` line.
+- **Behavior (`static/composer.js`):** `shareNowPlaying()` sets an `aria-busy`/disabled state,
+  fetches `GET /api/me/now-playing`, and on a non-null `data.track` drops it into the **existing**
+  selected-track step via `selectTrack(section, track, "SPOTIFY")` — so caption + Share + Cancel
+  all work unchanged. Null case (nothing playing / no linked Spotify / outage — all `data: null`)
+  writes the friendly "Nothing playing right now…" status and leaves the composer untouched.
+  `selectTrack` gained a `source` param (defaults `"MANUAL"`); `composerPublish` now sends
+  `section._source` so search posts stay `MANUAL` and now-playing posts publish `SPOTIFY`.
+- **No new endpoint / no new posting code** — reuses T20 now-playing + T10 `POST /api/posts`.
+  `PostSource.SPOTIFY` distinguishes these posts; feed renders both kinds identically (v1, no
+  template change).
+- **CSS:** one `.composer-nowplaying` placement rule; colour/states reuse the shared `.btn` system.
+- **Tests:** `test_pages.py` (button markup wired + composer.js source asserts the now-playing
+  fetch, `"SPOTIFY"` source, and null-case copy); `test_posts.py` adds a `SPOTIFY`-source
+  create round-trip (was uncovered at the API level).
+- **Deliberately out of scope:** recent-plays fallback chips when nothing is playing, any feed
+  rendering change for SPOTIFY posts, and zero-tap auto-posting (the norm is one tap *to* the
+  composer, user always confirms).
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable
