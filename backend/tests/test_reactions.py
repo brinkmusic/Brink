@@ -142,3 +142,70 @@ def test_delete_only_removes_own_reaction(client, as_user, db_session):
     # user-1's reaction is untouched; the count still shows it.
     assert res.json()["data"]["counts"]["HEART"] == 1
     assert len(db_session.exec(select(Reaction)).all()) == 1
+
+
+# --- T96: GET /api/posts/{id}/reactions (who reacted) -------------------------------
+
+# The extra imports give reactions DISTINCT timestamps so "newest first" is deterministic
+# (the T96 createdAt column orders the reactors list) and let tests name reaction types.
+from datetime import timedelta
+
+from app.models import ReactionType
+
+_T0 = datetime(2026, 7, 22, 12, 0, 0)
+
+
+# Listing who reacted requires a login, like every other social read (Brink is private).
+def test_list_reactors_unauthenticated_returns_401(client):
+    def raise_auth_error():
+        raise AuthError("invalid session")
+
+    app.dependency_overrides[require_user] = raise_auth_error
+    app.dependency_overrides[get_session] = lambda: None
+    res = client.get("/api/posts/post-1/reactions")
+    assert res.status_code == 401
+
+
+# Asking who reacted to a post that doesn't exist -> a clean 404.
+def test_list_reactors_missing_post_returns_404(client, as_user, db_session):
+    as_user(_user(), session=db_session)
+    res = client.get("/api/posts/nope/reactions")
+    assert res.status_code == 404
+
+
+# The list is one entry per UNIQUE reactor (their reaction types combined), ordered by their
+# most recent reaction, newest first — and it exposes only public author fields (ADR-0012).
+def test_list_reactors_groups_by_user_newest_first(client, as_user, db_session):
+    _seed_post(db_session)
+    db_session.add(_user("user-1"))
+    db_session.add(_user("user-2"))
+    db_session.commit()
+    # user-1 hearts first, user-2 sparkles second, user-1 fires third (their most recent).
+    db_session.add(Reaction(post_id="post-1", user_id="user-1", type=ReactionType.HEART,
+                            created_at=_T0))
+    db_session.add(Reaction(post_id="post-1", user_id="user-2", type=ReactionType.SPARKLE,
+                            created_at=_T0 + timedelta(minutes=1)))
+    db_session.add(Reaction(post_id="post-1", user_id="user-1", type=ReactionType.FIRE,
+                            created_at=_T0 + timedelta(minutes=2)))
+    db_session.commit()
+    as_user(_user("viewer"), session=db_session)
+
+    res = client.get("/api/posts/post-1/reactions")
+    assert res.status_code == 200
+    reactors = res.json()["data"]["reactors"]
+    # user-1's latest reaction (the FIRE) is newest overall, so they lead the list.
+    assert [r["handle"] for r in reactors] == ["user-1", "user-2"]
+    # Types are combined per user, listed newest-first as encountered.
+    assert reactors[0]["types"] == ["FIRE", "HEART"]
+    assert reactors[1]["types"] == ["SPARKLE"]
+    # Only the public author fields + types — never an email or internal id.
+    assert set(reactors[0].keys()) == {"displayName", "handle", "avatarUrl", "types"}
+
+
+# A post with no reactions returns an empty list (a stable shape, not an error).
+def test_list_reactors_empty(client, as_user, db_session):
+    _seed_post(db_session)
+    as_user(_user(), session=db_session)
+    res = client.get("/api/posts/post-1/reactions")
+    assert res.status_code == 200
+    assert res.json()["data"]["reactors"] == []

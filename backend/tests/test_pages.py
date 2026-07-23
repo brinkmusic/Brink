@@ -854,3 +854,35 @@ def test_nav_logged_in_on_home_page(client, db_session, monkeypatch):
     body = client.get("/").text
     assert 'href="/feed"' in body
     assert 'href="/auth/logout"' in body
+
+
+# ---- T96: the "Liked by X and N others" line renders on song cards ----
+
+
+def test_feed_renders_liked_by_line(client, db_session, monkeypatch):
+    viewer = _seed_viewer(db_session)
+    other = User(handle="fan", display_name="Fan One", created_at=datetime.now(timezone.utc))
+    db_session.add(other)
+    db_session.add(Track(spotify_id="t_lb", title="Popular Song", artist_name="Artist"))
+    db_session.commit()
+    db_session.refresh(other)
+    post = Post(user_id=viewer.id, track_id="t_lb", source=PostSource.MANUAL)
+    db_session.add(post)
+    db_session.commit()
+    db_session.refresh(post)
+    # Two reactions: the viewer's is older, Fan One's is the most recent.
+    db_session.add(Reaction(post_id=post.id, user_id=viewer.id, type=ReactionType.HEART,
+                            created_at=datetime(2026, 7, 22, 11, 0, 0)))
+    db_session.add(Reaction(post_id=post.id, user_id=other.id, type=ReactionType.FIRE,
+                            created_at=datetime(2026, 7, 22, 12, 0, 0)))
+    db_session.commit()
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    _login(client, monkeypatch)
+
+    body = client.get("/feed").text
+    assert "Liked by" in body
+    assert "Fan One" in body            # the most recent reactor is named
+    assert "and 1 other" in body        # 2 total reactions -> "and 1 other"
+    assert "toggleReactors(this)" in body   # the line opens the reactors list
+    assert "/static/liked-by.js" in body    # the script is loaded

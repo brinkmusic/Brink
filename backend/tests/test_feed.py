@@ -247,3 +247,27 @@ def test_feed_artist_item_carries_engagement(client, as_user, db_session, monkey
     assert item["reactionCounts"] == {"HEART": 1, "FIRE": 1, "SPARKLE": 0}
     assert item["commentCount"] == 2
     assert item["viewerReactions"] == {"HEART": True, "FIRE": False, "SPARKLE": False}
+
+
+# ---- T96: each song post names its most recent reactor ("Liked by X and N others") ----
+
+
+# likedBy carries the public author fields of whoever reacted MOST RECENTLY, and is null on
+# a post with no reactions (a stable shape the template can branch on).
+def test_feed_post_carries_most_recent_reactor(client, as_user, db_session):
+    _seed_world(db_session)
+    # friend hearts first, me fires later -> me is the most recent reactor.
+    db_session.add(Reaction(post_id="p-friend", user_id="friend", type=ReactionType.HEART,
+                            created_at=NOW - timedelta(minutes=2)))
+    db_session.add(Reaction(post_id="p-friend", user_id="me", type=ReactionType.FIRE,
+                            created_at=NOW - timedelta(minutes=1)))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    res = client.get("/api/feed")
+    data = res.json()["data"]
+    friend_post = next(p for p in data if p["id"] == "p-friend")
+    assert friend_post["likedBy"] == {"displayName": "me", "handle": "me", "avatarUrl": None}
+    # The viewer's own unreacted post has no likedBy.
+    own_post = next(p for p in data if p["id"] == "p-me")
+    assert own_post["likedBy"] is None
