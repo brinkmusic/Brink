@@ -164,6 +164,13 @@
             · shared {{ p.when }}
           </p>
 
+          {# Play-count endorsement (T102): how many times the AUTHOR has actually played this track.
+             Only shown from 2 up — a single play just means "they heard it once", not a signal — so
+             the "1 time" wording can never appear. Muted, sits just under the meta line. #}
+          {% if p.author_play_count >= 2 %}
+          <p class="post-plays">▶ played {{ p.author_play_count }} times by {{ p.author }}</p>
+          {% endif %}
+
           {# Reaction bar. data-post-id tells the script which post to react to; each
              button carries its type. "reacted" marks the ones this viewer already tapped. #}
           <div class="reactions" data-post-id="{{ p.id }}">

@@ -163,6 +163,9 @@ def _feed_items(session: Session, user) -> list[dict]:
             common["spotify_id"] = it["track"]["spotifyId"]
             # The most recent reactor (or None) for the "Liked by X and N others" line (T96).
             common["liked_by"] = it["likedBy"]
+            # How many times the author has played this track (T102) — the card shows the
+            # "played N times by {author}" line only from 2 up (see the template threshold).
+            common["author_play_count"] = it["authorPlayCount"]
         items.append(common)
     return items
 

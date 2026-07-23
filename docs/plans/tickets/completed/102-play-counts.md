@@ -1,5 +1,5 @@
 ---
-status: Backlog
+status: Completed
 priority: Medium
 complexity: Small
 category: Feature
@@ -86,12 +86,34 @@ following the established no-N+1 pattern.
 | `docs/plans/tickets/README.md` | MODIFY | record completion (at close-out) |
 
 ## Testing Checklist
-- [ ] feed item carries `authorPlayCount` (seeded N; 0 when the author never played it)
-- [ ] the count is the AUTHOR's plays of THAT track (not the viewer's, not other tracks)
-- [ ] card hides the line at 0–1 plays, shows it at 2+
-- [ ] artist posts unaffected
-- [ ] no N+1: still a fixed number of feed queries
-- [ ] full backend suite passes
+- [x] feed item carries `authorPlayCount` (seeded N; 0 when the author never played it)
+- [x] the count is the AUTHOR's plays of THAT track (not the viewer's, not other tracks)
+- [x] card hides the line at 0–1 plays, shows it at 2+
+- [x] artist posts unaffected (they carry no track; `authorPlayCount` is a song-item-only field)
+- [x] no N+1: still a fixed number of feed queries (one added grouped query, batched like the rest)
+- [x] full backend suite passes (279 passed)
+
+## Outcome (as built)
+- **DTO:** `FeedPostOut.author_play_count: int = 0` (alias `authorPlayCount`) in `schemas.py` —
+  always present, stable-shape default 0. Artist items (`ArtistFeedPostOut`) are untouched (no
+  track to count).
+- **Query:** `_build_song_items()` in `routers/feed.py` adds ONE batched grouped query over
+  `silver.Play` for the exact `(user_id, track_id)` pairs in the feed batch, using
+  `tuple_(Play.user_id, Play.track_id).in_([...])` (row-value IN — chose the `tuple_` option; works
+  on Postgres and the SQLite test DB). Result keyed `(author, track) -> count`, assigned per post
+  via `.get(..., 0)`. No N+1 — structurally identical to the existing reaction/comment/liked-by
+  batches.
+- **Page + template:** `pages.py::_feed_items()` passes `author_play_count` through on the song
+  branch; `feed.html` renders `<p class="post-plays">▶ played {N} times by {author}</p>` **only
+  when `author_play_count >= 2`**, so the "1 time" wording never appears. Muted `.post-plays`
+  styling in `brink.css`, consistent with `.post-meta`.
+- **Profile:** left unchanged — `profile.html` already shows `{{ t.plays }} plays` on top tracks
+  (T44), so the "display existing count if missing" clause did not apply (verified, not duplicated).
+- **Tests:** `test_feed.py` (author's count + 0 default; author-and-track-specific, excluding the
+  viewer's plays and the author's plays of other tracks); `test_pages.py` (3 plays → line shown,
+  1 play → line hidden).
+- **Out of scope (unchanged):** viewer's own play count on others' posts, time-windowed counts, any
+  new endpoint.
 
 ## Readiness Checklist
 - [x] Summary is specific and actionable

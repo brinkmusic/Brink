@@ -17,6 +17,7 @@ from app.models import (
     ArtistReaction,
     Comment,
     Follow,
+    Play,
     Post,
     PostSource,
     Reaction,
@@ -119,6 +120,44 @@ def test_feed_post_includes_author(client, as_user, db_session):
     res = client.get("/api/feed")
     friend_post = next(p for p in res.json()["data"] if p["id"] == "p-friend")
     assert friend_post["author"] == {"displayName": "friend", "handle": "friend", "avatarUrl": None}
+
+
+# --- T102: play counts ("played N times by {author}") -----------------------------
+
+# A song feed item carries authorPlayCount: how many times the POST'S AUTHOR has played the shared
+# track. It defaults to 0 (stable shape) for a post whose author never played that track.
+def test_feed_post_carries_author_play_count(client, as_user, db_session):
+    _seed_world(db_session)
+    # The friend played spot-1 three times (distinct times — Play is unique on (userId, playedAt)).
+    for i in range(3):
+        db_session.add(Play(user_id="friend", track_id="spot-1", played_at=NOW - timedelta(hours=i)))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    data = client.get("/api/feed").json()["data"]
+    friend_post = next(p for p in data if p["id"] == "p-friend")
+    my_post = next(p for p in data if p["id"] == "p-me")
+    assert friend_post["authorPlayCount"] == 3
+    assert my_post["authorPlayCount"] == 0   # I (the viewer) never played spot-1
+
+
+# The count is the AUTHOR's plays of THAT track — not the viewer's plays, and not the author's plays
+# of some other track. Both kinds of noise must be excluded.
+def test_feed_author_play_count_is_author_and_track_specific(client, as_user, db_session):
+    _seed_world(db_session)
+    db_session.add(Track(spotify_id="spot-2", title="B", artist_name="Y"))
+    db_session.commit()
+    # Counts: the friend played the POSTED track (spot-1) twice.
+    db_session.add(Play(user_id="friend", track_id="spot-1", played_at=NOW - timedelta(hours=1)))
+    db_session.add(Play(user_id="friend", track_id="spot-1", played_at=NOW - timedelta(hours=2)))
+    # Noise that must NOT count: the friend played a DIFFERENT track, and the VIEWER played spot-1.
+    db_session.add(Play(user_id="friend", track_id="spot-2", played_at=NOW - timedelta(hours=3)))
+    db_session.add(Play(user_id="me", track_id="spot-1", played_at=NOW - timedelta(hours=4)))
+    db_session.commit()
+    as_user(_user("me", "me"), session=db_session)
+
+    friend_post = next(p for p in client.get("/api/feed").json()["data"] if p["id"] == "p-friend")
+    assert friend_post["authorPlayCount"] == 2
 
 
 # Unfollowing a user drops their posts from the feed.

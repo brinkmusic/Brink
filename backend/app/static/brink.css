@@ -445,6 +445,8 @@ body {
 .post-artist { margin: 0.1rem 0 0; color: var(--mute); font-size: 0.85rem; }
 .post-caption { margin: 0.4rem 0 0; font-size: 0.9rem; color: var(--text); font-style: italic; }
 .post-meta { margin: 0.4rem 0 0; color: var(--mute); font-size: 0.75rem; }
+/* T102: the "▶ played N times by {author}" endorsement line — muted, consistent with .post-meta. */
+.post-plays { margin: 0.25rem 0 0; color: var(--mute); font-size: 0.75rem; }
 
 /* ---- Double-tap to heart (T97) ---- */
 /* The card anchors the floating heart (position: relative makes the heart's absolute
